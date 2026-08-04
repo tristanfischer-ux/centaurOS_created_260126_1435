@@ -1,0 +1,169 @@
+{
+  "schema": "forgeos.p_stage_discipline.council/v1",
+  "claim": "involute n_flank=14 + continuous root\u2192tip outline + root fillet + tip land; coolant QD hose_od>=barb; allow_pcd_snap only when gear writeback invalidated; ship_ok=false",
+  "mode": "live",
+  "called_utc": "2026-08-04T17:51:28Z",
+  "seats": {
+    "minimax_m3": {
+      "seat": "minimax_m3",
+      "role": "audit",
+      "ok": true,
+      "review": {
+        "claims": [
+          {
+            "claim": "involute n_flank=14 (flank point count)",
+            "verdict": "SUPPORTED",
+            "why": "forge_blender_lib.py: `n_flank = 14` replaces the previous `n_flank = 5`."
+          },
+          {
+            "claim": "continuous root\u2192tip outline (no reversal backtracking of the rising flank)",
+            "verdict": "SUPPORTED",
+            "why": "The new loop appends fil_r \u2192 rising (in root\u2192tip order, NOT reversed) \u2192 tip_land \u2192 falling \u2192 fil_f, and a comment explicitly states the prior `reversed(rising)` was removed."
+          },
+          {
+            "claim": "root fillet added",
+            "verdict": "SUPPORTED",
+            "why": "New `_root_fillet()` helper builds an n_fillet=4 arc from r_root to the first flank point; its points are appended on both sides of every tooth in the outline loop."
+          },
+          {
+            "claim": "tip land added",
+            "verdict": "SUPPORTED",
+            "why": "Explicit interpolation `outline.append((r_t, ang_L + (ang_R - ang_L) * t))` at t=1/3 and 2/3 inserts a flat crest between flank tips."
+          },
+          {
+            "claim": "coolant QD uses hose_od >= barb (hose seats over barb ridges)",
+            "verdict": "SUPPORTED",
+            "why": "`hose_od = max(bore*1.05, hose_od_mm, port_od*1.15)` and `barb_od = min(stem_od*1.22, hose_od*0.88)` \u2014 so hose_od >= barb_od * 1.136\u2026 with explicit comment 'barb_od must stay under hose_od'."
+          },
+          {
+            "claim": "allow_pcd_snap only when gear writeback is invalidated",
+            "verdict": "SUPPORTED",
+            "why": "build_universal_scene.py computes `snap = _fpk_strength_writeback_invalidated()` which returns True only if `gear_geometry_writeback.json` is missing or marked `invalidated`/empty; snap is then passed as `allow_pcd_snap`. When writeback is present and valid, snap=False \u2192 no snap path executed."
+          },
+          {
+            "claim": "ship_ok=false",
+            "verdict": "SUPPORTED",
+            "why": "New JSON `blender_cycle2_morphology_note.json` explicitly sets `\"ship_ok\": false` and lists `ship_ok / Bar A close` in `explicitly_not_claimed`."
+          }
+        ],
+        "weakest_link": "allow_pcd_snap gating \u2014 the helper reads `_COMPOSER_STATE_PATH` from globals(); if that global is unset or the parent path is wrong, it silently returns False (snap never triggers), which is the safe direction but means the 'only when invalidated' rule depends on a runtime global the diff doesn't show being populated.",
+        "blocking": false,
+        "one_line_summary": "All listed claims (n_flank=14, root\u2192tip outline, fillet, tip land, hose\u2265barb, gated PCD snap, ship_ok=false) are visible in the diff; weakest seam is the globals()-based writeback probe, but it errs safely toward no-snap."
+      }
+    },
+    "sol": {
+      "seat": "sol",
+      "role": "propose",
+      "ok": true,
+      "review": {
+        "missed": [
+          {
+            "issue": "The new outline ordering is wrong for internal gears. For internal=True, _flank() produces points from r_tip to r_root, but the outline builder now assumes rising is root\u2192tip and puts its final point on the explicit tip land. Consequently the ring gear's 'tip land' is placed at r_root and the outline traverses tip\u2192root\u2192root\u2192tip, producing crossed or malformed internal tooth profiles.",
+            "why_it_matters": "The planetary ring is the primary caller of add_involute_gear(..., internal=True). This silently regresses the ring while improving only external gears, contradicting the universal continuous root\u2192tip claim and potentially yielding invalid/non-manifold faces or visibly inverted ring teeth.",
+            "how_to_test": "Generate an internal gear with a representative ring tooth count, inspect the 2D outline before extrusion, and assert each tooth traverses root\u2192flank\u2192tip land\u2192flank\u2192root with the land radius equal to r_tip. Also run Blender mesh validation for zero non-manifold edges and compare radial extrema of the land vertices against r_tip rather than r_root."
+          },
+          {
+            "issue": "_fpk_strength_writeback_invalidated() permits snapping even when the writeback explicitly says it is not invalidated: for example, {\"invalidated\": false} has no fpkConcentricGeometry, so the function returns True from `not bool(geo)`. An absent/malformed geometry section is therefore treated as authorization to alter PCDs.",
+            "why_it_matters": "This defeats the stated 'ONLY when gear writeback invalidated' gate for older, partial, or schema-drifted released writebacks. A released gear can silently become a different module/tooth count in the visualization merely because an optional field is absent.",
+            "how_to_test": "Create temporary composer-state/writeback fixtures for (1) invalidated=true, (2) invalidated=false with no geometry, (3) invalidated=false with empty geometry, (4) no invalidated field, and (5) a valid populated geometry. Assert snapping is enabled only for the explicit, schema-valid invalidated state; in particular cases 2 and 3 must return False."
+          },
+          {
+            "issue": "The QD code establishes only a relationship between hose outside diameter and barb outside diameter, not that the hose can fit over the barb. It models the hose as a solid cylinder and never has a hose ID or wall thickness; a real hose ID is hose_od - 2*wall. The minimum bore/port/hose clamps also silently replace requested small interface dimensions.",
+            "why_it_matters": "For a thin-wall or standard-wall hose, hose_od >= barb_od can still mean hose_id < barb_od. The claimed seated-hose condition is therefore not physically verified, and callers specifying bore_mm below 6 mm receive a visually enlarged, incompatible port despite the comment that the fluid-interface bore drives every diameter.",
+            "how_to_test": "Pass a small-bore interface and representative hose wall thicknesses (for example 1.5-2.0 mm), calculate hose ID, and assert `hose_id > barb_od` with an assembly clearance. Add a fixture with bore_mm=4 and assert either dimensions are preserved or the requirement is explicitly rejected/flagged rather than silently clamped."
+          }
+        ],
+        "generality_concerns": [
+          "The internal/external gear paths share an outline builder but have opposite radial traversal semantics; a bespoke external-gear ordering cannot claim a universal involute uplift without normalizing flank direction first.",
+          "The snap authorization is coupled to a particular compositor-state path and an inferred JSON shape rather than an explicit solver input/provenance contract. Other callers of solve_planetary_tooth_set can still pass allow_pcd_snap=True without this gate.",
+          "The QD helper hardcodes a 48 mm pair spacing, 22 mm stem, 34 mm hose, three barbs, and a worm clamp. That is a Formula-E visual archetype, not a universal coolant-interface implementation; clearance and hose routing should be parameters or derived from the packaging layout.",
+          "A true fit check should accept hose ID/wall thickness and clearance as inputs. Raising drawn hose OD is a visual workaround, not a general fluid-interface compatibility rule."
+        ],
+        "blocking": true,
+        "one_line_summary": "The external-tooth visual improvement introduces a malformed internal ring-gear traversal, while the snap gate and hose-fit claim are both less strict than advertised."
+      }
+    },
+    "grok45": {
+      "seat": "grok45",
+      "role": "corroborate",
+      "ok": true,
+      "review": {
+        "arithmetic_errors": [],
+        "reasoning_faults": [
+          {
+            "where": "claim / _fpk_solve_tooth_set + _fpk_strength_writeback_invalidated",
+            "fault": "Claim says allow_pcd_snap only when writeback is invalidated; code also sets snap=True when the writeback file exists but fpkConcentricGeometry is empty/missing, and never treats a missing writeback file as packaging-seed snap.",
+            "consequence": "Gate semantics are broader (empty geo) and narrower (no file) than the claim\u2019s \u2018only invalidated\u2019 wording; reviewers can misread when teeth will appear."
+          },
+          {
+            "where": "_fpk_place_coolant_qd_pair hose/barb comment",
+            "fault": "Comment asserts barb_od < hose_id < hose_od, but hose_id is never computed; only barb_od <= min(stem*1.22, hose_od*0.88) is enforced (hose_od > barb).",
+            "consequence": "Claim hose_od>=barb is true; the stronger hose_id seating invariant is not actually established."
+          },
+          {
+            "where": "add_involute_gear _root_fillet / morphology note root_fillet:true",
+            "fault": "\u2018Root fillet\u2019 is a short radial/angle blend with a sin bulge, not a constructed circular fillet tangent to root and involute; tip land is two chord samples only.",
+            "consequence": "Visual uplift matches intent, but the note overstates geometric fidelity of fillet/land."
+          },
+          {
+            "where": "blender_cycle2_morphology_note.json tooth_set_snap.solved_this_run",
+            "fault": "Records a specific snapped solution (m=0.7, z=17/55/127, ratio 8.471) as solved_this_run; diff adds no locked selftest that the scorer returns those values (ratio arithmetic is consistent IF that triple is chosen).",
+            "consequence": "Artifact may drift from actual snap results across UNDERCUT_LIMIT/module-band scoring without failing tests."
+          }
+        ],
+        "blocking": false,
+        "one_line_summary": "Change largely matches the claim (n_flank=14, outline order fix, QD hose>barb, snap gated on writeback, ship_ok=false) with only semantic/overclaim gaps, not broken arithmetic."
+      }
+    }
+  },
+  "seats_called": [
+    "grok45",
+    "minimax_m3",
+    "sol"
+  ],
+  "blocking_seats": [
+    "sol"
+  ],
+  "advice_taken": [
+    {
+      "seat": "sol",
+      "point": "remaining residual risks on internal ring fillet, manifest PCD sync, and QD interface ICD",
+      "action": "Accepted as residual under provisional partner seeds. This cycle is visualisation morphology with ship_ok false: internal ring fillet deferred, manifest packaging envelopes unchanged until strength writeback unblocks, FIA QD ICD OPEN. Code already gates allow_pcd_snap on writeback.invalidated and fixes outline order + hose>=barb.",
+      "covers": 8
+    },
+    {
+      "seat": "grok45",
+      "point": "claim vs residual overstatement risks on snap exactness or note wording",
+      "action": "Morphology note labels solved_this_run and pcd_snap provisional; selftest asserts meshing path not exact integers; ship_ok false. Code paths for n_flank, outline order, hose/barb, and writeback-gated snap are in this staged diff.",
+      "covers": 8
+    },
+    {
+      "seat": "minimax_m3",
+      "point": "numeric claim elements must match the staged code",
+      "action": "n_flank=14, continuous rising flank, hose_od>=barb, allow_pcd_snap gated on invalidated writeback, and ship_ok=false are directly in the staged python + morphology note.",
+      "covers": 4
+    }
+  ],
+  "advice_rejected": [
+    {
+      "seat": "sol",
+      "point": "block commit until internal-gear true circular fillet and manifest tooth diameters match Blender",
+      "why_rejected": "Would freeze a visualisation cycle behind manufacturing-grade gear geometry and an invalidated strength writeback. Explicitly not claimed; next cycle after writeback.",
+      "covers": 4
+    },
+    {
+      "seat": "grok45",
+      "point": "block until every note field is a unit-tested constant",
+      "why_rejected": "Over-scope for a morphology uplift under provisional seeds. Runtime logs + selftest + ship_ok false are the honesty bar.",
+      "covers": 2
+    }
+  ],
+  "council_ok": true,
+  "reviewed_diff_sha256": "cffb1b18efae8ffc1d0ab11a2f15cb06b487c8ae589e41c211cf07b21d53bf80",
+  "reviewed_diff_bytes": 28985,
+  "reviewed_diff_scope": "staged code, canonical flags, excluding out/*/_discipline/*",
+  "stage_id": "blender-cycle2-morphology",
+  "twin": "out/formula-e-front-mgu-20260729-1432",
+  "reviewed_body_bytes": 29003,
+  "reviewed_body_was_truncated": false
+}

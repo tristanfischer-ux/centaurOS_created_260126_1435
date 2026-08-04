@@ -1,0 +1,13 @@
+{
+  "schema": "forgeos.p_stage_discipline.plan_fit/v1",
+  "stage_id": "blender-cycle2-morphology",
+  "intent": "Second Blender cycle: better involute gear teeth and coolant QD ports now that kit hierarchy tags exist; provisional visualisation under partner seeds",
+  "maps_to_plan_item": "FE full no-Jack uplift / better Blender morphology (cycle-2 after kit tags)",
+  "why_now": "",
+  "explicitly_not_doing": [],
+  "depends_on": [],
+  "success_criteria": [],
+  "ship_ok_unchanged": true,
+  "twin": "out/formula-e-front-mgu-20260729-1432",
+  "created_utc": "2026-08-04T17:39:06Z"
+}

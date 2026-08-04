@@ -20046,6 +20046,231 @@ def _fpk_draw_principal_vehicle_routes(
     )
 
 
+def _fpk_place_coolant_qd_pair(
+    *,
+    x_motor,
+    y_face,
+    z_port,
+    bore_mm,
+    port_od_mm,
+    hose_od_mm,
+    mat_alum,
+    mat_port,
+    mat_rubber,
+    mat_fast,
+    mat_steel,
+    story_mod,
+    MO,
+    _mm3,
+    spacing_mm=48.0,
+):
+    """Race-style coolant quick-disconnect pair on the pack service face.
+
+    INTENT (2026-08-04 cycle-2 / Tristan "better teeth in coolant ports"):
+    stacked plain cylinders read as hose stubs. A vehicle QD is a compound:
+      housing boss → hex body → coloured lock collar → multi-barb nipple
+      → hose → worm-drive clamp.
+    Principal mesh names ``u_se_td_coolant_in`` / ``_out`` stay the stem so
+    authenticity roles and exterior-keep rules keep working.
+    All dims millimetres in, metres via fl.MM at the primitive boundary.
+    Axis of each QD runs −Y (out of the service face).
+    """
+    bore = max(6.0, float(bore_mm))
+    port_od = max(bore * 1.2, float(port_od_mm))
+    # Hose must fit OVER the barb ridges. Form-grammar route_od can sit under
+    # port_od; lift the drawn hose OD so barb_od < hose_id < hose_od.
+    hose_od = max(bore * 1.05, float(hose_od_mm), port_od * 1.15)
+    stem_od = min(port_od * 0.72, hose_od * 0.62)
+    barb_od = min(stem_od * 1.22, hose_od * 0.88)  # ridges under hose bore
+    # Local −Y stack from housing outward (y decreases).
+    rot_out = (1.5707963, 0.0, 0.0)  # cylinder +Z → world −Y
+    mat_collar = fl.make_mat(
+        "m_se_td_qd_collar", (0.12, 0.42, 0.78), metallic=0.35, roughness=0.32
+    )
+    mat_barb = fl.make_mat(
+        "m_se_td_qd_barb", (0.55, 0.56, 0.58), metallic=0.82, roughness=0.28
+    )
+
+    for i, name in enumerate(("u_se_td_coolant_in", "u_se_td_coolant_out")):
+        px = x_motor + (i - 0.5) * float(spacing_mm)
+        z = z_port
+
+        def _y(out_mm: float) -> float:
+            return y_face - float(out_mm)
+
+        # 1) Housing boss flange — larger OD short disc on the casting face.
+        fl.add_cyl(
+            f"{name}_boss",
+            _mm3((px, _y(1.5), z)),
+            (port_od * 1.15) * fl.MM,
+            5.0 * fl.MM,
+            mat_alum,
+            module=story_mod,
+            module_objects=MO,
+            rotation=rot_out,
+            vertices=48,
+        )
+        # Bolt circle cues on the boss (4× M4-ish pads) — reads as a bolted port.
+        _bc_r = port_od * 0.78
+        for bi in range(4):
+            bang = (bi / 4.0) * math.tau + (math.pi / 4.0 if i else 0.0)
+            bx = px + _bc_r * math.cos(bang) * 0.55
+            bz = z + _bc_r * math.sin(bang) * 0.55
+            fl.add_cyl(
+                f"{name}_boss_bolt_{bi}",
+                _mm3((bx, _y(2.5), bz)),
+                1.6 * fl.MM,
+                3.5 * fl.MM,
+                mat_fast,
+                module=story_mod,
+                module_objects=MO,
+                rotation=rot_out,
+                vertices=10,
+            )
+
+        # 2) Hex body (6-sided cylinder = AF hex prism) — the QD socket cue.
+        _hex_af = port_od * 1.05
+        _hex_h = max(10.0, bore * 0.95)
+        fl.add_cyl(
+            f"{name}_hex",
+            _mm3((px, _y(5.0 + _hex_h * 0.5), z)),
+            (_hex_af * 0.5) * fl.MM,
+            _hex_h * fl.MM,
+            mat_port,
+            module=story_mod,
+            module_objects=MO,
+            rotation=rot_out,
+            vertices=6,
+        )
+
+        # 3) Coloured lock collar — the quick-disconnect signature ring.
+        _col_y = 5.0 + _hex_h + 3.0
+        fl.add_cyl(
+            f"{name}_collar",
+            _mm3((px, _y(_col_y), z)),
+            (port_od * 0.62) * fl.MM,
+            5.5 * fl.MM,
+            mat_collar,
+            module=story_mod,
+            module_objects=MO,
+            rotation=rot_out,
+            vertices=32,
+        )
+        # Collar finger groove (slightly smaller ring in front).
+        fl.add_cyl(
+            f"{name}_collar_lip",
+            _mm3((px, _y(_col_y + 3.5), z)),
+            (port_od * 0.68) * fl.MM,
+            1.8 * fl.MM,
+            mat_collar,
+            module=story_mod,
+            module_objects=MO,
+            rotation=rot_out,
+            vertices=32,
+        )
+
+        # 4) Principal stem (authenticity name) — male nipple body.
+        _stem_len = 22.0
+        _stem_y0 = _col_y + 5.0
+        fl.add_cyl(
+            name,
+            _mm3((px, _y(_stem_y0 + _stem_len * 0.5), z)),
+            (stem_od * 0.5) * fl.MM,
+            _stem_len * fl.MM,
+            mat_port,
+            module=story_mod,
+            module_objects=MO,
+            rotation=rot_out,
+            vertices=32,
+        )
+        # Bore cue — slightly recessed tip so the OD is not a solid plug.
+        fl.add_cyl(
+            f"{name}_bore",
+            _mm3((px, _y(_stem_y0 + _stem_len + 0.5), z)),
+            (bore * 0.5) * fl.MM,
+            2.0 * fl.MM,
+            mat_steel,
+            module=story_mod,
+            module_objects=MO,
+            rotation=rot_out,
+            vertices=20,
+        )
+
+        # 5) Multi-barb ridges on the nipple (3 rings — hose retention grammar).
+        # GOTCHA: barb_od must stay under hose_od so the hose can seat over them.
+        for bi, b_off in enumerate((4.0, 9.0, 14.0)):
+            fl.add_cyl(
+                f"{name}_barb_{bi}",
+                _mm3((px, _y(_stem_y0 + b_off), z)),
+                (barb_od * 0.5) * fl.MM,
+                2.2 * fl.MM,
+                mat_barb,
+                module=story_mod,
+                module_objects=MO,
+                rotation=rot_out,
+                vertices=28,
+            )
+
+        # 6) Hose stub past the nipple (OD > barb so it reads as seated on the QD).
+        _hose_len = 34.0
+        _hose_y0 = _stem_y0 + _stem_len * 0.35  # overlaps barb zone
+        fl.add_cyl(
+            f"u_se_td_coolant_hose_{i}",
+            _mm3((px, _y(_hose_y0 + _hose_len * 0.5), z)),
+            (hose_od * 0.5) * fl.MM,
+            _hose_len * fl.MM,
+            mat_rubber,
+            module=story_mod,
+            module_objects=MO,
+            rotation=rot_out,
+            vertices=28,
+        )
+        # Hose corrugation rings (read as reinforced coolant hose, not a pipe).
+        for ri, r_off in enumerate((6.0, 14.0, 22.0, 30.0)):
+            fl.add_cyl(
+                f"u_se_td_coolant_hose_{i}_rib_{ri}",
+                _mm3((px, _y(_hose_y0 + r_off), z)),
+                (hose_od * 0.58) * fl.MM,
+                1.4 * fl.MM,
+                mat_rubber,
+                module=story_mod,
+                module_objects=MO,
+                rotation=rot_out,
+                vertices=24,
+            )
+
+        # 7) Worm-drive clamp band + screw housing.
+        _cl_y = _hose_y0 + 8.0
+        fl.add_cyl(
+            f"u_se_td_coolant_clamp_{i}",
+            _mm3((px, _y(_cl_y), z)),
+            (hose_od * 0.58) * fl.MM,
+            4.0 * fl.MM,
+            mat_fast,
+            module=story_mod,
+            module_objects=MO,
+            rotation=rot_out,
+            vertices=28,
+        )
+        # Clamp screw housing (small box offset on +X of band).
+        fl.add_box(
+            f"u_se_td_coolant_clamp_{i}_screw",
+            _mm3((px + hose_od * 0.45, _y(_cl_y), z)),
+            _mm3((5.0, 6.0, 4.5)),
+            mat_fast,
+            module=story_mod,
+            module_objects=MO,
+        )
+
+    print(
+        f"[univ][sealed] coolant QD pair drawn "
+        f"(bore Ø{bore:.1f} port_od Ø{port_od:.1f} stem Ø{stem_od:.1f} "
+        f"barb Ø{barb_od:.1f} hose Ø{hose_od:.1f} mm; "
+        f"boss+hex+collar+3×barb+hose+worm-clamp)",
+        flush=True,
+    )
+
+
 def _fpk_meshing_ring_pcd_mm(sun_pcd_mm, planet_pcd_mm):
     """Ring pitch diameter that physically meshes: sun + 2×planet.
 
@@ -20054,6 +20279,24 @@ def _fpk_meshing_ring_pcd_mm(sun_pcd_mm, planet_pcd_mm):
     ``pcd_meshing_mismatch`` (88.8 vs 84.7 mm) and split the nest. One rule.
     """
     return float(sun_pcd_mm) + 2.0 * float(planet_pcd_mm)
+
+
+def _fpk_strength_writeback_invalidated() -> bool:
+    """True when gear_geometry_writeback is empty/invalidated (packaging seed only)."""
+    try:
+        _state_path = globals().get("_COMPOSER_STATE_PATH")
+        if not _state_path:
+            return False
+        wb_path = Path(_state_path).parent / "_motor_stack" / "gear_geometry_writeback.json"
+        if not wb_path.is_file():
+            return False
+        wb = json.loads(wb_path.read_text(encoding="utf-8"))
+        if wb.get("invalidated") is True:
+            return True
+        geo = wb.get("fpkConcentricGeometry") or {}
+        return not bool(geo)
+    except Exception:
+        return False
 
 
 def _fpk_solve_tooth_set(sun_pcd_mm, planet_pcd_mm, ring_pcd_mm, n_planets):
@@ -20071,9 +20314,15 @@ def _fpk_solve_tooth_set(sun_pcd_mm, planet_pcd_mm, ring_pcd_mm, n_planets):
     """
     try:
         from fpk_gear_teeth import solve_planetary_tooth_set  # noqa: PLC0415
+        # allow_pcd_snap ONLY when strength writeback is invalidated — packaging
+        # seeds often sit 0.3 mm off a standard module. Never silently snap a
+        # released / strength-solved tooth set (finish-council 2026-08-04).
+        snap = _fpk_strength_writeback_invalidated()
         return solve_planetary_tooth_set(
             float(sun_pcd_mm), float(planet_pcd_mm), float(ring_pcd_mm),
-            int(n_planets))
+            int(n_planets),
+            allow_pcd_snap=snap,
+        )
     except Exception as exc:  # noqa: BLE001 — a gear body beats a crashed render
         print(f"[univ][gear] tooth set unsolved ({exc}) — "
               "gears will be drawn WITHOUT teeth rather than with invented ones",
@@ -21046,56 +21295,31 @@ def _place_traction_drive_pack_layout(W, D, H, base_z, t, story_mod, MO):
             rotation=rot_along_x,
         )
 
-    # Coolant bosses sized from fluid_interface requirement (analytical bore).
+    # Coolant QD ports — fluid_interface bore drives every diameter.
+    # INTENT (2026-08-04 cycle-2): plain stacked cylinders read as hose stubs.
+    # A race QD is boss + hex body + lock collar + multi-barb nipple + hose +
+    # worm clamp. Names u_se_td_coolant_in/out kept for authenticity/BoM joins.
     y_face = y_motor - motor_od * 0.48
     _cool_dims = (_edu_form.coolant_ports.dimensions_mm if _edu_form else {})
     _bore = float(_cool_dims.get("bore_mm", 10.0))
     _port_od = float(_cool_dims.get("port_od_mm", _bore * 1.35))
     _hose_od = float(_cool_dims.get("route_od_mm", _bore * 1.15))
-    for i, name in enumerate(("u_se_td_coolant_in", "u_se_td_coolant_out")):
-        px = x_motor + (i - 0.5) * 48.0
-        fl.add_cyl(
-            f"{name}_flange",
-            _mm3((px, y_face - 2.0, z_motor + motor_od * 0.08)),
-            (_port_od * 0.85) * fl.MM,
-            6.0 * fl.MM,
-            mat_alum,
-            module=story_mod,
-            module_objects=MO,
-            rotation=(1.5707963, 0.0, 0.0),
-        )
-        fl.add_cyl(
-            f"u_se_td_coolant_hose_{i}",
-            _mm3((px, y_face - 36.0, z_motor + motor_od * 0.08)),
-            (_hose_od * 0.5) * fl.MM,
-            30.0 * fl.MM,
-            mat_rubber,
-            module=story_mod,
-            module_objects=MO,
-            rotation=(1.5707963, 0.0, 0.0),
-            vertices=24,
-        )
-        fl.add_cyl(
-            f"u_se_td_coolant_clamp_{i}",
-            _mm3((px, y_face - 25.0, z_motor + motor_od * 0.08)),
-            (_hose_od * 0.55) * fl.MM,
-            3.0 * fl.MM,
-            mat_fast,
-            module=story_mod,
-            module_objects=MO,
-            rotation=(1.5707963, 0.0, 0.0),
-            vertices=24,
-        )
-        fl.add_cyl(
-            name,
-            _mm3((px, y_face - 16.0, z_motor + motor_od * 0.08)),
-            (_port_od * 0.5) * fl.MM,
-            28.0 * fl.MM,
-            mat_port,
-            module=story_mod,
-            module_objects=MO,
-            rotation=(1.5707963, 0.0, 0.0),
-        )
+    _fpk_place_coolant_qd_pair(
+        x_motor=x_motor,
+        y_face=y_face,
+        z_port=z_motor + motor_od * 0.08,
+        bore_mm=_bore,
+        port_od_mm=_port_od,
+        hose_od_mm=_hose_od,
+        mat_alum=mat_alum,
+        mat_port=mat_port,
+        mat_rubber=mat_rubber,
+        mat_fast=mat_fast,
+        mat_steel=mat_steel,
+        story_mod=story_mod,
+        MO=MO,
+        _mm3=_mm3,
+    )
     if _edu_form is not None:
         _edu_emitted_req_ids.append(_edu_form.coolant_ports.requirement_id)
     # HV connector family — dims from hv_interface (I, V → pin/shell/HVIL/braid).
@@ -21776,7 +22000,8 @@ def _place_traction_drive_pack_layout(W, D, H, base_z, t, story_mod, MO):
                         r"^u_se_td_(motor_housing|stator_ring|stator_hint|hollow_rotor|"
                         r"rotor_hint|winding_end_\d+|sun_gear|planet_\d+|planet_carrier|"
                         r"ring_gear|gearbox|diff_nest|diff_bulge|coolant_jacket|coolant_in|"
-                        r"coolant_out|coolant_hose_\d+|coolant_clamp_\d+|"
+                        r"coolant_out|coolant_in_.+|coolant_out_.+|"
+                        r"coolant_hose_\d+(_rib_\d+)?|coolant_clamp_\d+(_screw)?|"
                         r"hv_cable_boot|lv_harness_boot|signal_ribbon|gate_drive_ribbon|"
                         r"output_shaft(_b)?|end_bell_\d+|bearing_cap_\d+|"
                         r"jacket_band|microjet_\d+_\d+|motor_shaft|motor_cover|"

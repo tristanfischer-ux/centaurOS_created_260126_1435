@@ -57,6 +57,9 @@ PRINCIPAL_ROLES: tuple[tuple[str, str, str, str], ...] = (
     ("coolant_jacket", "Motor coolant jacket", r"^u_se_td_coolant_jacket$", "compound"),
     ("coolant_ports", "Coolant inlet/outlet", r"^u_se_td_coolant_(in|out)$", "compound"),
     ("coolant_hoses", "Attached coolant hose stubs", r"^u_se_td_coolant_hose_\d+$", "compound"),
+    # Cycle-2 QD morphology sub-parts (boss/hex/collar/barb) — compound family.
+    ("coolant_qd_body", "Coolant QD boss/hex/collar", r"^u_se_td_coolant_(in|out)_(boss|hex|collar)(_lip)?$", "compound"),
+    ("coolant_qd_barb", "Coolant QD barb ridges", r"^u_se_td_coolant_(in|out)_barb_\d+$", "compound"),
     ("hv_connector", "HV DC connector", r"^u_se_td_hv_connector(_barrel)?$", "compound"),
     ("hv_cable_boot", "HV cable boot", r"^u_se_td_hv_cable_boot$", "compound"),
     ("lv_harness", "LV/control harness boot", r"^u_se_td_lv_harness_boot$", "compound"),

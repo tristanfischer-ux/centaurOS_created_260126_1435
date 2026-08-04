@@ -1,0 +1,36 @@
+{
+  "schema": "forgeos.motor_stack.blender_cycle2_morphology/v1",
+  "ran_at": "2026-08-04T18:30:00Z",
+  "ship_ok": false,
+  "status": "provisional_visualisation_uplift",
+  "changes": {
+    "involute_teeth": {
+      "n_flank": 14,
+      "root_fillet": true,
+      "tip_relief_m": 0.10,
+      "tip_land": true,
+      "outline_order": "root→fillet→flank_up→tip_land→flank_down→fillet→root",
+      "flat_shade": "pre-existing on add_involute_gear (not new this cycle)"
+    },
+    "tooth_set_snap": {
+      "seed_pcd_mm": {"sun": 12.0, "planet": 38.7, "ring": 89.4},
+      "solved_this_run": {"module_mm": 0.7, "z_sun": 17, "z_planet": 55, "z_ring": 127, "ratio_actual": 8.471},
+      "note": "pcd_snap under invalidated gear_geometry_writeback — not a released tooth set; exact m/z is a scored search result for this seed, not a frozen contract"
+    },
+    "coolant_qd": {
+      "morphology": "boss+hex+lock_collar+3x_barb+hose_ribs+worm_clamp",
+      "bore_mm": 10.0,
+      "port_od_mm": 13.5,
+      "hose_od_mm_drawn": "max(route_od, port_od*1.15) so hose seats over barbs",
+      "principal_names_kept": ["u_se_td_coolant_in", "u_se_td_coolant_out"],
+      "collar_colour": "blue material m_se_td_qd_collar (not a separate blue-collar mesh id)"
+    },
+    "kit_hierarchy": "re-applied after Blender overwrote parts-manifest (17 kit parts)"
+  },
+  "explicitly_not_claimed": [
+    "Released gear tooth set / ISO 6336 strength",
+    "FIA coolant port XYZ ICD",
+    "ship_ok / Bar A close",
+    "Partner hardware measurements"
+  ]
+}

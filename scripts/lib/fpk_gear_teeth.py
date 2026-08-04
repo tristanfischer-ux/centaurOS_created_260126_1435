@@ -68,6 +68,7 @@ def solve_planetary_tooth_set(
     *,
     candidate_modules: Optional[Sequence[float]] = None,
     pcd_tol_mm: float = 0.6,
+    allow_pcd_snap: bool = False,
 ) -> PlanetaryToothSet:
     """Solve the tooth set from calculated pitch diameters.
 
@@ -122,6 +123,39 @@ def solve_planetary_tooth_set(
             notes.append(
                 f"undercut_relaxed: no module gives z_sun >= {UNDERCUT_LIMIT_TEETH} "
                 "at 20 deg pressure angle; profile shift would be required")
+
+    # INTENT (2026-08-04 cycle-2): packaging-seed PCDs often land 0.3 mm off a
+    # standard module (sun=12.0 planet=38.7 fails; planet=38.4 solves at m=0.6).
+    # Blender visualisation may snap (allow_pcd_snap=True) so the nest shows
+    # real involute teeth rather than blank discs. The pure solver still RAISES
+    # so unequal-spacing / unbuildable sets are never silently smoothed in
+    # strength or release paths.
+    if got is None and allow_pcd_snap:
+        # Prefer undercut-safe sun first; fall back to z_sun>=12 (still better
+        # than z=8 knife-edge teeth at catalogue scale).
+        for _min_z in (UNDERCUT_LIMIT_TEETH, 12, 8):
+            got_snap = _snap_nearest_tooth_set(
+                sun_pcd_mm, planet_pcd_mm, ring_used, n_planets,
+                candidate_modules=candidate_modules,
+                min_teeth=_min_z,
+            )
+            if got_snap is not None:
+                m_s, zs_s, zp_s, zr_s, d_pct = got_snap
+                notes.append(
+                    f"pcd_snap: seed sun/planet/ring="
+                    f"{sun_pcd_mm:.2f}/{planet_pcd_mm:.2f}/{ring_used:.2f} mm → "
+                    f"z={zs_s}/{zp_s}/{zr_s} m={m_s} mm "
+                    f"(max PCD delta {d_pct:.1f}%); provisional visualisation "
+                    "under packaging seed — not a released tooth set"
+                )
+                if zs_s < UNDERCUT_LIMIT_TEETH:
+                    notes.append(
+                        f"undercut_relaxed: snapped z_sun={zs_s} < "
+                        f"{UNDERCUT_LIMIT_TEETH}"
+                    )
+                got = (m_s, zs_s, zp_s, zr_s)
+                break
+
     if got is None:
         raise ValueError(
             "no standard module satisfies integer teeth + meshing + equal "
@@ -138,6 +172,69 @@ def solve_planetary_tooth_set(
         sun_pcd_mm=zs_i * m, planet_pcd_mm=zp_i * m, ring_pcd_mm=zr_i * m,
         notes=tuple(notes),
     )
+
+
+def _snap_nearest_tooth_set(
+    sun_pcd_mm: float,
+    planet_pcd_mm: float,
+    ring_pcd_mm: float,
+    n_planets: int,
+    *,
+    candidate_modules: Sequence[float],
+    min_teeth: int = 8,
+    max_pcd_delta_pct: float = 5.0,
+):
+    """Nearest meshing integer tooth set within ``max_pcd_delta_pct`` of seeds.
+
+    Searches standard modules and small integer neighbourhoods around the
+    implied tooth counts. Prefers higher sun tooth count (readable involute)
+    then larger module then smaller PCD error.
+    Returns ``(m, zs, zp, zr, max_delta_pct)`` or None.
+    """
+    best = None  # (score, m, zs, zp, zr, d_pct)
+    for m in candidate_modules:
+        if m <= 0:
+            continue
+        zs0 = max(min_teeth, int(round(sun_pcd_mm / m)))
+        zp0 = max(min_teeth, int(round(planet_pcd_mm / m)))
+        # Tight neighbourhood: only ±2 teeth — snap packaging rounding, do not
+        # invent a different gearbox.
+        for dzs in range(-2, 3):
+            for dzp in range(-2, 3):
+                zs = zs0 + dzs
+                zp = zp0 + dzp
+                if zs < min_teeth or zp < min_teeth:
+                    continue
+                zr = zs + 2 * zp
+                if (zs + zr) % n_planets != 0:
+                    continue
+                sun_a, pl_a, rg_a = zs * m, zp * m, zr * m
+                errs = (
+                    abs(sun_a - sun_pcd_mm) / max(sun_pcd_mm, 1e-6),
+                    abs(pl_a - planet_pcd_mm) / max(planet_pcd_mm, 1e-6),
+                    abs(rg_a - ring_pcd_mm) / max(ring_pcd_mm, 1e-6),
+                )
+                d_pct = 100.0 * max(errs)
+                if d_pct > max_pcd_delta_pct:
+                    continue
+                # Prefer catalogue-readable module (0.5–2.0 mm) over micro-teeth
+                # (m=0.2 × z_ring=448 is a Blender mesh bomb and invisible at
+                # hero scale). Then undercut-safe sun count, then PCD fidelity.
+                m_f = float(m)
+                if 0.5 <= m_f <= 2.0:
+                    m_band = 0
+                elif 0.35 <= m_f < 0.5 or 2.0 < m_f <= 3.0:
+                    m_band = 1
+                else:
+                    m_band = 2
+                undercut_pen = 0 if zs >= UNDERCUT_LIMIT_TEETH else 1
+                score = (m_band, undercut_pen, -m_f, d_pct, -zs)
+                if best is None or score < best[0]:
+                    best = (score, m_f, zs, zp, zr, d_pct)
+    if best is None:
+        return None
+    _, m, zs, zp, zr, d_pct = best
+    return m, zs, zp, zr, d_pct
 
 
 def involute_tooth_profile(
@@ -208,6 +305,20 @@ def _selftest() -> None:
     assert ts.ratio_actual > 8.2, (
         f"this kit's PCDs give ratio {ts.ratio_actual:.3f}, not the stated 8 — "
         "the solver must report the HONEST ratio")
+
+    # ── Cycle-2 packaging seed (planet 38.7): pure solver may RAISE; Blender
+    # path (allow_pcd_snap) must produce involute teeth, not blank discs.
+    try:
+        exact_387 = solve_planetary_tooth_set(12.0, 38.7, 89.4, 3)
+    except ValueError:
+        exact_387 = None
+    snapped = solve_planetary_tooth_set(
+        12.0, 38.7, 89.4, 3, allow_pcd_snap=True
+    )
+    assert snapped.module_mm > 0 and snapped.z_sun >= 8
+    assert snapped.z_ring == snapped.z_sun + 2 * snapped.z_planet
+    if exact_387 is None:
+        assert any(n.startswith("pcd_snap") for n in snapped.notes), snapped.notes
 
     # ── ADVERSARIAL 1: PCDs that do not mesh must be FLAGGED, not smoothed ──
     bad = solve_planetary_tooth_set(12.0, 38.4, 120.0, 3)

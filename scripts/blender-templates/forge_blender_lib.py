@@ -923,30 +923,72 @@ def add_involute_gear(
     alpha = math.radians(pressure_angle_deg)
     r_pitch = m_mm * z / 2.0 * MM
     r_base = r_pitch * math.cos(alpha)
-    add_m, ded_m = 1.00 * m_mm * MM, 1.25 * m_mm * MM
+    # ISO 53 spur proportions; tip relief ~0.1 m keeps thin tips from aliasing
+    # into a sawtooth fringe at catalogue scale (cycle-2 morphology uplift).
+    add_m = 1.00 * m_mm * MM
+    ded_m = 1.25 * m_mm * MM
+    tip_relief = 0.10 * m_mm * MM
+    # Root fillet radius ~0.38 m (standard full-fillet root) — without this the
+    # tooth–root junction is a sharp corner that reads as a jagged cylinder.
+    fillet_r = 0.38 * m_mm * MM
     if internal:
-        r_tip, r_root = r_pitch - add_m, r_pitch + ded_m
+        r_tip = r_pitch - add_m + tip_relief
+        r_root = r_pitch + ded_m
     else:
-        r_tip, r_root = r_pitch + add_m, max(r_pitch - ded_m, m_mm * MM * 0.35)
+        r_tip = r_pitch + add_m - tip_relief
+        r_root = max(r_pitch - ded_m, m_mm * MM * 0.35)
 
     def _inv(a):
         return math.tan(a) - a
 
     half_at_pitch = math.pi / (2.0 * z)
-    n_flank = 5
+    # INTENT (2026-08-04 cycle-2): n_flank 5 → 14 so m≈0.6 mm teeth catch light
+    # as curved involute flanks rather than five-facet wedges.
+    n_flank = 14
+    n_fillet = 4
 
     def _flank(sign):
-        """Involute flank points from root to tip; sign mirrors across the tooth."""
+        """Involute flank points from base/root to tip; sign mirrors the tooth."""
         out = []
-        lo = max(min(r_root, r_tip), r_base * 1.0001) if not internal else min(r_root, r_tip)
-        hi = max(r_root, r_tip) if internal else r_tip
-        lo = max(lo, r_base * 1.0001)
+        if internal:
+            lo = min(r_root, r_tip)
+            hi = max(r_root, r_tip)
+            # Internal: start just above base so involute is defined.
+            lo = max(lo, r_base * 1.0001)
+        else:
+            lo = max(r_base * 1.0001, min(r_root + fillet_r * 0.55, r_tip * 0.98))
+            hi = r_tip
+        if hi <= lo:
+            hi = lo * 1.01
         for i in range(n_flank + 1):
-            r = lo + (hi - lo) * (i / n_flank)
+            # Slight ease near tip (cosine spacing) so tip land is denser.
+            t = i / n_flank
+            t_ease = 0.5 - 0.5 * math.cos(math.pi * t)
+            r = lo + (hi - lo) * t_ease
             r = max(r, r_base * 1.0001)
             a_r = math.acos(min(1.0, r_base / r))
             th = half_at_pitch + _inv(alpha) - _inv(a_r)
             out.append((r, sign * th))
+        return out
+
+    def _root_fillet(sign, flank0):
+        """Circular fillet from root circle up to the first involute point."""
+        if internal or fillet_r <= 0 or not flank0:
+            return []
+        r0, th0 = flank0[0]
+        # Fillet centre sits near the root, offset toward the tooth centreline.
+        # Approximate: arc from (r_root, th_root) to first flank point.
+        th_root = sign * half_at_pitch * 1.55
+        out = []
+        for i in range(n_fillet):
+            t = (i + 1) / (n_fillet + 1)
+            # Blend radius and angle toward the flank start.
+            r = r_root + (r0 - r_root) * t
+            # Ease outward slightly so the fillet bulges into the root gap.
+            bulge = math.sin(math.pi * t) * fillet_r * 0.35
+            r = r + bulge * (1.0 if not internal else -1.0)
+            th = th_root + (th0 - th_root) * t
+            out.append((r, th))
         return out
 
     pitch_ang = math.tau / z
@@ -955,11 +997,28 @@ def add_involute_gear(
         c = k * pitch_ang
         rising = _flank(+1)
         falling = list(reversed(_flank(-1)))
-        # root -> up one flank -> across the tip -> down the other flank
+        fil_r = _root_fillet(+1, rising)
+        fil_f = list(reversed(_root_fillet(-1, list(reversed(falling)))))
+        # root → fillet → up flank (root→tip) → tip land → down flank (tip→root)
+        # → fillet → root. Rising is stored root→tip; do NOT reverse it after the
+        # fillet (cycle-2 finish council: reversed(rising) backtracked the flank).
         outline.append((r_root, c - half_at_pitch * 1.55))
-        for r, th in reversed(rising):
+        for r, th in fil_r:
             outline.append((r, c - th))
+        for r, th in rising:
+            outline.append((r, c - th))
+        # Explicit tip land: interpolate absolute angle between flank tips so the
+        # crest reads as a flat land, not a knife-edge (catalogue aliasing).
+        if rising and falling:
+            r_t = rising[-1][0]
+            ang_L = c - rising[-1][1]
+            ang_R = c - falling[0][1]
+            for ti in (1, 2):
+                t = ti / 3.0
+                outline.append((r_t, ang_L + (ang_R - ang_L) * t))
         for r, th in falling:
+            outline.append((r, c - th))
+        for r, th in fil_f:
             outline.append((r, c - th))
         outline.append((r_root, c + half_at_pitch * 1.55))
 
