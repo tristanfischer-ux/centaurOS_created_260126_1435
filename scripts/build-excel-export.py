@@ -40622,8 +40622,17 @@ def _write_deliverable_bundle(run_dir: str, slug: str) -> Optional[dict]:
             "EM honesty — W2.12 gear ratio writeback BLOCKED (architecture hold)"
         ),
         "21-path-b-voltage-feasibility.png": (
-            "EM honesty — Path B 24k/−30° voltage feasibility vs 600–900 V bus "
-            "(analytical; Bar A still open)"
+            "EM honesty — Path B 24k voltage feasibility vs 600–900 V bus "
+            "(analytical; −30° is OP context not model input; Bar A still open)"
+        ),
+        "22-dyno-request-matrix.png": (
+            "EM honesty — W5.1 dyno request matrix from Path B OP (no invented map)"
+        ),
+        "23-partner-asks-ranked.png": (
+            "EM honesty — W5 ranked partner asks (draft; ship_ok false)"
+        ),
+        "24-lap-log-columns-ask.png": (
+            "EM honesty — W5.2 lap/stint log CSV columns ask (DEC-007 / B10)"
         ),
         "FE-FRONT-PATH-B-EM-HONESTY-PACK.pdf": (
             "EM honesty — full Path B pack (PDF multi-page)"
@@ -40650,23 +40659,32 @@ def _write_deliverable_bundle(run_dir: str, slug: str) -> Optional[dict]:
         "motor-stack",
         "render_phase_d_kit_screens.py",
     )
+    _render_phase_e = os.path.join(
+        os.path.dirname(os.path.abspath(__file__)),
+        "motor-stack",
+        "render_phase_e_partner_pack.py",
+    )
     # Auto-build if Path B exists and pack is missing or older than inputs
     if os.path.isfile(_path_b_art) and os.path.isfile(_render_jack):
         _need_render = not os.path.isdir(_jack_dir)
         _need_phase_c = bool(_need_render)
         _need_phase_d = bool(_need_render)
+        _need_phase_e = bool(_need_render)
         if not _need_render:
             try:
                 _pb_m = os.path.getmtime(_path_b_art)
                 _pdf = os.path.join(_jack_dir, "FE-FRONT-PATH-B-EM-HONESTY-PACK.pdf")
                 _p13 = os.path.join(_jack_dir, "13-kit-assembly-envelopes-lite.png")
                 _p20 = os.path.join(_jack_dir, "20-gear-ratio-writeback-blocked.png")
+                _p24 = os.path.join(_jack_dir, "24-lap-log-columns-ask.png")
                 if not os.path.isfile(_pdf) or os.path.getmtime(_pdf) + 1.0 < _pb_m:
                     _need_render = True
                 if not os.path.isfile(_p13):
                     _need_phase_c = True
                 if not os.path.isfile(_p20):
                     _need_phase_d = True
+                if not os.path.isfile(_p24):
+                    _need_phase_e = True
                 # Phase C input freshness (council: do not key only on Path B)
                 _phase_c_inputs = [
                     _path_b_art,
@@ -40711,7 +40729,8 @@ def _write_deliverable_bundle(run_dir: str, slug: str) -> Optional[dict]:
                 _need_render = True
                 _need_phase_c = True
                 _need_phase_d = True
-        if _need_render or _need_phase_c or _need_phase_d:
+                _need_phase_e = True
+        if _need_render or _need_phase_c or _need_phase_d or _need_phase_e:
             try:
                 import subprocess as _sp_jack
                 _repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -40794,6 +40813,21 @@ def _write_deliverable_bundle(run_dir: str, slug: str) -> Optional[dict]:
                         )
                     else:
                         print("[bundle] rendered phase-D kit screens (14–20)", flush=True)
+                if os.path.isfile(_render_phase_e) and _need_phase_e:
+                    _er = _sp_jack.run(
+                        [sys.executable, _render_phase_e, "--twin", run_dir],
+                        capture_output=True,
+                        text=True,
+                        timeout=120,
+                        cwd=_repo_root,
+                    )
+                    if _er.returncode != 0:
+                        skipped.append(
+                            f"em-honesty/phase-e (exit {_er.returncode}: "
+                            f"{(_er.stderr or _er.stdout or '')[:200]})"
+                        )
+                    else:
+                        print("[bundle] rendered phase-E partner pack (22–24)", flush=True)
             except Exception as _jack_exc:  # noqa: BLE001
                 skipped.append(f"em-honesty/ (renderer failed: {_jack_exc})")
     if os.path.isdir(_jack_dir):
@@ -40822,6 +40856,8 @@ def _write_deliverable_bundle(run_dir: str, slug: str) -> Optional[dict]:
             "gear_oil_status_one_pager.json",
             "gear_ratio_writeback_status.json",
             "path_b_voltage_feasibility_screen.json",
+            "dyno_request_matrix.json",
+            "lap_log_column_ask.json",
         ):
             _sjp = os.path.join(run_dir, "_motor_stack", _sj)
             if os.path.isfile(_sjp):

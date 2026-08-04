@@ -73,6 +73,9 @@ def main() -> int:
         "19-gear-oil-status.png",
         "20-gear-ratio-writeback-blocked.png",
         "21-path-b-voltage-feasibility.png",
+        "22-dyno-request-matrix.png",
+        "23-partner-asks-ranked.png",
+        "24-lap-log-columns-ask.png",
         "FE-FRONT-PATH-B-EM-HONESTY-PACK.pdf",
     ):
         ck(f"jack_{name}", (jack / name).is_file(), str(jack / name))
@@ -202,6 +205,26 @@ def main() -> int:
         )
         hl = vd.get("headline") or {}
         ck("voltage_has_bus_util", hl.get("controlling_utilisation_at_nominal") is not None)
+        op_role = (vd.get("operating_point") or {}).get("current_angle_role")
+        ck(
+            "voltage_angle_context_only",
+            op_role == "CONTEXT_ONLY_not_used_in_scalar_Vll_model" or "CONTEXT" in str(op_role or ""),
+            str(op_role),
+        )
+
+    # Phase E partner asks
+    for name in ("dyno_request_matrix.json", "lap_log_column_ask.json"):
+        p = ms / name
+        ck(f"phase_e_{name}", p.is_file(), str(p))
+        if p.is_file():
+            d = json.loads(p.read_text())
+            ck(f"phase_e_{name}_ship_ok_false", d.get("ship_ok") is False)
+    dyno = ms / "dyno_request_matrix.json"
+    if dyno.is_file():
+        dd = json.loads(dyno.read_text())
+        pts = dd.get("points") or []
+        ck("dyno_has_path_b_point", any(p.get("id") == "DYNO-P0" for p in pts))
+        ck("dyno_no_invented_results", "dyno_results" in (dd.get("explicitly_not_claimed") or []))
 
     # tracker addendum
     tr = (REPO / "docs/plans/JLR-FE-FRONT-FPK-BAR-A-BAR-B-CLOSEOUT-TRACKER-2026-07-31.md").read_text()
