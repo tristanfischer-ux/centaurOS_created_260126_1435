@@ -40,6 +40,16 @@ def _qty_value(quantities: Mapping[str, Any], key: str, default: Any = None) -> 
     return default
 
 
+def _path_b_bars_value(em_works: Mapping[str, Any], em_sweep: Mapping[str, Any]) -> str:
+    mean = em_works.get("torque_magnitude_mean_nm", em_sweep.get("torque_magnitude_mean_nm"))
+    arch = em_works.get("required_shaft_torque_nm")
+    try:
+        ratio = f"{float(mean) / float(arch):.3f}" if mean is not None and arch else "—"
+    except (TypeError, ValueError, ZeroDivisionError):
+        ratio = "—"
+    return f"mean={mean} N·m; arch={arch} N·m; mean/arch={ratio}"
+
+
 def _load_json(path: Path) -> Optional[dict[str, Any]]:
     if not path.is_file():
         return None
@@ -68,7 +78,15 @@ def build_register(twin_dir: Path) -> dict[str, Any]:
         quantities = {}
 
     motor_stack = twin_dir / "_motor_stack"
-    em = _load_json(motor_stack / "em_fia_front_kit_case.json") or {}
+    # Prefer Path B DEC-009 kit-case as EM truth (2026-08-04 uplift)
+    em_path_b = _load_json(motor_stack / "em_fia_front_kit_case_PATH_B_DEC009.json")
+    em_default = _load_json(motor_stack / "em_fia_front_kit_case.json") or {}
+    em = em_path_b if isinstance(em_path_b, Mapping) and em_path_b else em_default
+    em_source_name = (
+        "em_fia_front_kit_case_PATH_B_DEC009.json"
+        if em_path_b
+        else "em_fia_front_kit_case.json"
+    )
     cool = _load_json(motor_stack / "analytical_fia_cooling_network_screen.json") or {}
     gear_oil = _load_json(motor_stack / "gear_oil_fia_front_kit_case.json") or {}
     post = _load_json(motor_stack / "post_diff_final_drive_packaging_screen.json") or {}
@@ -77,11 +95,14 @@ def build_register(twin_dir: Path) -> dict[str, Any]:
     rotor_struct = _load_json(motor_stack / "calculix_fia_rotor_screen.json") or {}
     pocket_struct = _load_json(motor_stack / "calculix_fia_magnet_pocket_screen.json") or {}
     mount_struct = _load_json(motor_stack / "analytical_fia_case_mount_screen.json") or {}
+    prov = _load_json(motor_stack / "provisional_partner_seeds.json") or {}
+    volt = _load_json(motor_stack / "path_b_voltage_feasibility_screen.json") or {}
     mm = _load_json(twin_dir / "motor-multiphysics.json") or {}
     cad = mm.get("cadAuthority") if isinstance(mm.get("cadAuthority"), Mapping) else {}
 
     em_works = em.get("works_in_kit_context") if isinstance(em.get("works_in_kit_context"), Mapping) else {}
     em_loaded = em.get("loaded_point") if isinstance(em.get("loaded_point"), Mapping) else {}
+    # Path B stores mean on works_in_kit_context; older cases on sweep.summary
     em_sweep = (
         ((em.get("rotor_position_sweep") or {}).get("summary"))
         if isinstance(em.get("rotor_position_sweep"), Mapping)
@@ -89,6 +110,11 @@ def build_register(twin_dir: Path) -> dict[str, Any]:
     )
     if not isinstance(em_sweep, Mapping):
         em_sweep = {}
+    if not em_sweep.get("torque_magnitude_mean_nm") and em_works.get("torque_magnitude_mean_nm") is not None:
+        em_sweep = {
+            **em_sweep,
+            "torque_magnitude_mean_nm": em_works.get("torque_magnitude_mean_nm"),
+        }
     cool_scr = cool.get("screening_results") if isinstance(cool.get("screening_results"), Mapping) else {}
     cool_inq = (
         cool.get("input_quantities")
@@ -208,12 +234,70 @@ def build_register(twin_dir: Path) -> dict[str, Any]:
         },
         {
             "id": "A-IFACE",
-            "status": "NEEDS_PARTNER_INPUT",
-            "statement": "Vehicle port XYZ / mount CAD",
-            "value": "Types only (HV, coolant×2, LV/CAN, halfshafts, mounts) — XYZ not invented",
-            "replace_with": "Chassis interface control drawing coordinates",
+            "status": "PROVISIONAL_HYPOTHESIS",
+            "statement": "Vehicle port XYZ / mount CAD (bay-local provisional layout)",
+            "value": (
+                "Provisional bay-local XYZ frozen in provisional_partner_seeds.json "
+                "(S-IFACE-XYZ) for packaging/GA — NOT a chassis ICD"
+            ),
+            "replace_with": "Chassis interface control drawing coordinates (BARB-ICD-XYZ)",
+        },
+        {
+            "id": "A-EM-TRUTH",
+            "status": "PROVISIONAL_HYPOTHESIS",
+            "statement": "Working EM truth until dyno",
+            "value": (
+                f"Path B FE mean "
+                f"{em_works.get('torque_magnitude_mean_nm', em_sweep.get('torque_magnitude_mean_nm', '—'))} N·m "
+                f"@ {_qty_value(quantities, 'max_rotor_speed_rpm', 24000)} rpm; "
+                f"arch duty {em_works.get('required_shaft_torque_nm', '—')} N·m; "
+                f"torque_reliable=false"
+            ),
+            "replace_with": "BARB-DYNO measured map",
+        },
+        {
+            "id": "A-DUTY-LAP",
+            "status": "PROVISIONAL_HYPOTHESIS",
+            "statement": "Thermal duty hypothesis until lap log",
+            "value": "DEC-008 intermittent vignette (24 s class) vs continuous screen",
+            "replace_with": "BARB-DUTY-CYCLE lap/stint CSV ≥20 Hz",
+        },
+        {
+            "id": "A-PE-CLASS",
+            "status": "PROVISIONAL_HYPOTHESIS",
+            "statement": "SiC/ESL/cap class until supplier + double-pulse",
+            "value": "3-module class; ESL ~6.4 nH seed; C 71–884 µF concept band; NO MPN",
+            "replace_with": "BARB-SIC-MODULE + BARB-DOUBLE-PULSE + film MPN",
         },
     ]
+
+    # Merge any provisional partner seeds as additional assumption rows
+    for seed in (prov.get("seeds") or []) if isinstance(prov, Mapping) else []:
+        if not isinstance(seed, Mapping):
+            continue
+        sid = str(seed.get("id") or "")
+        if not sid or any(a.get("id") == sid for a in assumptions):
+            continue
+        val = seed.get("value")
+        if isinstance(val, Mapping):
+            # compact one-line
+            parts = []
+            for k, v in list(val.items())[:6]:
+                if k in ("ports", "bay_mm", "coordinate_frame"):
+                    continue
+                parts.append(f"{k}={v}")
+            val_s = "; ".join(parts) if parts else json.dumps(val)[:180]
+        else:
+            val_s = str(val)
+        assumptions.append(
+            {
+                "id": sid,
+                "status": seed.get("status") or "PROVISIONAL_HYPOTHESIS",
+                "statement": seed.get("statement") or sid,
+                "value": val_s,
+                "replace_with": seed.get("replace_with") or "partner input",
+            }
+        )
 
     results = [
         {
@@ -246,7 +330,7 @@ def build_register(twin_dir: Path) -> dict[str, Any]:
                 f"duty_torque_screen_ok="
                 f"{em_loaded.get('duty_torque_screen_ok', em_works.get('duty_torque_screen_ok'))}"
             ),
-            "evidence": "_motor_stack/em_fia_front_kit_case.json",
+            "evidence": f"_motor_stack/{em_source_name}",
         },
         {
             "id": "R-COOL-NET",
@@ -332,6 +416,25 @@ def build_register(twin_dir: Path) -> dict[str, Any]:
                 f"bay_mount_shear_FoS={mount_margins.get('bay_mount_shear_fos')}"
             ),
             "evidence": "_motor_stack/analytical_fia_case_mount_screen.json",
+        },
+        {
+            "id": "R-PATH-B-BARS",
+            "status": "RESULT_UNDER_ASSUMPTIONS",
+            "statement": "Dual torque bars under Path B hypothesis",
+            "value": _path_b_bars_value(em_works, em_sweep),
+            "evidence": f"_motor_stack/{em_source_name}",
+        },
+        {
+            "id": "R-VOLTAGE-24K",
+            "status": "RESULT_UNDER_ASSUMPTIONS",
+            "statement": "Analytical voltage util @ 24k vs 600–900 V (scalar model)",
+            "value": (
+                f"util@750={(volt.get('headline') or {}).get('controlling_utilisation_at_nominal')}; "
+                f"worst_bus={(volt.get('headline') or {}).get('worst_bus_v')}; "
+                f"all_fit={(volt.get('headline') or {}).get('all_bus_corners_within_usable_ceiling')}; "
+                f"closes_bar_a={(volt.get('bar_a_implication') or {}).get('closes_bar_a')}"
+            ),
+            "evidence": "_motor_stack/path_b_voltage_feasibility_screen.json",
         },
         {
             "id": "R-POST-DIFF",

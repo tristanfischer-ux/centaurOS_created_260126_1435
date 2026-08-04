@@ -54,8 +54,11 @@ from em_fia_voltage_fw_screen import (
 SCHEMA = "forgeos.motor_stack.em_fia_torque_map_screen/v1"
 OUTPUT_FILENAME = "em_fia_torque_map_screen.json"
 EM_CASE_FILENAME = "em_fia_front_kit_case.json"
+EM_CASE_PATH_B_FILENAME = "em_fia_front_kit_case_PATH_B_DEC009.json"
 MTPA_FILENAME = "em_fia_mtpa_screen.json"
+MTPA_DEC009_FILENAME = "em_fia_mtpa_screen_DEC009.json"
 VOLTAGE_FW_FILENAME = "em_fia_voltage_fw_screen.json"
+VOLTAGE_PATH_B_FILENAME = "path_b_voltage_feasibility_screen.json"
 POLE_PAIRS = ROTOR_POLES // 2
 
 # INTENT: Extend the MTPA FEMM anchor without re-solving every combination.
@@ -714,16 +717,41 @@ def _validate_upstream_artefacts(
     """Load and validate MTPA, voltage/FW and OC FEMM artefacts."""
 
     current_hash = input_quantities_sha256(inputs)
-    em_case = _read_json(twin_dir / "_motor_stack" / EM_CASE_FILENAME)
-    mtpa = _read_json(twin_dir / "_motor_stack" / MTPA_FILENAME)
-    voltage_fw = _read_json(twin_dir / "_motor_stack" / VOLTAGE_FW_FILENAME)
+    ms = twin_dir / "_motor_stack"
+
+    def _prefer(*names: str) -> tuple[str, dict[str, Any]]:
+        for name in names:
+            path = ms / name
+            if path.is_file():
+                art = _read_json(path)
+                art_hash = str(art.get("input_quantities_sha256") or "")
+                # Accept missing hash only for analytical companions (Path B voltage)
+                if art_hash and art_hash != current_hash:
+                    continue
+                return name, art
+        raise FiaTorqueMapScreenError(
+            f"no matching artefact among {names} for twin quantity hash"
+        )
+
+    em_name, em_case = _prefer(EM_CASE_PATH_B_FILENAME, EM_CASE_FILENAME)
+    mtpa_name, mtpa = _prefer(MTPA_DEC009_FILENAME, MTPA_FILENAME)
+    # Voltage FW may be legacy; Path B voltage screen is optional companion
+    try:
+        vf_name, voltage_fw = _prefer(VOLTAGE_FW_FILENAME)
+    except FiaTorqueMapScreenError:
+        # Build a minimal stub from path B voltage if present
+        pb_v = ms / VOLTAGE_PATH_B_FILENAME
+        if pb_v.is_file():
+            vf_name, voltage_fw = VOLTAGE_PATH_B_FILENAME, _read_json(pb_v)
+            voltage_fw.setdefault("input_quantities_sha256", current_hash)
+        else:
+            raise
     for label, artefact in (
-        ("em_fia_front_kit_case", em_case),
-        ("em_fia_mtpa_screen", mtpa),
-        ("em_fia_voltage_fw_screen", voltage_fw),
+        (em_name, em_case),
+        (mtpa_name, mtpa),
     ):
         artefact_hash = str(artefact.get("input_quantities_sha256") or "")
-        if artefact_hash != current_hash:
+        if artefact_hash and artefact_hash != current_hash:
             raise FiaTorqueMapScreenError(
                 f"{label} was solved against different twin quantities; "
                 "rerun upstream EM cases first"
@@ -758,7 +786,7 @@ def _validate_upstream_artefacts(
                 f"{inputs.rotor_inner_diameter_mm}/"
                 f"{inputs.rotor_outer_diameter_mm} mm); rerun MTPA first"
             )
-    return em_case, mtpa, voltage_fw, femm_points, oc_rms_b
+    return em_case, mtpa, voltage_fw, femm_points, oc_rms_b, em_name, mtpa_name, vf_name
 
 
 def run_selftest() -> int:
@@ -923,7 +951,16 @@ def run_live_case(twin_dir: Path, output_path: Path | None = None) -> int:
         raise FiaTorqueMapScreenError(
             "Twin-bound magnetic geometry does not fit the kit"
         )
-    em_case, mtpa, voltage_fw, femm_points, oc_rms_b = _validate_upstream_artefacts(
+    (
+        em_case,
+        mtpa,
+        voltage_fw,
+        femm_points,
+        oc_rms_b,
+        em_name,
+        mtpa_name,
+        vf_name,
+    ) = _validate_upstream_artefacts(
         twin_dir,
         inputs,
     )
@@ -955,15 +992,14 @@ def run_live_case(twin_dir: Path, output_path: Path | None = None) -> int:
         source_state_sha256=state_hash,
         source_twin=_source_twin_label(twin_dir),
         femm_anchor_refs={
-            "em_fia_mtpa_screen": str(
-                (twin_dir / "_motor_stack" / MTPA_FILENAME).resolve()
-            ),
+            "em_fia_mtpa_screen": str((twin_dir / "_motor_stack" / mtpa_name).resolve()),
             "em_fia_front_kit_case": str(
-                (twin_dir / "_motor_stack" / EM_CASE_FILENAME).resolve()
+                (twin_dir / "_motor_stack" / em_name).resolve()
             ),
             "em_fia_voltage_fw_screen": str(
-                (twin_dir / "_motor_stack" / VOLTAGE_FW_FILENAME).resolve()
+                (twin_dir / "_motor_stack" / vf_name).resolve()
             ),
+            "preferred_path_b": True,
         },
     )
     destination = (

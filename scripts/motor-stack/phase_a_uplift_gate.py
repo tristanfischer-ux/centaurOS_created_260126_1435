@@ -76,6 +76,8 @@ def main() -> int:
         "22-dyno-request-matrix.png",
         "23-partner-asks-ranked.png",
         "24-lap-log-columns-ask.png",
+        "25-provisional-partner-seeds.png",
+        "26-results-under-assumptions.png",
         "FE-FRONT-PATH-B-EM-HONESTY-PACK.pdf",
     ):
         ck(f"jack_{name}", (jack / name).is_file(), str(jack / name))
@@ -225,6 +227,30 @@ def main() -> int:
         pts = dd.get("points") or []
         ck("dyno_has_path_b_point", any(p.get("id") == "DYNO-P0" for p in pts))
         ck("dyno_no_invented_results", "dyno_results" in (dd.get("explicitly_not_claimed") or []))
+
+    # Provisional partner seeds + ABD Path B binding
+    seeds_p = ms / "provisional_partner_seeds.json"
+    ck("provisional_seeds", seeds_p.is_file(), str(seeds_p))
+    if seeds_p.is_file():
+        sd = json.loads(seeds_p.read_text())
+        ck("seeds_ship_ok_false", sd.get("ship_ok") is False)
+        ck("seeds_hypothesis_active", sd.get("status") == "HYPOTHESIS_SET_ACTIVE")
+        ck("seeds_count", len(sd.get("seeds") or []) >= 8)
+    abd_p = twin / "JLR-FE-FRONT-FPK-ASSUMPTION-BASED-DESIGN.json"
+    ck("abd_register", abd_p.is_file(), str(abd_p))
+    if abd_p.is_file():
+        ad = json.loads(abd_p.read_text())
+        ck("abd_ship_ok_false", ad.get("ship_ok") is False)
+        # Path B mean must appear in results (not stale 81.56)
+        blob = json.dumps(ad.get("results_under_assumptions") or [])
+        ck("abd_has_path_b_mean", "122.09" in blob or "122.1" in blob, blob[:120])
+    tmap = ms / "em_fia_torque_map_screen.json"
+    if tmap.is_file():
+        td = json.loads(tmap.read_text())
+        summ = td.get("summary") or {}
+        npts = summ.get("total_screen_points") if isinstance(summ, dict) else None
+        ck("dense_map_points", isinstance(npts, (int, float)) and npts >= 100, str(npts))
+        ck("dense_map_ship_ok_false", td.get("ship_ok") is False)
 
     # tracker addendum
     tr = (REPO / "docs/plans/JLR-FE-FRONT-FPK-BAR-A-BAR-B-CLOSEOUT-TRACKER-2026-07-31.md").read_text()
