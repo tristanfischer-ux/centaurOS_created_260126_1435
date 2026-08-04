@@ -1,0 +1,28 @@
+{
+  "schema": "forgeos.fpk.path_b_dec009_evidence_slim/v1",
+  "source": "out/formula-e-front-mgu-20260729-1432/_motor_stack/em_fia_front_kit_case_PATH_B_DEC009.json",
+  "machine_geometry": {
+    "magnet_thickness_mm": 6.0,
+    "magnet_length_mm": 22.5,
+    "active_length_mm": 130.0
+  },
+  "input_quantities": {
+    "max_rotor_speed_rpm": 24000.0,
+    "phase_current_design_a": 535.0
+  },
+  "works_in_kit_context": {
+    "torque_magnitude_mean_nm": 122.099939,
+    "required_shaft_torque_nm": 104.098914,
+    "mean_torque_vs_required_ratio": 1.172922,
+    "torque_reliable": false,
+    "duty_torque_screen_ok": false
+  },
+  "rotor_position_sweep_summary": {
+    "sign_reversals": 0,
+    "torque_sign_consistent": true,
+    "torque_magnitude_min_nm": 84.967287,
+    "torque_magnitude_max_nm": 145.231484
+  },
+  "loaded_point_angle_deg": -30.0,
+  "ship_ok": false
+}
