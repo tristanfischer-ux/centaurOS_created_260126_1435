@@ -28925,6 +28925,7 @@ def _sc_schedules(wb, ws, state, run_dir):
 PCB_SIDECAR_FILENAMES: tuple = (
     "pcb-stage-result.json",   # chain + repair-pcb-verified-identities.ts
     "pcb-stage.json",          # scripts/fe-front-run-pcb-pipeline.ts
+    "pcb-stage-b.json",        # dual-store / check_store_divergence successor name
 )
 
 def _ensure_pcb_from_sidecar(state: dict, run_dir: str) -> bool:
