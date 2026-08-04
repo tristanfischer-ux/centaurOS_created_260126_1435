@@ -62,10 +62,90 @@ def main() -> int:
         "07-pcb-honesty-sheet.png",
         "08-system-block-diagram.png",
         "09-inverter-mass-budget.png",
+        "11-coolant-loop-one-pager.png",
+        "12-torque-ripple-load-sheet.png",
+        "13-kit-assembly-envelopes-lite.png",
         "FE-FRONT-PATH-B-EM-HONESTY-PACK.pdf",
     ):
         ck(f"jack_{name}", (jack / name).is_file(), str(jack / name))
 
+    # Phase C analytical screens + partner asks
+    ms = twin / "_motor_stack"
+    required_phase_c_sources = [
+        ms / "em_fia_front_kit_case_PATH_B_DEC009.json",
+        ms / "analytical_fia_cooling_network_screen.json",
+        ms / "dc_link_capacitor_concept_screen.json",
+        ms / "inverter_packaging_fia_front_kit_case.json",
+    ]
+    for src in required_phase_c_sources:
+        ck(f"phase_c_src_{src.name}", src.is_file(), str(src))
+    for name in (
+        "coolant_loop_one_pager.json",
+        "torque_ripple_load_sheet.json",
+        "kit_assembly_envelopes_lite.json",
+        "dc_link_capacitor_concept_screen.json",
+    ):
+        p = ms / name
+        ck(f"screen_{name}", p.is_file(), str(p))
+        if p.is_file():
+            d = json.loads(p.read_text())
+            ck(f"screen_{name}_ship_ok_false", d.get("ship_ok") is False)
+    # Staleness: Phase C outputs must not be older than their sources
+    try:
+        newest_src = max(s.stat().st_mtime for s in required_phase_c_sources if s.is_file())
+        for out_name in (
+            "coolant_loop_one_pager.json",
+            "torque_ripple_load_sheet.json",
+            "kit_assembly_envelopes_lite.json",
+            "jack_em_pack/13-kit-assembly-envelopes-lite.png",
+        ):
+            op = ms / out_name
+            if op.is_file():
+                ck(
+                    f"fresh_{out_name}",
+                    op.stat().st_mtime + 2.0 >= newest_src,
+                    f"mtime {op.stat().st_mtime} < src {newest_src}",
+                )
+    except OSError as exc:
+        ck("phase_c_mtime", False, str(exc))
+    asks = twin / "JLR-FE-FRONT-FPK-PARTNER-ASKS-DRAFT-2026-08-04.md"
+    ck("partner_asks_draft", asks.is_file())
+    env = ms / "kit_assembly_envelopes_lite.json"
+    if env.is_file():
+        ed = json.loads(env.read_text())
+        ck("envelopes_visual_only", ed.get("visualOnly") is True)
+        parts = ed.get("parts") or []
+        ck("envelopes_have_cap_high", any(p.get("id") == "dc_link_cap_region_high" for p in parts))
+        ck(
+            "envelopes_all_visual_only",
+            all(p.get("visualOnly") is True for p in parts if isinstance(p, dict)),
+        )
+        hi = next((p for p in parts if p.get("id") == "dc_link_cap_region_high"), {})
+        ck(
+            "cap_high_fit_indeterminate_flag",
+            hi.get("fit_indeterminate_without_supplier_dims") is True,
+        )
+    rip = ms / "torque_ripple_load_sheet.json"
+    if rip.is_file():
+        rd = json.loads(rip.read_text())
+        sf = rd.get("source_flags") or {}
+        tr = sf.get("torque_reliable")
+        ck("ripple_echoes_torque_reliable_false", tr is False or tr == 0 or tr == "false")
+        ck(
+            "ripple_status_not_validated",
+            rd.get("status") in ("INPUT_NOT_VALIDATED", "ORDER_OF_MAGNITUDE_EXCITATION"),
+        )
+        ck("ripple_has_consumer_guard", isinstance(rd.get("consumer_guard"), dict))
+    coolj = ms / "coolant_loop_one_pager.json"
+    if coolj.is_file():
+        cd = json.loads(coolj.read_text())
+        ck("coolant_status_partial", "PARTIAL" in str(cd.get("status") or "").upper() or cd.get("status") == "PARTIAL_ANALYTICAL_SCREEN")
+        ck("coolant_topology_named", bool((cd.get("branches") or {}).get("topology_assumption")))
+        ck(
+            "coolant_topology_assumed",
+            "ASSUMED" in str((cd.get("branches") or {}).get("topology_assumption") or "").upper()
+            or (cd.get("branches") or {}).get("topology_status") == "ASSUMED_NOT_PROVEN",
+        )
     # tracker addendum
     tr = (REPO / "docs/plans/JLR-FE-FRONT-FPK-BAR-A-BAR-B-CLOSEOUT-TRACKER-2026-07-31.md").read_text()
     ck("tracker_addendum", "ADDENDUM 2026-08-04" in tr and "122.100" in tr)
