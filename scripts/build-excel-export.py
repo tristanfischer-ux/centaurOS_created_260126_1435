@@ -40600,6 +40600,27 @@ def _write_deliverable_bundle(run_dir: str, slug: str) -> Optional[dict]:
         "13-kit-assembly-envelopes-lite.png": (
             "EM honesty — W3.2-lite kit assembly envelopes (visualOnly boxes)"
         ),
+        "14-busbar-esl-budget.png": (
+            "EM honesty — W2.3 busbar ESL analytical budget (double-pulse OPEN)"
+        ),
+        "15-iron-loss-corner-table.png": (
+            "EM honesty — W2.7 iron loss corner table (screening uncertainty)"
+        ),
+        "16-bearing-reaction-oom.png": (
+            "EM honesty — W2.9 bearing reaction order-of-magnitude (L10 OPEN)"
+        ),
+        "17-rotor-fos-screening-card.png": (
+            "EM honesty — W2.10 rotor FoS screening card (not release)"
+        ),
+        "18-nvh-modal-open-register.png": (
+            "EM honesty — W2.11 NVH/modal explicit OPEN register"
+        ),
+        "19-gear-oil-status.png": (
+            "EM honesty — W2.13 gear-oil analytical vs B7 CFD status"
+        ),
+        "20-gear-ratio-writeback-blocked.png": (
+            "EM honesty — W2.12 gear ratio writeback BLOCKED (architecture hold)"
+        ),
         "FE-FRONT-PATH-B-EM-HONESTY-PACK.pdf": (
             "EM honesty — full Path B pack (PDF multi-page)"
         ),
@@ -40620,19 +40641,28 @@ def _write_deliverable_bundle(run_dir: str, slug: str) -> Optional[dict]:
         "motor-stack",
         "render_phase_c_kit_screens.py",
     )
+    _render_phase_d = os.path.join(
+        os.path.dirname(os.path.abspath(__file__)),
+        "motor-stack",
+        "render_phase_d_kit_screens.py",
+    )
     # Auto-build if Path B exists and pack is missing or older than inputs
     if os.path.isfile(_path_b_art) and os.path.isfile(_render_jack):
         _need_render = not os.path.isdir(_jack_dir)
-        _need_phase_c = False
+        _need_phase_c = bool(_need_render)
+        _need_phase_d = bool(_need_render)
         if not _need_render:
             try:
                 _pb_m = os.path.getmtime(_path_b_art)
                 _pdf = os.path.join(_jack_dir, "FE-FRONT-PATH-B-EM-HONESTY-PACK.pdf")
                 _p13 = os.path.join(_jack_dir, "13-kit-assembly-envelopes-lite.png")
+                _p20 = os.path.join(_jack_dir, "20-gear-ratio-writeback-blocked.png")
                 if not os.path.isfile(_pdf) or os.path.getmtime(_pdf) + 1.0 < _pb_m:
                     _need_render = True
                 if not os.path.isfile(_p13):
                     _need_phase_c = True
+                if not os.path.isfile(_p20):
+                    _need_phase_d = True
                 # Phase C input freshness (council: do not key only on Path B)
                 _phase_c_inputs = [
                     _path_b_art,
@@ -40656,10 +40686,28 @@ def _write_deliverable_bundle(run_dir: str, slug: str) -> Optional[dict]:
                     _need_phase_c = True
                 elif _newest_in > _p13_m + 1.0 or not os.path.isfile(_p13):
                     _need_phase_c = True
+                # Phase D freshness
+                _phase_d_inputs = [
+                    os.path.join(run_dir, "_motor_stack", "torque_ripple_load_sheet.json"),
+                    os.path.join(run_dir, "_motor_stack", "stator_iron_loss_from_lamination.json"),
+                    os.path.join(run_dir, "_motor_stack", "calculix_rotor_speed_sweep.json"),
+                    os.path.join(run_dir, "_motor_stack", "gear_oil_fia_front_kit_case.json"),
+                    os.path.join(run_dir, "_motor_stack", "gear_geometry_writeback.json"),
+                    os.path.join(run_dir, "_motor_stack", "inverter_packaging_fia_front_kit_case.json"),
+                    _render_phase_d,
+                ]
+                _p20_m = os.path.getmtime(_p20) if os.path.isfile(_p20) else 0.0
+                _newest_d = 0.0
+                for _inp in _phase_d_inputs:
+                    if os.path.isfile(_inp):
+                        _newest_d = max(_newest_d, os.path.getmtime(_inp))
+                if _newest_d > _p20_m + 1.0 or not os.path.isfile(_p20):
+                    _need_phase_d = True
             except OSError:
                 _need_render = True
                 _need_phase_c = True
-        if _need_render or _need_phase_c:
+                _need_phase_d = True
+        if _need_render or _need_phase_c or _need_phase_d:
             try:
                 import subprocess as _sp_jack
                 _repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -40727,6 +40775,21 @@ def _write_deliverable_bundle(run_dir: str, slug: str) -> Optional[dict]:
                                     pass
                     else:
                         print("[bundle] rendered phase-C kit screens (11–13)", flush=True)
+                if os.path.isfile(_render_phase_d) and _need_phase_d:
+                    _dr = _sp_jack.run(
+                        [sys.executable, _render_phase_d, "--twin", run_dir],
+                        capture_output=True,
+                        text=True,
+                        timeout=120,
+                        cwd=_repo_root,
+                    )
+                    if _dr.returncode != 0:
+                        skipped.append(
+                            f"em-honesty/phase-d (exit {_dr.returncode}: "
+                            f"{(_dr.stderr or _dr.stdout or '')[:200]})"
+                        )
+                    else:
+                        print("[bundle] rendered phase-D kit screens (14–20)", flush=True)
             except Exception as _jack_exc:  # noqa: BLE001
                 skipped.append(f"em-honesty/ (renderer failed: {_jack_exc})")
     if os.path.isdir(_jack_dir):
@@ -40740,13 +40803,20 @@ def _write_deliverable_bundle(run_dir: str, slug: str) -> Optional[dict]:
             # Ship under em-honesty/ (customer-facing name) not _motor_stack/
             if _cp(_jp, f"em-honesty/{_jn}"):
                 _em_any = True
-        # companion JSON screens used by phase-C figures
+        # companion JSON screens used by phase-C/D figures
         for _sj in (
             "coolant_loop_one_pager.json",
             "torque_ripple_load_sheet.json",
             "kit_assembly_envelopes_lite.json",
             "dc_link_capacitor_concept_screen.json",
             "inverter_class_mass_screen.json",
+            "busbar_esl_budget_screen.json",
+            "iron_loss_corner_table.json",
+            "bearing_reaction_oom_screen.json",
+            "rotor_fos_screening_card.json",
+            "nvh_modal_open_register.json",
+            "gear_oil_status_one_pager.json",
+            "gear_ratio_writeback_status.json",
         ):
             _sjp = os.path.join(run_dir, "_motor_stack", _sj)
             if os.path.isfile(_sjp):
@@ -40765,9 +40835,9 @@ def _write_deliverable_bundle(run_dir: str, slug: str) -> Optional[dict]:
                 "---------------\n"
                 "00–06  Jack spine: verdict, dual bars, sweep, air-gap, identity, thermal.\n"
                 "07–10  Phase B kit: PCB honesty, system block, mass budget, visual brief.\n"
-                "11     Coolant loop one-pager (analytical network; flow bench OPEN).\n"
-                "12     Torque-ripple load sheet (Path B |T| → F_tang order-of-magnitude).\n"
-                "13     W3.2-lite kit envelopes (visualOnly boxes in bay ghost).\n"
+                "11–13  Phase C: coolant, ripple load, W3.2-lite envelopes.\n"
+                "14–20  Phase D: ESL budget, iron corners, bearing OoM, rotor FoS,\n"
+                "       NVH OPEN, gear-oil status, gear-ratio BLOCKED.\n"
                 "PDF Multi-page pack of the above.\n\n"
                 "Honest status (do not over-read)\n"
                 "--------------------------------\n"
@@ -40776,11 +40846,14 @@ def _write_deliverable_bundle(run_dir: str, slug: str) -> Optional[dict]:
                 "- duty_torque_screen_ok remains false (torque_reliable gate / dyno).\n"
                 "- ship_ok is false. This is not a Bar A close.\n"
                 "- Homologation stays ~1/10 until partners return data.\n"
+                "- Gear ratio writeback is BLOCKED (PLANETARY_STRENGTH_VS_ROTOR_BORE).\n"
+                "- NVH/modal is explicitly OPEN — no fake eigenmodes.\n"
                 "- Do not quote failed DEC009 artefacts that re-derived magnets to 8.85 mm.\n\n"
                 "Source renderers:\n"
                 "  scripts/motor-stack/render_path_b_jack_em_pack.py\n"
                 "  scripts/motor-stack/render_phase_b_kit_screens.py\n"
                 "  scripts/motor-stack/render_phase_c_kit_screens.py\n"
+                "  scripts/motor-stack/render_phase_d_kit_screens.py\n"
             )
             _em_readme_path = os.path.join(bundle_dir, "em-honesty", "README.txt")
             os.makedirs(os.path.dirname(_em_readme_path), exist_ok=True)

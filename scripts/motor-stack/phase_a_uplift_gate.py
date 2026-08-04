@@ -65,6 +65,13 @@ def main() -> int:
         "11-coolant-loop-one-pager.png",
         "12-torque-ripple-load-sheet.png",
         "13-kit-assembly-envelopes-lite.png",
+        "14-busbar-esl-budget.png",
+        "15-iron-loss-corner-table.png",
+        "16-bearing-reaction-oom.png",
+        "17-rotor-fos-screening-card.png",
+        "18-nvh-modal-open-register.png",
+        "19-gear-oil-status.png",
+        "20-gear-ratio-writeback-blocked.png",
         "FE-FRONT-PATH-B-EM-HONESTY-PACK.pdf",
     ):
         ck(f"jack_{name}", (jack / name).is_file(), str(jack / name))
@@ -146,6 +153,39 @@ def main() -> int:
             "ASSUMED" in str((cd.get("branches") or {}).get("topology_assumption") or "").upper()
             or (cd.get("branches") or {}).get("topology_status") == "ASSUMED_NOT_PROVEN",
         )
+
+    # Phase D analytical honesty screens
+    for name, expect_status in (
+        ("busbar_esl_budget_screen.json", "PARTIAL_ANALYTICAL_SCREEN"),
+        ("iron_loss_corner_table.json", "SCREENING_ESTIMATE_CORNERS"),
+        ("bearing_reaction_oom_screen.json", "ORDER_OF_MAGNITUDE_ONLY"),
+        ("rotor_fos_screening_card.json", "SCREENING_ONLY"),
+        ("nvh_modal_open_register.json", "EXPLICITLY_OPEN"),
+        ("gear_oil_status_one_pager.json", None),
+        ("gear_ratio_writeback_status.json", "BLOCKED_ARCHITECTURE_HOLD"),
+    ):
+        p = ms / name
+        ck(f"phase_d_{name}", p.is_file(), str(p))
+        if p.is_file():
+            d = json.loads(p.read_text())
+            ck(f"phase_d_{name}_ship_ok_false", d.get("ship_ok") is False)
+            if expect_status is not None:
+                ck(f"phase_d_{name}_status", d.get("status") == expect_status, str(d.get("status")))
+    nvh = ms / "nvh_modal_open_register.json"
+    if nvh.is_file():
+        nd = json.loads(nvh.read_text())
+        reg = nd.get("register") or []
+        ck("nvh_all_open", all(r.get("status") == "OPEN" for r in reg if isinstance(r, dict)))
+        ck("nvh_no_fake_hz", "modal_frequencies_hz" in (nd.get("explicitly_not_claimed") or []))
+    gr = ms / "gear_ratio_writeback_status.json"
+    if gr.is_file():
+        gd = json.loads(gr.read_text())
+        ck("gear_writeback_invalidated", (gd.get("writeback") or {}).get("invalidated") is True)
+    fos = ms / "rotor_fos_screening_card.json"
+    if fos.is_file():
+        fd = json.loads(fos.read_text())
+        ck("fos_release_not_closed", (fd.get("honesty") or {}).get("release_fos_closed") is False)
+
     # tracker addendum
     tr = (REPO / "docs/plans/JLR-FE-FRONT-FPK-BAR-A-BAR-B-CLOSEOUT-TRACKER-2026-07-31.md").read_text()
     ck("tracker_addendum", "ADDENDUM 2026-08-04" in tr and "122.100" in tr)
