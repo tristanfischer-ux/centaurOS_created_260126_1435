@@ -53,6 +53,14 @@ OUTPUT_FILENAME = "em_fia_mtpa_screen.json"
 SMOKE_POINT_COUNT = 1
 POLE_PAIRS = ROTOR_POLES // 2
 
+# The rotor-frame tracking rule lives in ONE place. Importing it rather than
+# re-deriving it is the whole point: the sign was settled by measurement on
+# 2026-08-01 and the phase-A axis reference on the same day, and a second copy
+# silently missed the second of those for three days.
+from em_fia_front_kit_case import (  # noqa: E402
+    rotor_frame_current_angle_deg as _canonical_rotor_frame_angle_deg,
+)
+
 # INTENT: Resolve the broad torque-producing region around the front-kit
 # point-case optimum without pretending to be an optimisation-grade MTPA map.
 DEFAULT_CURRENT_ANGLES_ELECTRICAL_DEG = (
@@ -119,21 +127,46 @@ def select_grid(*, fast: bool) -> ScreenGrid:
 def phase_excitation_angle_electrical_deg(
     commanded_current_angle_electrical_deg: float,
     rotor_position_mechanical_deg: float,
+    rotor_poles: int = ROTOR_POLES,
+    stator_slots: int = 0,
 ) -> float:
     """Convert a rotor-relative current command into stator phase excitation.
 
-    INTENT: A current angle means one dq command relative to the rotor. When
-    the rotor geometry advances mechanically, the stator current phasor must
-    advance by pole-pairs × mechanical angle; otherwise a position sweep
-    silently changes the dq command and mostly measures phase misalignment.
+    ⭐⭐ ONE TRACKING RULE, IMPORTED — NOT A SECOND COPY (2026-08-04). This
+    function used to compute `command + POLE_PAIRS * theta_mech` and that is
+    NOT the rule the kit case uses. The kit case's
+    `rotor_frame_current_angle_deg` adds the PHASE-A MMF AXIS first, because the
+    advance is referenced to where phase A actually sits for the solved winding
+    layout — 15 electrical degrees for this 24-slot/8-pole machine. Omitting it
+    leaves the current vector misaligned with the rotor at theta_m = 0, so the
+    sweep walks in and out of synchronism and every mean over it is an artefact.
+
+    The kit case's own docstring records the symptom of exactly this omission:
+    "37-point ripple of 119.7 N.m peak-to-peak on a 57.83 N.m mean (207%)". The
+    2026-08-04 MTPA screen at the DEC-009 geometry produced 138 N.m
+    peak-to-peak on a 47.99 N.m mean (287%) with torque crossing zero at all
+    seven angles — the same fault, in the module that kept its own copy of the
+    rule. It also hard-coded the pole count as a module constant rather than
+    reading the machine, so a pole change would have been applied to one solver
+    and not the other.
+
+    THE TEST FOR THIS IS HARMONIC, NOT NUMERIC (campaign-established): a
+    correctly tracking excitation holds the load angle constant, which drives
+    the k=1 PM term and the k=2 reluctance term to near zero and leaves the DC
+    term carrying the torque. "The number got better" is not evidence.
 
     @param commanded_current_angle_electrical_deg Rotor-relative command.
     @param rotor_position_mechanical_deg Mechanical FEM rotor position.
+    @param rotor_poles Machine pole count; defaults to this module's constant.
+    @param stator_slots Solved slot count, for the phase-A axis reference.
     @returns Absolute electrical angle passed to the reused phase-current model.
     """
 
-    return float(commanded_current_angle_electrical_deg) + (
-        POLE_PAIRS * float(rotor_position_mechanical_deg)
+    return _canonical_rotor_frame_angle_deg(
+        float(commanded_current_angle_electrical_deg),
+        float(rotor_position_mechanical_deg),
+        int(rotor_poles),
+        int(stator_slots),
     )
 
 

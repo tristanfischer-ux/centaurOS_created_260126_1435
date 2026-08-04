@@ -115,17 +115,40 @@ def evaluate(state: dict, run_dir: Path | None = None) -> dict:
                          "issue": issue, "evidence": evidence})
 
     # ── 1. SHAFT POWER vs DECLARED HARDWARE CLASS ─────────────────────────────
+    # ⭐⭐ DUTY-TO-DUTY, NOT DUTY-TO-ENVELOPE (Cursor R4/R5 + council, 2026-08-04).
+    # This compared mgu_shaft_power_kw — a DUTY figure — against
+    # front_hardware_power_class_kw, which the brief defines as the SURVIVABILITY
+    # ENVELOPE ("HW nameplate class (press) — NOT continuous duty; SiC/EM envelope
+    # sizing"). On the FE front twin that read 244.5 kW against 350 kW and cried
+    # "70% of the label" for months. It is the same delivered-versus-required
+    # category error as S12, one level up, and it cost real time: it sent me
+    # hunting a 40% inverter down-rate that would have UNDER-sized the envelope
+    # the brief says must survive 350 kW.
+    #
+    # A machine is legitimately built to survive more than its duty. Compare a
+    # duty against a DUTY bound, and only fall back to the class figure when no
+    # duty bound is stated — saying so in the evidence either way.
     shaft_kw = _q(state, "mgu_shaft_power_kw") or _q(state, "peak_mechanical_power_kw")
+    duty_kw = (_q(state, "front_regen_electrical_cap_kw")
+               or _q(state, "continuous_power_kw"))
     class_kw = (_q(state, "front_hardware_power_class_kw")
                 or _q(state, "traction_motor_power_kw"))
-    if shaft_kw and class_kw and class_kw > 0:
-        ratio = shaft_kw / class_kw
+    bound_kw, bound_name, is_duty = (
+        (duty_kw, "duty cap", True) if duty_kw else (class_kw, "hardware class", False))
+    if shaft_kw and bound_kw and bound_kw > 0:
+        ratio = shaft_kw / bound_kw
         if ratio < SHAFT_POWER_CLASS_FLOOR:
-            flag("shaft_power_vs_class", "high",
-                 f"machine delivers {shaft_kw:.1f} kW at the shaft but is declared a "
-                 f"{class_kw:.0f} kW class unit ({ratio:.0%} of the label)",
-                 f"mgu_shaft_power_kw={shaft_kw} vs class {class_kw} "
-                 f"(floor {SHAFT_POWER_CLASS_FLOOR:.0%})")
+            flag("shaft_power_vs_class", "high" if is_duty else "medium",
+                 f"machine delivers {shaft_kw:.1f} kW at the shaft against a "
+                 f"{bound_kw:.0f} kW {bound_name} ({ratio:.0%})"
+                 + ("" if is_duty else
+                    " — compared against the ENVELOPE because no duty cap is stated, "
+                    "which is a weaker test: a machine may legitimately survive more "
+                    "than its duty"),
+                 f"mgu_shaft_power_kw={shaft_kw} vs {bound_name} {bound_kw} "
+                 f"(floor {SHAFT_POWER_CLASS_FLOOR:.0%})"
+                 + (f"; hardware class {class_kw} kW is the survivability envelope and "
+                    f"is deliberately NOT the comparand" if is_duty and class_kw else ""))
 
     # ── 2. MACHINE EFFICIENCY CEILING ─────────────────────────────────────────
     eff = _q(state, "mgu_efficiency")
@@ -197,7 +220,17 @@ def evaluate(state: dict, run_dir: Path | None = None) -> dict:
     dur_regen = _q(state, "duty_regen_time_s")
     dur_motor = _q(state, "duty_motoring_time_s")
     cont_kw = _q(state, "continuous_power_kw")
-    if dur_regen and dur_motor and cont_kw:
+    # ⭐ DEC-008 restamp (2026-08-03): when continuous_power_kw.basis is explicitly
+    # intermittent_peak (or peak/intermittent), the contradiction is RESOLVED by a
+    # named decision — do not keep firing as if both claims were still live.
+    # basis absent or "continuous" still means the old dual claim.
+    _cp_raw = ((state.get("orchestratorContract") or {}).get("quantities") or {}).get(
+        "continuous_power_kw")
+    _cp_basis = ""
+    if isinstance(_cp_raw, dict):
+        _cp_basis = str(_cp_raw.get("basis") or "").strip().lower()
+    _basis_is_continuous = _cp_basis in ("", "continuous", "cont", "steady", "rated_continuous")
+    if dur_regen and dur_motor and cont_kw and _basis_is_continuous:
         window = dur_regen + dur_motor
         duty = dur_regen / window if window > 0 else 1.0
         if duty < 0.9:
@@ -249,9 +282,49 @@ def evaluate(state: dict, run_dir: Path | None = None) -> dict:
                          f"lumped={_a:.1f} network={_b:.1f} "
                          f"(tolerance {SCREEN_TEMP_COHERENCE_K} K)")
 
+    # ⭐⭐ WINDING AND MAGNET CANNOT BE THE SAME TEMPERATURE (Sol, finish council
+    # 2026-08-03). On the live twin `mgu_winding_temp_c` and `mgu_magnet_temp_c`
+    # both read 99.4 °C, because the DEC-008/DEC-009 restamps assign the MAGNET
+    # screen value to both under a comment calling it a "same path proxy". They
+    # are not the same quantity: copper loss is dissipated IN the winding, and
+    # the twin's own thermal screen carries a non-zero magnet-to-winding
+    # resistance (0.05 K/W), so the winding must sit ABOVE the magnet. Publishing
+    # them equal hands a reader checking insulation-class margin (class H, 180 °C)
+    # a number that describes a different part of the machine.
+    #
+    # Arithmetic, not judgement: two temperatures joined by a non-zero thermal
+    # resistance with a non-zero loss between them cannot be equal. Exact
+    # equality is the signal — a proxy that was COPIED, not computed.
+    _t_wind = _q(state, "mgu_winding_temp_c")
+    _t_mag = _q(state, "mgu_magnet_temp_c")
+    _cu = _q(state, "mgu_copper_loss_w")
+    # ⭐ SEVERITY FOLLOWS THE EVIDENCE (Sol, guards council 2026-08-03). Exact
+    # equality plus copper loss is strong, but coarse or rounded telemetry can
+    # legitimately report both temperatures at the same precision. When the twin
+    # also states a non-zero magnet-to-winding resistance the equality is
+    # genuinely impossible and the finding is HIGH; without that resistance on
+    # record it is still worth reporting, at MEDIUM, as something to check.
+    # ⭐ SEVERITY DOWNGRADED TO MEDIUM (Sol, raised twice, guards council
+    # 2026-08-03). A stated branch resistance shows the nodes are separated; it
+    # does NOT prove the temperatures must differ by any particular amount,
+    # because copper heat leaves by several paths and a coarse or rounded
+    # telemetry source can legitimately report both at one precision. A HIGH
+    # gates a release, so a finding that cannot fully establish impossibility
+    # must not carry one — a false HIGH on an honest twin costs more than a
+    # MEDIUM that gets read. The equality is still always reported.
+    _r_mw = _q(state, "magnet_to_winding_k_per_w")
+    if _t_wind and _t_mag and _cu and _cu > 0 and _t_wind == _t_mag:
+        flag("winding_equals_magnet_temperature", "medium",
+             f"winding and magnet temperatures are both exactly {_t_wind:.2f} °C "
+             f"while {_cu:.0f} W of copper loss is dissipated in the winding — a "
+             "copied proxy, not a computed temperature. Insulation-class margin "
+             "cannot be read from it",
+             f"mgu_winding_temp_c={_t_wind} mgu_magnet_temp_c={_t_mag} "
+             f"mgu_copper_loss_w={_cu}")
+
     return {"findings": findings,
             "ok": not any(f["severity"] == "high" for f in findings),
-            "checked": 7}
+            "checked": 8}
 
 
 def _selftest() -> int:
@@ -270,9 +343,32 @@ def _selftest() -> int:
             mgu_efficiency=0.99018, mgu_iron_loss_w=135.56,
             mgu_copper_loss_w=2180.49, max_rotor_speed_rpm=19500)
     got = {f["check"] for f in evaluate(fe)["findings"]}
-    for need in ("shaft_power_vs_class", "efficiency_ceiling", "iron_loss_defaulted"):
+    for need in ("efficiency_ceiling", "iron_loss_defaulted"):
         ck(f"proveCatch.{need}", need in got,
            f"the live FE numbers did not trip {need} (got {sorted(got)})")
+
+    # ⭐ DUTY-VS-ENVELOPE. 244.49 kW against the 250 kW DUTY cap is 97.8% and must
+    # be silent; the same shaft power against the 350 kW ENVELOPE used to fire
+    # HIGH and was wrong to.
+    ck("duty_comparison.silent_when_shaft_meets_the_duty_cap",
+       "shaft_power_vs_class" not in {f["check"] for f in evaluate(
+           st(mgu_shaft_power_kw=244.49, front_regen_electrical_cap_kw=250,
+              front_hardware_power_class_kw=350))["findings"]},
+       "244.5 kW against a 250 kW duty cap (97.8%) was flagged")
+    # …and a genuine duty shortfall must still fire, HIGH.
+    _short = [f for f in evaluate(st(mgu_shaft_power_kw=180.0,
+                                     front_regen_electrical_cap_kw=250))["findings"]
+              if f["check"] == "shaft_power_vs_class"]
+    ck("duty_comparison.fires_on_a_real_duty_shortfall",
+       _short and _short[0]["severity"] == "high",
+       "180 kW against a 250 kW duty cap did not fire HIGH")
+    # With NO duty cap stated it falls back to the envelope, at MEDIUM, and says so.
+    _env = [f for f in evaluate(st(mgu_shaft_power_kw=244.49,
+                                   front_hardware_power_class_kw=350))["findings"]
+            if f["check"] == "shaft_power_vs_class"]
+    ck("duty_comparison.envelope_fallback_is_medium_and_disclosed",
+       _env and _env[0]["severity"] == "medium" and "ENVELOPE" in _env[0]["issue"],
+       "the envelope fallback did not downgrade or did not disclose itself")
 
     # ⭐ proveCatch 2: a healthy machine must NOT trip anything.
     good = st(mgu_shaft_power_kw=340.0, front_hardware_power_class_kw=350,
@@ -287,6 +383,30 @@ def _selftest() -> int:
     ck("iron_loss_abstains_at_low_frequency",
        "iron_loss_defaulted" not in {f["check"] for f in evaluate(lowf)["findings"]},
        "iron-loss check fired at low frequency where a small iron loss is physical")
+
+    # ⭐⭐ proveCatch (Sol, finish council 2026-08-03): the live twin's copied
+    # winding temperature. Both quantities read 99.4 °C with 2180 W of copper
+    # loss on record — physically impossible, and it shipped.
+    ck("proveCatch.winding_equals_magnet_caught",
+       "winding_equals_magnet_temperature" in {
+           f["check"] for f in evaluate(st(mgu_winding_temp_c=99.4,
+                                           mgu_magnet_temp_c=99.4,
+                                           mgu_copper_loss_w=2180.49))["findings"]},
+       "identical winding and magnet temperatures with copper loss did not fire")
+    # NEGATIVE CONTROL — a genuinely computed pair, winding above magnet as the
+    # physics requires, must stay silent or every honest twin fails.
+    ck("negative_control.winding_above_magnet_silent",
+       "winding_equals_magnet_temperature" not in {
+           f["check"] for f in evaluate(st(mgu_winding_temp_c=112.7,
+                                           mgu_magnet_temp_c=99.4,
+                                           mgu_copper_loss_w=2180.49))["findings"]},
+       "a correctly computed winding/magnet pair was flagged")
+    # No copper loss on record -> abstain, do not guess.
+    ck("no_copper_loss_abstains",
+       "winding_equals_magnet_temperature" not in {
+           f["check"] for f in evaluate(st(mgu_winding_temp_c=99.4,
+                                           mgu_magnet_temp_c=99.4))["findings"]},
+       "the check fired without any loss on record to justify a delta")
 
     # ⭐ proveCatch 4: missing inputs must abstain, never invent a verdict.
     ck("empty_state_abstains", evaluate({})["ok"] and not evaluate({})["findings"],
@@ -325,6 +445,15 @@ def _selftest() -> int:
     ck("near_100pct_duty_is_not_flagged",
        "duty_basis_contradiction" not in {f["check"] for f in evaluate(full)["findings"]},
        "a ~99% duty was wrongly called a contradiction")
+    # ⭐ proveCatch DEC-008: intermittent_peak basis must NOT flag.
+    dec008 = {"orchestratorContract": {"quantities": {
+        "continuous_power_kw": {"value": 250, "basis": "intermittent_peak"},
+        "duty_regen_time_s": {"value": 24},
+        "duty_motoring_time_s": {"value": 76},
+    }}}
+    ck("proveCatch.dec_008_intermittent_basis_silent",
+       "duty_basis_contradiction" not in {f["check"] for f in evaluate(dec008)["findings"]},
+       "DEC-008 intermittent_peak basis was still flagged as continuous contradiction")
 
     # Determinism: same input, same answer, twice.
     ck("deterministic", json.dumps(evaluate(fe), sort_keys=True)
