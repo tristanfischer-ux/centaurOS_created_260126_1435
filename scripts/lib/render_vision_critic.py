@@ -751,6 +751,31 @@ def _attach_structured_defects(res: dict) -> dict:
         }
     except Exception as exc:  # noqa: BLE001
         res["structured_defects_error"] = f"{type(exc).__name__}: {exc}"
+        # ⭐⭐ A ROUTE THAT DID NOT RUN IS NOT A CLEAN ROUTE (S8, verify-2
+        # 2026-08-03). `vision_route_fix` is not installed in this checkout, so
+        # this except fired on EVERY critique, recorded the ModuleNotFoundError
+        # in a field nobody reads, and returned ok=true with an empty defect
+        # partition. Downstream that is indistinguishable from "the catalogue
+        # router looked and found nothing wrong" — a green tick that structurally
+        # cannot go red, on the exact surface meant to catch a bad render.
+        #
+        # THREE STATES, NOT TWO (Sol, start council 2026-08-03). Failing closed
+        # on every import error would break archetypes that deliberately run
+        # deterministic drawing checks with no vision backend installed — that
+        # is an environment capability, not an image defect. So:
+        #   • route REQUIRED (VISION_ROUTE_REQUIRED=1) and missing -> ok=False.
+        #     The claim "routed defects: none" was never earned.
+        #   • route optional and missing -> ok survives, but the partition is
+        #     marked not_run so no consumer can read absence as a clean bill.
+        # Either way `defect_partition` is never left looking like an answer.
+        _required = os.environ.get("VISION_ROUTE_REQUIRED", "").strip().lower() in (
+            "1", "true", "yes", "on")
+        res["structured_defects_state"] = "required_missing" if _required else "not_run"
+        res["defect_partition_not_run"] = True
+        if _required:
+            res["ok"] = False
+            res["error"] = (f"required vision route unavailable: "
+                            f"{res['structured_defects_error']}")
     return res
 
 

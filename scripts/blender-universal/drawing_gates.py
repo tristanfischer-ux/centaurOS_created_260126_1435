@@ -2767,6 +2767,32 @@ def main(argv) -> int:
         _state = None
     card = scorecard(gates, _state)
     json.dump(card, open(os.path.join(out_dir, "drawing-gates.json"), "w"), indent=2)
+    # ⭐ UNIVERSAL (2026-08-03): keep state.drawingGates in lockstep with the live
+    # artefact. F5/R5 was state saying fail while drawing-gates.json said pass —
+    # two stores, consumer reads the empty/stale one.
+    try:
+        _sp = os.path.join(out_dir, "state.json")
+        if os.path.isfile(_sp):
+            with open(_sp, encoding="utf-8") as _sf:
+                _st = json.load(_sf)
+            if isinstance(_st, dict):
+                _st["drawingGates"] = {
+                    "all_pass": card.get("all_pass"),
+                    "n_gates": card.get("n_gates"),
+                    "n_failing": card.get("n_failing"),
+                    "n_drawings_skipped": card.get("n_drawings_skipped"),
+                    "source": "drawing-gates.json",
+                    "synced_at": __import__("datetime").datetime.now(
+                        __import__("datetime").timezone.utc
+                    ).strftime("%Y-%m-%dT%H:%M:%SZ"),
+                }
+                _tmp = _sp + f".{os.getpid()}.tmp"
+                with open(_tmp, "w", encoding="utf-8") as _of:
+                    json.dump(_st, _of, indent=2)
+                    _of.write("\n")
+                os.replace(_tmp, _sp)
+    except Exception as _sync_exc:  # noqa: BLE001 — never fail the gate run on sync
+        print(f"[drawing-gates] ! state.drawingGates sync skipped: {_sync_exc}")
     print(f"[drawing-gates] {card['n_gates']} gates · {card['n_failing']} failing · "
           f"{card.get('n_drawings_skipped', 0)} drawing(s) skipped (out-of-scope) · "
           f"ALL-PASS={card['all_pass']}")

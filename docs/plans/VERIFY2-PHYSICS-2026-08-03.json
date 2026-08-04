@@ -1,0 +1,92 @@
+{
+  "id": "PHYSICS",
+  "ok": true,
+  "ship_ok_still_false": true,
+  "commands_run": [
+    "python scripts/lib/dec_em1_option_screen.py --selftest",
+    "python scripts/lib/dec_em1_option_screen.py --twin out/formula-e-front-mgu-20260729-1432",
+    "python scripts/lib/check_falsifiability_audit.py --twin out/formula-e-front-mgu-20260729-1432",
+    "python -c independent T=P/(eta*omega), Steinmetz iron, LPTN magnet, workbook openpyxl scan",
+    "python -c shaft_torque_identity.required_shaft_torque_nm(combined_efficiency=0.9777)"
+  ],
+  "not_checked": [
+    "Full FEMM re-solve of em_fia_front_kit_case_REBALANCED (used stamped FE means + arithmetic)",
+    "OpenFOAM / CalculiX re-solves",
+    "Design-pack zip internal copies beyond V1.280 unpacked tree + workbook"
+  ],
+  "summary": "A\u2013D,F,H confirmed by independent arithmetic and producer re-runs. E: adopted magnets agree at 83.8\u00b0C exactly; continuous_reference magnets differ by 0.115 K (strictly >0.1 K). G: duty required is 125.2193 N\u00b7m; 119.7 is shaft torque at 244.49 kW \u2014 ABD/EM/ISO/bevel/mount do not flatter, but gear_oil required_shaft_torque_nm=119.73 and workbook never surfaces 125.2. Iron loss correctly labelled screening_estimate (two-sided), not upper bound. ship_ok remains false.",
+  "findings": [
+    {
+      "claim": "A) Torque required 125.2193 N\u00b7m from T=P_elec/(\u03b7\u00b7\u03c9), \u03b7\u22480.9777",
+      "where": "scripts/motor-stack/shaft_torque_identity.py; _motor_stack/analytical_fia_case_mount_screen.json; _motor_stack/em_fia_front_kit_case_REBALANCED.json analytical_duty_check",
+      "command": "T=250e3/(0.9777*19500*2*pi/60); also \u03b7=0.98766*0.98995=0.977734",
+      "observed": "claimed=125.2193; independent \u03b7=0.9777 \u2192 125.219269 N\u00b7m (gap \u22123e-5); FE analytical \u03b7=0.977734 \u2192 125.214912 N\u00b7m (gap \u22120.0044). Formula: T_shaft=P_elec/(\u03b7_combined\u00b7\u03c9) with \u03c9=n\u00b72\u03c0/60. Match.",
+      "classification": "CONFIRMED",
+      "reader_would_conclude": "Required regen/duty shaft torque at 250 kW / 19500 rpm is ~125.22 N\u00b7m using combined \u03b7\u22480.9777.",
+      "severity": "info"
+    },
+    {
+      "claim": "B) Delivered baseline ~81.558 N\u00b7m; DEC-009 24k rpm/130mm \u2192 ~1.069\u00d7",
+      "where": "_motor_stack/em_fia_front_kit_case_REBALANCED.json; _motor_stack/em_combined_case.json; _motor_stack/dec_em1_option_screen.json",
+      "command": "python scripts/lib/dec_em1_option_screen.py --twin <twin>; read FE mean and combined row rpm=24000 stack=130",
+      "observed": "claimed baseline\u224881.558 / ratio\u22481.069; observed mean |T|=81.558081; 24k/130 torque_ratio=1.069 (combined ratio=1.0692=implied_delivered 108.782 / required 101.741). Producer re-run reproduces 1.069. Note ratio is vs speed-adjusted required torque, not 81.558\u00d71.069.",
+      "classification": "CONFIRMED",
+      "reader_would_conclude": "Baseline FE mean torque is ~81.6 N\u00b7m (~0.65\u00d7 required); 24k/130 option is the first that clears torque at ~1.069\u00d7 its own required.",
+      "severity": "info"
+    },
+    {
+      "claim": "C) Iron loss 6035 W screening_estimate range 3.9\u20138.5 kW \u2014 confirm basis label; flag if called upper bound",
+      "where": "_motor_stack/stator_iron_loss_from_lamination.json; _motor_stack/magnet_margin_sensitivity.json; state.json iron_loss provenance",
+      "command": "Steinmetz recompute kh\u00b7f\u00b7B^\u03b1+ke\u00b7f\u00b2\u00b7B\u00b2 on tooth/yoke masses; 0.65\u00d7\u20131.4\u00d7 envelope",
+      "observed": "claimed 6035 W / screening_estimate / 3.9\u20138.5 kW; observed iron_loss_w=6035.1, basis=screening_estimate, tooth 2249.4 + yoke 3785.7. Caveat: 'SCREENING ESTIMATE, not a bound\u2026 TWO-SIDED' \u2192 3.92\u20138.45 kW (corners 3.92\u20138.45). NOT labelled upper bound in primary artefacts.",
+      "classification": "CONFIRMED",
+      "reader_would_conclude": "6035 W is a mid screening point with a two-sided uncertainty band ~3.9\u20138.5 kW, not a conservative upper bound.",
+      "severity": "info"
+    },
+    {
+      "claim": "D) Magnet temp under DEC-008 intermittent ~83.8\u00b0C; DEC-009 ~99.4\u00b0C vs 150 limit",
+      "where": "_motor_stack/dec_008_duty_restamp.json; _motor_stack/dec_em1_option_screen.json; 10-decision-register.json DEC-008/009",
+      "command": "python scripts/lib/dec_em1_option_screen.py --twin <twin>; LPTN T_mag=T_in+(P_m+P_inv)\u00b7duty/(\u1e41\u00b7cp)+0.01\u00b7P_m\u00b7duty",
+      "observed": "claimed 83.8 / 99.4 / limit 150; independent baseline vignette\u219283.84\u00b0C (stored 83.8); DEC-009 24k/130 vignette\u219299.39\u00b0C (stored 99.4); continuous 009\u2192224.1\u00b0C. Margin vs 150: +66.2 K (008), +50.6 K (009 vignette).",
+      "classification": "CONFIRMED",
+      "reader_would_conclude": "Under 24% vignette both baseline and DEC-009 clear 150\u00b0C magnets; continuous duty does not (especially at 24k/130).",
+      "severity": "info"
+    },
+    {
+      "claim": "E) Two thermal screens agree within 0.1 K",
+      "where": "_motor_stack/analytical_fia_cooling_thermal_screen.json vs analytical_fia_cooling_network_screen.json; closeout council 0.1 K claim",
+      "command": "diff continuous_reference_maximum_magnet_temperature_c and maximum_magnet_temperature_c",
+      "observed": "claimed \u22640.1 K; adopted max magnet both 83.8 (\u0394=0.0 K); continuous_reference 159.35 vs 159.235 (\u0394=0.115 K). Network thermal_network.magnet_temperature_c still 159.235 (pre-restamp continuous path).",
+      "classification": "BORDERLINE_NUMERIC",
+      "reader_would_conclude": "Post-DEC-008 adopted magnets match exactly; continuous-path cross-screen agreement is ~0.12 K, slightly looser than the stated 0.1 K slogan.",
+      "severity": "low"
+    },
+    {
+      "claim": "F) Falsifiability 0/169 unfalsifiable",
+      "where": "check-falsifiability-audit.json; scripts/lib/check_falsifiability_audit.py",
+      "command": "python scripts/lib/check_falsifiability_audit.py --twin out/formula-e-front-mgu-20260729-1432",
+      "observed": "claimed 0/169; re-run: checks_audited=169, unfalsifiable_count=0, findings=[], ok=true. Matches stamped audit JSON.",
+      "classification": "CONFIRMED",
+      "reader_would_conclude": "All 169 audited checks are structurally capable of failing.",
+      "severity": "info"
+    },
+    {
+      "claim": "G) TORQUE DENOMINATOR TRAP: mgu_shaft_torque_nm=119.7 is at 244.49 kW shaft \u2014 duty req is 125.2193; workbook/pack/ABD must not flatter with 119.7 as required",
+      "where": "state.json quantities.mgu_shaft_torque_nm; workbook V1.280 Verification/Calculations/\u26a0 Checks; JLR-FE-FRONT-FPK-ASSUMPTION-BASED-DESIGN.md; _motor_stack/gear_oil_fia_front_kit_case.json; iso6336/iso_bevel/em REBALANCED",
+      "command": "T=244.49e3/\u03c9_19500; openpyxl scan 119.7 vs 125.2; grep required_shaft_torque across motor_stack",
+      "observed": "119.7 path confirmed: 244.49e3/\u03c9\u2248119.73 N\u00b7m (motoring post-\u03b7 shaft). Duty required independent=125.2193. ABD R-EM-DUTY uses 125.214912; EM REBALANCED required=125.214912; ISO6336/bevel duty_torques.motor_shaft=125.219269 with explicit note twin mgu_shaft_torque does not set screen load; mount=125.2193. CONTRARY: gear_oil required_shaft_torque_nm=119.7286 and mgu_shaft_torque_nm=119.7. Workbook: 20 hits of 119.7 as mgu_shaft_torque_nm PASS, 0 hits of 125.2. Pack tree has workbook copy only for these numbers.",
+      "classification": "PARTIAL_TRAP_RESIDUAL",
+      "reader_would_conclude": "EM duty bar is ~125.2 N\u00b7m and ABD states that; but gear_oil still denominates on ~119.7, and the engineering workbook never shows the 125.2 duty requirement \u2014 a reader using workbook/gear_oil alone could understate the torque gap (0.681 vs 0.651).",
+      "severity": "medium"
+    },
+    {
+      "claim": "H) DEC-008 and DEC-009 presented as reversible decisions; DEC-009 depends on DEC-008",
+      "where": "10-decision-register.json DEC-008, DEC-009; _motor_stack/dec_008_duty_restamp.json note",
+      "command": "python json load 10-decision-register.json filter DEC-008/009",
+      "observed": "Both status=FROZEN_UNDER_ASSUMPTION; owner text includes 'reversible'; DEC-008 reverses_if lap CSV higher duty; DEC-009 residual_risk='DEPENDS ON DEC-008\u2026', reverses_if='DEC-008 is reversed, or release-grade rotor burst fails'. dec_008 note: DEC-009 geometry NOT applied in 008 restamp. Match.",
+      "classification": "CONFIRMED",
+      "reader_would_conclude": "008 (intermittent duty) and 009 (24k/130) are assumption-frozen and reversible; reversing 008 forces re-score of 009.",
+      "severity": "info"
+    }
+  ]
+}

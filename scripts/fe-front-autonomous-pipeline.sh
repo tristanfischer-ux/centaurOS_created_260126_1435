@@ -59,7 +59,13 @@ run_stage3() {
   echo "$(date -Iseconds) STAGE3 start out=$OUT" | tee "$WD/stage3-started.txt"
   export PATH="/opt/homebrew/opt/node@22/bin:$PATH"
   set -a; [[ -f .env.local ]] && . ./.env.local; set +a
+  # ⭐ UNIVERSAL: restamp twin from frozen decisions BEFORE excel so Checks cannot
+  # ship continuous magnet temps while DEC-008 says intermittent (F1/R1).
+  python3 scripts/lib/apply_frozen_decisions.py --twin "$OUT" \
+    > "$OUT/apply-frozen-decisions.log" 2>&1 || echo "frozen-decisions exit $?"
   python3 scripts/build-excel-export.py "$OUT" > "$OUT/excel-stage3.log" 2>&1 || echo "excel exit $?"
+  python3 scripts/lib/check_deliverable_coherence.py --twin "$OUT" --enforce \
+    > "$OUT/deliverable-coherence.log" 2>&1 || echo "coherence exit $?"
   python3 scripts/lib/ship_red_team.py "$OUT" > "$OUT/ship-red-team.log" 2>&1 || true
   python3 scripts/lib/loop_board.py assemble "$OUT" --board out/formula-e-front-mgu-board.json || true
   echo "$(date -Iseconds) STAGE3 done" | tee "$WD/stage3-done.txt"

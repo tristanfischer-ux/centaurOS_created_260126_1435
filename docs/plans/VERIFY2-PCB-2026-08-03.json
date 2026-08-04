@@ -1,0 +1,78 @@
+{
+  "id": "PCB",
+  "ok": false,
+  "ship_ok_still_false": true,
+  "commands_run": [
+    "ls/find pcb-boards, pcb-project, pcb/, pcb-stage*.json",
+    "python3 parse pcb-stage.json, both drc-report.json, power-tree.json, tab-scorecard PCB, state.pcb",
+    "kicad-cli version; kicad-cli pcb drc baseline on /tmp scratch copy of traction_control",
+    "inject dual-net short on scratch; kicad-cli pcb drc \u2192 30 violations incl. shorting_items; prod DRC still 0",
+    "openpyxl scan latest engineering workbook PCB + Quality & Audit sheets",
+    "cross-check pcb-project/*/build/default.csv designators vs positions.csv vs main.ato channel news vs required_channel_counts",
+    "diff root pcb-stage.json vs pcb/pcb-stage.json; find pcb-stage-result.json (absent)"
+  ],
+  "findings": [
+    {
+      "claim": "2 routed boards under pcb-boards/*",
+      "where": "/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/formula-e-front-mgu-20260729-1432/pcb-boards/{traction_control,traction_gate_drive}/pcb/board-routed.kicad_pcb",
+      "command": "ls pcb-boards; python boardPipelines + pipeline.routed",
+      "observed": "Exactly 2 dirs; both have board-routed.kicad_pcb, 21 gerbers each, boardPipelines pipelineOk=true stageReached=complete, pipeline.routed=true components=62",
+      "classification": "CONFIRMED",
+      "reader_would_conclude": "Two Freerouting-completed KiCad boards exist and are the live pipeline outputs",
+      "severity": "info"
+    },
+    {
+      "claim": "0 DRC violations and DRC actually ran",
+      "where": "pcb-boards/*/pcb/drc-report.json; pcb-stage.json pipeline.drc; /tmp scratch kicad-cli run",
+      "command": "python len(violations); kicad-cli pcb drc on scratch baseline then deliberate short",
+      "observed": "Both reports: KiCad 10.0.4, schema drc.v1.json, violations=[], dates 2026-07-30T10:00:49/10:01:04 matching board mtimes; pipeline.drc={ran:true,violations:0}. Scratch short \u2192 30 violations (6 shorting_items, 11 tracks_crossing); production reports remain 0",
+      "classification": "CONFIRMED",
+      "reader_would_conclude": "DRC is real KiCad output, not a stub; zero means clean under current rules (some checks ignored: missing_courtyard etc.)",
+      "severity": "info"
+    },
+    {
+      "claim": "fitness 7.6/10",
+      "where": "workbook PCB R147; pcb-stage.json designFitness; tab-scorecard.json tabs.PCB",
+      "command": "openpyxl PCB sheet; python designFitness + tab-scorecard PCB",
+      "observed": "Workbook Design-fitness scorecard Fitness score (/10)=7.6 PASS (threshold \u22657.5). JSON designFitness={ok:true,findings:[]} with no numeric. tab-scorecard PCB content_score=9.0 (hygiene/evidence axis)",
+      "classification": "PARTIAL",
+      "reader_would_conclude": "7.6 is the workbook design-fitness number; JSON only carries ok-boolean; tab scorecard 9/10 is a different score",
+      "severity": "low"
+    },
+    {
+      "claim": "NOT_FABRICATION_READY must be true in state and workbook language",
+      "where": "pcb-stage.json; state.json pcb; workbook PCB R6; Quality & Audit",
+      "command": "python NOT_FABRICATION_READY/ship_ok; openpyxl PCB+QA",
+      "observed": "Root stage+state: NOT_FABRICATION_READY=true, forgeDraftOnly=true, ship_ok=false, supplierGerbers=false, hilPresent=false. QA: NOT_FABRICATION_READY=TRUE ENGINEERING DRAFT. PCB R6 banner: 'FAB-READY \u2014 UNPROVEN IN HARDWARE' (honesty max-claim label, not supplier release)",
+      "classification": "PARTIAL",
+      "reader_would_conclude": "State hard-blocks fab release; workbook banner can be skim-misread as fab-ready despite UNPROVEN and QA stamp",
+      "severity": "medium"
+    },
+    {
+      "claim": "power-tree.json, positions.csv, channel lists consistent with electronics BoM",
+      "where": "pcb/power-tree.json; pcb/positions.csv; pcb-project/*/build/default.csv; main.ato; required_channel_counts",
+      "command": "python channel counts vs ato news vs BOM designator expand; pos vs bom set diff; power-tree lv.to vs boardIds",
+      "observed": "Channels required=implemented match ato (6 gate/desat, 3 phase, etc.). Gate BOM collapses parent+6 channels into 7 gate_driver_ic U-refs. positions \u2287 BOM refs (+H*/TP*). power-tree LV names oem_inverter_control_board/gate_driver_board \u2260 board ids traction_control/traction_gate_drive; architecture marks oem_inverter_control_board off_board while traction_control board exists",
+      "classification": "PARTIAL",
+      "reader_would_conclude": "Channel math holds; power-tree naming and off_board vs traction_control dual-story; gate IC count 7 vs channel 6 needs the parent-word explanation",
+      "severity": "medium"
+    },
+    {
+      "claim": "pcb-stage.json vs pcb-stage-result.json two-store trap",
+      "where": "pcb-stage.json vs pcb/pcb-stage.json (pcb-stage-result.json absent)",
+      "command": "find pcb-stage-result.json; python key/disposition/size/mtime diff",
+      "observed": "No pcb-stage-result.json. Dual stores: root 50744B bespoke + full pipeline + NOT_FABRICATION_READY + 2 boardPipelines; pcb/pcb-stage.json 2680B older cots-modules electronicPartCount=4 no pipeline no NOT_FAB field",
+      "classification": "CONFIRMED_TRAP",
+      "reader_would_conclude": "Reading pcb/pcb-stage.json alone yields false COTS/no-board story; authoritative store is root pcb-stage.json / state.pcb",
+      "severity": "high"
+    }
+  ],
+  "not_checked": [
+    "Full netlist electrical correctness beyond DRC/unconnected",
+    "Re-run of Freerouting or full multi-board pipeline end-to-end",
+    "Gerber CAM/manufacturer DFM (annular ring, impedance, HV creepage)",
+    "HIL/firmware proof contents beyond hilPresent=false and workbook NOT RUN",
+    "Whether ignored_checks in DRC would hide real courtyard/footprint issues on a fab house stackup"
+  ],
+  "summary": "Headline claim mostly holds from project files: 2 routed boards, both DRC-clean with provenance and a scratch short catch proving kicad-cli DRC works, design-fitness 7.6 on the workbook scorecard, NOT_FABRICATION_READY/ship_ok=false in root state. ok=false because of a live two-store trap (root pcb-stage.json bespoke/2-board vs stale pcb/pcb-stage.json cots-modules) plus power-tree/board-id naming drift and workbook FAB-READY banner vs NOT_FABRICATION_READY hard flag."
+}

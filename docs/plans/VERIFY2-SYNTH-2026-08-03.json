@@ -1,0 +1,268 @@
+{
+  "overall_ok": false,
+  "guards_ok": true,
+  "typecheck_ok": true,
+  "ship_ok_still_false": true,
+  "no_hold_closed": true,
+  "adversarial_detectors_still_fire": true,
+  "evidence": "Re-ran 2026-08-03 on twin out/formula-e-front-mgu-20260729-1432: bash scripts/verify-engine-guards.sh \u21920; node scripts/check-typecheck-baseline.mjs \u21920 (143 sigs); check_falsifiability_audit.py --twin \u21920 (169/0 unfalsifiable) + --selftest proveCatch OK; check_bar_b_register_freshness.py --twin \u21920 (stale_count=0, stamped/live ship_ok=false, 10 OPEN rows) + --selftest proveCatch OK; physics_plausibility.py --twin \u21920 ok=False HIGH shaft_power_vs_class 244.49 vs 350 class, --enforce \u219245; npx tsx gate-registry.ts --selftest \u21920 (28/28 catch; 7 enforced-by-default: 22,25,41\u201345); drawing_gates.py twin \u219223/23 ALL-PASS; state.drawingGates synced_at=2026-08-03T18:12:58Z all_pass=true matches drawing-gates.json; dec_em1_option_screen --twin baseline T/Treq=0.651 magnet_vignette=83.8, 24k/130 T/Treq=1.069 magnet_vignette=99.4; independent T=250e3/(0.9777*\u03c9_19500)=125.219269 N\u00b7m; FE mean |T|=81.558081; continuous_reference magnets 159.35 vs 159.235 (\u03940.115 K); gear_oil required_shaft_torque_nm=119.7286; openpyxl V1.280 Exec Summary r38\u201346 all Target=Achieved STATUS=PASS incl. magnet limit 150/150 while Checks r63 design 159.35 FAIL; PCB A6 FAB-READY banner vs root pcb-stage/state NOT_FABRICATION_READY=true; nested pcb/pcb-stage.json cots-modules eParts=4; visual 00-hero.png open/disassembled with floor rails/bolts + floating bar; quality-scorecard floor=4 release_readiness=4 allPass=false; ESCALATE drawing stubs still open vs live ALL-PASS.",
+  "findings_ordered": [
+    {
+      "claim": "00-hero is a shippable closed-product flagship render of the unitised front MGU",
+      "where": "out/formula-e-front-mgu-20260729-1432/00-hero.png (and 04/08/13 sharing floor debris)",
+      "command": "read_file 00-hero.png; ls -la; drawing_gates.py twin (renders=pass); render-vision-critique.json",
+      "observed": "Hero is open/disassembled: end region open with copper windings exposed, thin bar floating above, long rails and bolt-like solids on the ground plane disconnected from the pack. drawing_gates render_* PASS; vision critique ok=true on 04 only with structured_defects_error ModuleNotFoundError: vision_route_fix. evaluate path does not fail open-hero/debris.",
+      "classification": "WRONG",
+      "reader_would_conclude": "The product flagship shot shows a finished sealed FPK ready for customer review",
+      "severity": "critical",
+      "area": "RENDERS"
+    },
+    {
+      "claim": "Executive Summary Key specifications show engineering achievements (Target met \u2192 Achieved + PASS)",
+      "where": "20260803-1357-V1.280-DRAFT-\u2026workbook.xlsx Executive Summary!A37:I46",
+      "command": "openpyxl load_workbook(data_only=True) dump r37\u201346",
+      "observed": "Headers Brief metric|Target|Achieved|STATUS. All 9 rows have Target==Achieved and STATUS=PASS with notes 'brief key: \u2026 \u2192 contract: \u2026'. Includes Front hardware power class 350/350 PASS, Fpk mass cap 32/32 PASS, Magnet temp limit 150/150 PASS \u2014 pure brief/contract echo, not measured performance.",
+      "classification": "WRONG",
+      "reader_would_conclude": "The design has met every brief metric including power class, mass, and magnet temperature because the sheet shows green PASS",
+      "severity": "high",
+      "area": "EXCEL"
+    },
+    {
+      "claim": "Magnet temperature compliance is PASS at the 150 \u00b0C limit",
+      "where": "Executive Summary!A46 vs \u26a0 Checks!A63 vs DEC-008 restamp / thermal screens",
+      "command": "openpyxl Exec r46 + Checks r63; json thermal screens maximum_magnet_temperature_c",
+      "observed": "Exec: Target=150 Achieved=150 STATUS=PASS (limit echoed). Checks r63: Brief target met: magnet_temp_limit_c design=159.35 limit=150 delta=9.35 STATUS=FAIL. Post-DEC-008 vignette magnets 83.8 \u00b0C clear 150; continuous-path design value 159.35 still fails the ceiling check. Dual story on the same quantity name.",
+      "classification": "WRONG",
+      "reader_would_conclude": "From Exec Summary alone, magnets are compliant at 150 \u00b0C; the dossier is thermally closed",
+      "severity": "high",
+      "area": "EXCEL"
+    },
+    {
+      "claim": "Machine is a consistent 350 kW class unit at the shaft (label matches delivered performance)",
+      "where": "scripts/lib/physics_plausibility.py shaft_power_vs_class; contract front_hardware_power_class_kw=350; workbook Exec r38",
+      "command": ".venv/bin/python scripts/lib/physics_plausibility.py --twin out/formula-e-front-mgu-20260729-1432 [--enforce]",
+      "observed": "Detector HIGH: mgu_shaft_power_kw=244.49 vs class 350.0 (70% < 85% floor); ok=False. Default exit 0; --enforce exit 45. Exec Summary still PASSes 350/350 as brief echo. engine-guards only runs physics_plausibility --selftest.",
+      "classification": "WRONG",
+      "reader_would_conclude": "This unit delivers ~350 kW class performance at the shaft and CI would block a mis-labelled class",
+      "severity": "high",
+      "area": "PHYSICS"
+    },
+    {
+      "claim": "PCB boards are fabrication-ready (FAB-READY headline)",
+      "where": "workbook PCB!A6; Quality & Audit; root pcb-stage.json; state.json pcb",
+      "command": "openpyxl PCB A6 + QA D11; python json pcb-stage + state.pcb",
+      "observed": "PCB banner: 'FAB-READY \u2014 UNPROVEN IN HARDWARE \u2014 DRC-clean\u2026'. Root pcb-stage/state: NOT_FABRICATION_READY=true, forgeDraftOnly=true, ship_ok=false, supplierGerbers=false, hilPresent=false. QA readiness: ENGINEERING DRAFT. Two routed DRC-clean boards are real, but release language conflicts.",
+      "classification": "WRONG",
+      "reader_would_conclude": "Boards can be sent to a fab house as a release package",
+      "severity": "high",
+      "area": "PCB"
+    },
+    {
+      "claim": "mgu_iron_loss_w is a single consistent engineering value across the dossier",
+      "where": "\u26a0 Checks!A109; Calculations iron_loss rows; _motor_stack/stator_iron_loss_from_lamination.json",
+      "command": "openpyxl Checks r109; json iron_loss_w basis=screening_estimate",
+      "observed": "Design uses 6035.1 W (Steinmetz screening on FE tooth/yoke flux). Tool motor:loss-point still 135.56 W. Checks discloses supersession FAIL (delta \u22125899.54) but both values remain under the same quantity name. Dissipation blocks also disagree continuous totals (~6.6 vs ~12.5 kW paths).",
+      "classification": "WRONG",
+      "reader_would_conclude": "Iron loss is either ~136 W or ~6 kW depending on which row they trust; thermal/loss closure is ambiguous",
+      "severity": "high",
+      "area": "EXCEL"
+    },
+    {
+      "claim": "Gate registry blocks defects by default across the canonical set",
+      "where": "scripts/lib/gate-registry.ts enforcedByDefault(); npx tsx scripts/lib/gate-registry.ts --selftest",
+      "command": "npx tsx scripts/lib/gate-registry.ts --selftest",
+      "observed": "28/28 gates proven CATCH; only 7 enforced-by-default (22, 25, 41, 42, 43, 44, 45). 21 shadow/flag-gated including drawing-gates(35), physics-critic(33), design-closure(40). Live is 7/28 not ~full set.",
+      "classification": "UNSUPPORTED",
+      "reader_would_conclude": "A failing registry gate will stop a bad ship without setting env flags",
+      "severity": "high",
+      "area": "GUARDS"
+    },
+    {
+      "claim": "Automated image/vision/drawing gates catch open-hero, floaters, and floor debris",
+      "where": "drawing-gates.json renders; render-vision-critique.json; render_image_quality",
+      "command": "drawing_gates.py twin; cat render-vision-critique.json",
+      "observed": "drawing_gates ALL-PASS including render_presence/framing/washed_out and plan_render_coherence. Vision critique ok=true defects=[] on 04-product-exterior only; structured_defects_error ModuleNotFoundError. Human visual open of 00-hero fails ship criteria.",
+      "classification": "UNSUPPORTED",
+      "reader_would_conclude": "Green drawing/render gates mean the product visuals are customer-ready",
+      "severity": "high",
+      "area": "RENDERS"
+    },
+    {
+      "claim": "pcb-stage.json is a single authoritative store (no COTS/no-board false story)",
+      "where": "out/\u2026/pcb-stage.json vs out/\u2026/pcb/pcb-stage.json (pcb-stage-result.json absent)",
+      "command": "python diff root vs nested pcb-stage.json; find pcb-stage-result.json",
+      "observed": "Root 50\u202f744 B: disposition=bespoke, 2 boardPipelines, NOT_FABRICATION_READY, electronic pipeline complete. Nested pcb/pcb-stage.json 2\u202f680 B older: disposition=cots-modules, electronicPartCount=4, no pipeline, no NOT_FAB field. pcb-stage-result.json absent. PCB_SIDECAR expects both names.",
+      "classification": "WRONG",
+      "reader_would_conclude": "Reading pcb/pcb-stage.json alone yields a false COTS/four-part story with no routed boards",
+      "severity": "high",
+      "area": "PCB"
+    },
+    {
+      "claim": "physics_plausibility HIGH findings block the default guard/CI path",
+      "where": "scripts/lib/physics_plausibility.py main(); scripts/verify-engine-guards.sh",
+      "command": "physics_plausibility.py --twin (exit 0) vs --enforce (exit 45); rg physics_plausibility verify-engine-guards.sh",
+      "observed": "HIGH shaft_power_vs_class with ok=False but process exit 0 unless --enforce. engine-guards only runs --selftest, not twin --enforce.",
+      "classification": "UNSUPPORTED",
+      "reader_would_conclude": "Implausible power-class labelling would fail CI/guards without an extra flag",
+      "severity": "medium",
+      "area": "GUARDS"
+    },
+    {
+      "claim": "ESCALATE stubs for formula_e_front_mgu drawing:cad_geometry_coverage, drawing_set_coherence, plan_render_coherence still assert recurring loss",
+      "where": "tasks/harness-stubs/ESCALATE__formula_e_front_mgu__drawing_{cad_geometry_coverage,drawing_set_coherence,plan_render_coherence}.md",
+      "command": "cat stubs; python3 scripts/blender-universal/drawing_gates.py out/formula-e-front-mgu-20260729-1432",
+      "observed": "Stubs still open ('failed 2\u00d7/4\u00d7 \u2014 recurring loss'). Live drawing-gates.json and re-run: all three gates \u2713, all_pass=true n_failing=0. No retract mechanism. drawing-gates-final.log also stale (old FAILs).",
+      "classification": "STALE",
+      "reader_would_conclude": "Those three drawing gates are still failing and need council escalation",
+      "severity": "medium",
+      "area": "GUARDS"
+    },
+    {
+      "claim": "Duty required shaft torque is ~119.7 N\u00b7m (workbook/gear_oil path) and that is the EM duty bar",
+      "where": "state/excel mgu_shaft_torque_nm; _motor_stack/gear_oil_fia_front_kit_case.json; ABD/EM REBALANCED required_shaft_torque_nm",
+      "command": "T=P_shaft/\u03c9_19500; openpyxl/scan; json gear_oil + analytical_duty_check",
+      "observed": "119.73 N\u00b7m = 244.49 kW shaft / \u03c9 (post-\u03b7 motoring shaft). Duty required independent 125.2193 N\u00b7m (\u03b7\u22480.9777) / FE analytical 125.214912. ABD/EM/ISO/bevel/mount use ~125.2. gear_oil required_shaft_torque_nm=119.7286. Workbook surfaces 119.7 as mgu_shaft_torque PASS, not 125.2 duty requirement.",
+      "classification": "PARTIAL_TRAP_RESIDUAL",
+      "reader_would_conclude": "Using workbook/gear_oil alone understates the torque gap (0.681 vs 0.651 vs required)",
+      "severity": "medium",
+      "area": "PHYSICS"
+    },
+    {
+      "claim": "Closed exterior / ghost / exploded product renders are free of detached ground debris and toy-like solids",
+      "where": "04-product-exterior.png; 08-product-ghost-shell.png; 13-product-exploded.png; 14-product-parts-catalogue.png",
+      "command": "Prior visual open + hero re-open; drawing_gates renders=pass",
+      "observed": "04/08 share ground-plane rails/bolts; 13 axial explode readable but RGB phase bars toy-like and floaters; 14 catalogue neat but many featureless boxes. Structural BoM coverage BLE/GA/SLD 100% and FPK 48/48 still hold \u2014 mesh presence \u2260 visual ship quality.",
+      "classification": "WRONG",
+      "reader_would_conclude": "Product visualisation pack is engineering-grade and debris-free",
+      "severity": "medium",
+      "area": "RENDERS"
+    },
+    {
+      "claim": "Suppliers OPEN BY DESIGN unresolved helper agrees on every OBD MPN cell",
+      "where": "Suppliers!A17:D63; scripts.lib.homologation_honesty.is_unresolved_part_number",
+      "command": "openpyxl OBD scan + is_unresolved_part_number",
+      "observed": "Most OBD rows MPN='TBD (detailed design)' \u2192 unresolved True. Stator Windings r58 mpn='(none)' \u2192 is_unresolved_part_number False (disagreement). No fabricated catalogue MPNs on OBD block.",
+      "classification": "WARN",
+      "reader_would_conclude": "All open parts are uniformly flagged unresolved by the honesty helper",
+      "severity": "medium",
+      "area": "EXCEL"
+    },
+    {
+      "claim": "Continuous-path thermal screens agree within 0.1 K on magnet temperature",
+      "where": "analytical_fia_cooling_thermal_screen.json vs analytical_fia_cooling_network_screen.json",
+      "command": "python diff continuous_reference_maximum_magnet_temperature_c",
+      "observed": "Adopted/vignette magnets match 83.8 / 99.4 exactly across screens. continuous_reference: 159.35 vs 159.235 (\u0394=0.115 K) \u2014 slightly looser than the 0.1 K slogan. Network thermal_network.magnet_temperature_c still 159.235.",
+      "classification": "BORDERLINE_NUMERIC",
+      "reader_would_conclude": "Cross-screen continuous magnets agree to \u22640.1 K everywhere",
+      "severity": "low",
+      "area": "PHYSICS"
+    },
+    {
+      "claim": "ship_ok can be true or Bar B holds closed for this deliverable",
+      "where": "state.json ship_ok; JLR-FE-FRONT-FPK-BAR-B-READINESS.json; quality-scorecard release_readiness",
+      "command": "python inspect ship_ok + rows; bar_b freshness audit",
+      "observed": "ship_ok false on state, barb, pcb-stage, Quality B109. can_mint_ship_ok false. All 10 BARB-* homologation_status=OPEN. release_readiness score=4 floor=4 allPass=false. Freshness ok with live_ship_ok false.",
+      "classification": "CONFIRMED_NEGATIVE",
+      "reader_would_conclude": "N/A \u2014 honesty surface intact (no silent minting)",
+      "severity": "info",
+      "area": "GUARDS"
+    },
+    {
+      "claim": "Drawing gates 23/23 ALL-PASS; GA projection and SLD head-noun rules hold; artefacts non-zero",
+      "where": "drawing-gates.json; drawings/*.{pdf,svg,png}",
+      "command": "python3 scripts/blender-universal/drawing_gates.py out/formula-e-front-mgu-20260729-1432; ls drawings",
+      "observed": "23 gates \u00b7 0 failing \u00b7 ALL-PASS=True. state.drawingGates now synced (all_pass=true, source=drawing-gates.json). PDF/SVG non-zero. SLD mechanical head-noun filter holds per prior scan. Latent G23 except\u2192green-tick code risk did not fire on this twin.",
+      "classification": "CONFIRMED",
+      "reader_would_conclude": "Deterministic drawing gates are green for this traction twin (trust json over drawing-gates-final.log)",
+      "severity": "info",
+      "area": "DRAWINGS"
+    },
+    {
+      "claim": "Two routed boards, 0 DRC violations with real kicad-cli provenance; design-fitness 7.6 workbook",
+      "where": "pcb-boards/{traction_control,traction_gate_drive}; drc-report.json; workbook PCB fitness",
+      "command": "ls pcb-boards; python violations len; prior scratch short proveCatch",
+      "observed": "2 board-routed.kicad_pcb, pipeline complete, both drc violations=[]. Workbook fitness 7.6 PASS. This structural claim holds; does not override NOT_FABRICATION_READY or FAB-READY banner conflict.",
+      "classification": "CONFIRMED",
+      "reader_would_conclude": "Electronics pipeline produced two clean routed boards (still engineering draft for release)",
+      "severity": "info",
+      "area": "PCB"
+    }
+  ],
+  "physics_table": [
+    {
+      "claim": "A) Torque required from T=P_elec/(\u03b7\u00b7\u03c9) at 250 kW / 19500 rpm",
+      "claimed": "125.2193 N\u00b7m with \u03b7\u22480.9777",
+      "rederived": "T=250e3/(0.9777*19500*2\u03c0/60)=125.219269 N\u00b7m; FE analytical combined_regen_efficiency=0.977734 \u2192 required_shaft_torque_nm=125.214912",
+      "gap": "\u22123e-5 N\u00b7m vs 0.9777 path; \u22120.0044 N\u00b7m vs FE analytical",
+      "ok": true
+    },
+    {
+      "claim": "B) Delivered baseline ~81.558 N\u00b7m; DEC-009 24k rpm/130 mm \u2192 ~1.069\u00d7 required",
+      "claimed": "baseline\u224881.558 N\u00b7m; 24k/130 torque_ratio\u22481.069",
+      "rederived": "FE rotor_position_sweep mean |T|=81.558081 N\u00b7m (ratio 0.651 vs 125.214912); dec_em1_option_screen 24k/130 torque_ratio=1.069 (combined row 1.0692)",
+      "gap": "0 vs claimed means; ratio is vs speed-adjusted required, not 81.558\u00d71.069",
+      "ok": true
+    },
+    {
+      "claim": "C) Iron loss 6035 W screening_estimate with ~3.9\u20138.5 kW two-sided band",
+      "claimed": "6035 W; basis=screening_estimate; range 3.9\u20138.5 kW; not upper bound",
+      "rederived": "stator_iron_loss_from_lamination.json iron_loss_w=6035.1 tooth=2249.4+yoke=3785.7; basis=screening_estimate; caveat TWO-SIDED 0.65\u00d7\u20131.4\u00d7 \u2192 3923\u20138449 W",
+      "gap": "0 W on mid-point; label correctly not upper bound",
+      "ok": true
+    },
+    {
+      "claim": "D) Magnet temp DEC-008 intermittent ~83.8 \u00b0C; DEC-009 ~99.4 \u00b0C vs 150 limit",
+      "claimed": "83.8 / 99.4 / limit 150; continuous 009 ~224 \u00b0C",
+      "rederived": "dec_008_duty_restamp magnet_c=83.8 margin_k=66.2; option screen baseline vignette 83.8 cont 159.3; 24k/130 vignette 99.4 cont 224.1",
+      "gap": "0.0 K on stored vignette points",
+      "ok": true
+    },
+    {
+      "claim": "E) Two thermal screens agree within 0.1 K on magnets",
+      "claimed": "\u22640.1 K cross-screen agreement",
+      "rederived": "Adopted max magnets both 83.8/99.4 (\u0394=0). continuous_reference_maximum_magnet_temperature_c 159.35 vs 159.235 (\u0394=0.115 K)",
+      "gap": "+0.015 K over the 0.1 K slogan on continuous_reference path",
+      "ok": false
+    },
+    {
+      "claim": "F) Falsifiability 0/169 unfalsifiable",
+      "claimed": "0 unfalsifiable of 169",
+      "rederived": "check_falsifiability_audit.py --twin: checks_audited=169 unfalsifiable_count=0 findings=[] ok=true; stamped audit JSON matches; --selftest proveCatch OK",
+      "gap": "0",
+      "ok": true
+    },
+    {
+      "claim": "G) TORQUE DENOMINATOR TRAP: 119.7 is shaft at 244.49 kW not duty required 125.2",
+      "claimed": "mgu_shaft_torque_nm=119.7 must not flatter as required; duty bar ~125.2",
+      "rederived": "244.49e3/\u03c9_19500=119.7286 N\u00b7m. Duty req 125.2193 / FE 125.214912. gear_oil required_shaft_torque_nm=119.7286 still. ABD/EM/ISO use ~125.2. Workbook emphasises 119.7 not 125.2.",
+      "gap": "gear_oil + workbook residual understates duty gap by ~5.5 N\u00b7m",
+      "ok": false
+    },
+    {
+      "claim": "H) DEC-008 and DEC-009 reversible; DEC-009 depends on DEC-008",
+      "claimed": "Both FROZEN_UNDER_ASSUMPTION, reversible; 009 depends on 008",
+      "rederived": "10-decision-register.json: both status=FROZEN_UNDER_ASSUMPTION, owner marks reversible; DEC-009 residual_risk starts DEPENDS ON DEC-008; reverses_if includes DEC-008 reversal; dec_008 note geometry 009 not applied in 008 restamp",
+      "gap": "none material",
+      "ok": true
+    }
+  ],
+  "what_not_checked": [
+    "Full regression-harness run (verify-engine-guards --with-harness)",
+    "Whether CHAIN_GATE_ENFORCE / DRAWING_GATES_ENFORCING / PHYSICS enforce flags are set in deploy CI",
+    "Full FEMM re-solve of em_fia_front_kit_case_REBALANCED (used stamped FE means + arithmetic)",
+    "OpenFOAM / CalculiX re-solves",
+    "Byte-identity of twin DRAFT xlsx vs design-pack-embedded xlsx",
+    "Full Excel formula dependency graph / live Excel recompute beyond openpyxl cached data_only",
+    "BoM ledger line-by-line of all parts vs Suppliers pinned/OBD",
+    "Whether pinned catalogue MPNs are real orderable parts",
+    "Gerber CAM/manufacturer DFM (annular ring, impedance, HV creepage)",
+    "Full netlist electrical correctness beyond DRC/unconnected",
+    "HIL/firmware proof contents beyond hilPresent=false",
+    "DRAWING_VISION_ENFORCING=1 hard-fail path",
+    "Visual QA of all secondary product angles (05\u201307, 09\u201312) and module-*.png",
+    "Interactive GLB/USDZ viewer check",
+    "Non-FE-front ESCALATE stubs (other product classes) vs their twins",
+    "Historical design-pack drawing folders under versioned V1.* trees",
+    "Pixel diff vs pre-isatags / pre-internals rerender backups"
+  ]
+}

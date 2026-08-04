@@ -51,6 +51,8 @@ run "magnet_margin_sensitivity --selftest"    "$PY" scripts/lib/magnet_margin_se
 run "dec_em1_option_screen --selftest"        "$PY" scripts/lib/dec_em1_option_screen.py --selftest
 run "check_falsifiability_audit --selftest"   "$PY" scripts/lib/check_falsifiability_audit.py --selftest
 run "check_bar_b_register_freshness --selftest" "$PY" scripts/lib/check_bar_b_register_freshness.py --selftest
+run "apply_dec_008_duty_restamp --selftest" "$PY" scripts/lib/apply_dec_008_duty_restamp.py --selftest
+run "apply_dec_009_em_restamp --selftest" "$PY" scripts/lib/apply_dec_009_em_restamp.py --selftest
 run "check_duty_torque_identity --selftest" "$PY" scripts/lib/check_duty_torque_identity.py --selftest
 run "check_store_divergence --selftest"    "$PY" scripts/lib/check_store_divergence.py --selftest
 run "check_escalation_stub_freshness --selftest" "$PY" scripts/lib/check_escalation_stub_freshness.py --selftest

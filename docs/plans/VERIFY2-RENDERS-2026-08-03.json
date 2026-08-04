@@ -1,0 +1,115 @@
+{
+  "id": "RENDERS",
+  "ok": false,
+  "ship_ok_still_false": true,
+  "commands_run": [
+    "ls/find twin + scripts (parts_ledger, fpk_blender_coverage, form-meshes, pngs, logs)",
+    "python3 scripts/blender-universal/parts_ledger.py out/formula-e-front-mgu-20260729-1432",
+    "python3 scripts/lib/fpk_blender_coverage.py out/formula-e-front-mgu-20260729-1432",
+    "python3 reverse mesh\u2194ontology\u2194ledger analysis on form-meshes.json + parts-ledger.json + ONTOLOGY_MESH_MAP",
+    "rg Cycles/EEVEE/UNIVERSAL on blender-bg.log + _rerender-isatags-102506/render.log + build_universal_scene.py",
+    "read_file 00-hero.png, 08-product-ghost-shell.png, 13-product-exploded.png, 14-product-parts-catalogue.png, 04-product-exterior.png",
+    "python3 render_image_quality.evaluate_image on key PNGs; PIL/IHDR dims; mtime compare to _rerender-isatags-102506"
+  ],
+  "findings": [
+    {
+      "claim": "BoM\u2194mesh coverage is 100% for blender / GA / SLD",
+      "where": "out/formula-e-front-mgu-20260729-1432/parts-ledger.json coverage_by_drawing (re-derived)",
+      "command": "python3 scripts/blender-universal/parts_ledger.py out/formula-e-front-mgu-20260729-1432",
+      "observed": "Re-run: BLE 23/23 (100%), GA 23/23 (100%), SLD 6/6 (100%); n_gapped=0; orphan_equipment=[]; matches prior snapshot exactly",
+      "classification": "structure_pass",
+      "reader_would_conclude": "Every ledger part expected on render/GA/SLD is checked present in the coverage matrix",
+      "severity": "info"
+    },
+    {
+      "claim": "FPK ontology\u2192mesh coverage is complete (all first-principles parts meshed)",
+      "where": "out/formula-e-front-mgu-20260729-1432/JLR-FE-FRONT-FPK-BLENDER-COVERAGE.json + form-meshes.json",
+      "command": "python3 scripts/lib/fpk_blender_coverage.py out/formula-e-front-mgu-20260729-1432",
+      "observed": "covered=48/48 ontology_count, score=1.0, missing=[], mesh_count=194, ok=true; ship_ok remains false (hardcoded on persist in fpk_blender_coverage.py)",
+      "classification": "structure_pass",
+      "reader_would_conclude": "All 48 FPK part IDs have at least one matching mesh name",
+      "severity": "info"
+    },
+    {
+      "claim": "Every mesh has a corresponding parts-ledger line (reverse coverage)",
+      "where": "form-meshes.json meshes vs ONTOLOGY_MESH_MAP vs parts-ledger equipment",
+      "command": "python3 reverse analysis: 194 meshes \u00d7 ONTOLOGY_MESH_MAP \u00d7 ledger fuzzy name match",
+      "observed": "95/194 meshes have no ontology pattern (fasteners/ribs/PE detail/vehicle stubs). 19 ontology parts with meshes (geartrain: sun/planet/ring/diff/halfshafts/seals/encoder/\u2026) have no dedicated ledger row \u2014 collapsed mainly into X-117 Reduction gear stage. Not a BLE matrix miss, but reverse 1:1 mesh\u2194ledger line fails at geartrain granularity.",
+      "classification": "ledger_granularity_gap",
+      "reader_would_conclude": "Scene has many detail meshes and multi-mesh gear assemblies not itemised as separate BoM/ledger lines",
+      "severity": "medium"
+    },
+    {
+      "claim": "00-hero is a shippable closed-product flagship render",
+      "where": "out/formula-e-front-mgu-20260729-1432/00-hero.png (4800\u00d73200, mtime 2026-08-03 10:32 from _rerender-isatags-102506)",
+      "command": "read_file 00-hero.png",
+      "observed": "Hero shows open/disassembled assembly (end cover removed, copper windings and internals exposed), thin bar floating above unit, multiple rails and bolt-like parts lying detached on the ground plane, incomplete shaft/interface stubs. Not a sealed MGU exterior.",
+      "classification": "visual_defect",
+      "reader_would_conclude": "Product is unfinished, exploded on the floor, or a cutaway left in the hero slot",
+      "severity": "critical"
+    },
+    {
+      "claim": "Ghost shell (08) cleanly shows internals without debris or floaters",
+      "where": "out/formula-e-front-mgu-20260729-1432/08-product-ghost-shell.png",
+      "command": "read_file 08-product-ghost-shell.png",
+      "observed": "Smoked-shell transparency works and internals (windings, shaft) read, but same ground-plane rails/bolts and overhead floating bar remain; assembly still looks partially disassembled rather than ghosted sealed product.",
+      "classification": "visual_defect",
+      "reader_would_conclude": "Ghost view is useful but littered with unattached hardware",
+      "severity": "high"
+    },
+    {
+      "claim": "Exploded (13) is a coherent manufacturing explode without stray solids",
+      "where": "out/formula-e-front-mgu-20260729-1432/13-product-exploded.png",
+      "command": "read_file 13-product-exploded.png",
+      "observed": "Axial explode of housing/rotor/cover is readable, but RGB phase bars look like toy blocks, MCU board floats with weak mechanical story, small fasteners float in space, floor rails still present under the pad.",
+      "classification": "visual_defect",
+      "reader_would_conclude": "Exploded view is schematic/Lego-like in places rather than engineering-grade",
+      "severity": "high"
+    },
+    {
+      "claim": "Parts catalogue (14) presents recognisable engineered components",
+      "where": "out/formula-e-front-mgu-20260729-1432/14-product-parts-catalogue.png (7200\u00d74800)",
+      "command": "read_file 14-product-parts-catalogue.png",
+      "observed": "Grid, shadows, and labels are clean and complete. Many entries are featureless boxes/plates/discs (e.g. flat slabs labelled SiC Inverter / Inverter Housing / Pack Base). Good mesh inventory; weak part-identity storytelling.",
+      "classification": "visual_weakness",
+      "reader_would_conclude": "Catalogue proves mesh count more than manufacturing-ready part geometry",
+      "severity": "medium"
+    },
+    {
+      "claim": "Closed exterior product renders have no detached ground debris",
+      "where": "out/formula-e-front-mgu-20260729-1432/04-product-exterior.png",
+      "command": "read_file 04-product-exterior.png",
+      "observed": "Main housing is more sealed than hero, but long dark rails and small bolt-like solids still sit on the ground plane disconnected from the pack (consistent with pack-base rail / mount-bolt meshes not constrained to the assembly).",
+      "classification": "visual_defect",
+      "reader_would_conclude": "Even the 'closed product' shot has loose hardware on the floor",
+      "severity": "high"
+    },
+    {
+      "claim": "Render path is Blender universal builder with documented engine",
+      "where": "_rerender-isatags-102506/render.log + blender-bg.log + build_universal_scene.py",
+      "command": "rg Cycles|EEVEE|UNIVERSAL|build_universal_scene on latest render logs",
+      "observed": "Path: Blender 5.1.1 background \u2192 build_universal_scene.py (UNIVERSAL, no formula_e_front_mgu template). Hero tagged Cycles; ghost pass code forces Cycles; EEVEE used/restored for other passes. Product 4800\u00d73200, catalogue 7200\u00d74800. Prior bg run: shaded hero timeout 900s then fallback.",
+      "classification": "engine_path",
+      "reader_would_conclude": "Current key product PNGs come from universal Cycles/EEVEE hybrid studio path, latest isatags rerender 2026-08-03",
+      "severity": "info"
+    },
+    {
+      "claim": "Automated image quality / vision gates catch these defects",
+      "where": "render_image_quality + render-vision-critique.json + drawing-gates.json renders",
+      "command": "evaluate_image on key PNGs; read render-vision-critique.json; drawing-gates.json",
+      "observed": "evaluate_image passed all five key images (occupancy/edges only). drawing-gates renders=pass. vision critique ok=true on 04 only, defects=[], and structured_defects_error ModuleNotFoundError: vision_route_fix. Floating debris and open-hero state not gated.",
+      "classification": "gate_blind_spot",
+      "reader_would_conclude": "Deterministic/vision gates can report green while hero/exterior still look broken",
+      "severity": "high"
+    }
+  ],
+  "not_checked": [
+    "Visual QA of all secondary product angles (05\u201307, 09\u201312) and module-*.png pages",
+    "Interactive GLB/USDZ (product-3d-shell-on/off) in a viewer",
+    "GA.png / SLD.png linework visual quality (only ledger coverage cells)",
+    "Which single connection is the route 25/26 miss and whether it affects renders",
+    "PDF/Excel embed fidelity of these PNGs in the design pack",
+    "Pixel diff vs pre-isatags / pre-internals rerender backups"
+  ],
+  "summary": "Re-derived BoM coverage confirms BLE/GA/SLD 100% and FPK ontology 48/48 meshes; reverse check finds 95 detail meshes outside ontology map and 19 geartrain ontology parts without dedicated ledger lines. Render path is Blender 5.1.1 universal build_universal_scene (Cycles hero/ghost, EEVEE hybrid). Visual open of 00/08/13/14 (plus 04) fails ship: hero is open/disassembled with floor debris and floaters; ghost/exterior share ground-plane litter; exploded looks toy-like in places; catalogue is neat but primitive-heavy. Automated quality gates pass anyway \u2014 RENDERS ok=false, ship_ok still false."
+}

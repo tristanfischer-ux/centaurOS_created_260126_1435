@@ -1,3 +1,16 @@
+# RETRACTED 2026-08-03 — the gate this escalated now passes
+
+Evidence: drawing-gates.json on out/formula-e-front-mgu-20260729-1432 reads
+all_pass=true, n_gates=23, n_failing=0, and is newer than this stub.
+Caveat recorded at retraction: 4 drawings (block-flow-diagram, panel-schedule,
+pid, process-schedules) are skipped as out of scope, so gates scoped only to
+those did not run.
+
+Retracted by scripts/lib/check_escalation_stub_freshness.py, archived rather
+than deleted so the escalation history stays readable.
+
+---
+
 # ESCALATE: recurring loss
 
 **drawing:plan_render_coherence** has now failed **4×** on **formula_e_front_mgu**.

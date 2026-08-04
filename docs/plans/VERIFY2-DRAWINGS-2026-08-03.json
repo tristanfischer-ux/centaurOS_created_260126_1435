@@ -1,0 +1,76 @@
+{
+  "id": "DRAWINGS",
+  "ok": true,
+  "ship_ok_still_false": false,
+  "commands_run": [
+    "rg -n drawing_gates scripts/verify-engine-guards.sh scripts/blender-universal/drawing_gates.py",
+    "python3 scripts/blender-universal/drawing_gates.py out/formula-e-front-mgu-20260729-1432",
+    "python3 scripts/blender-universal/ga_projection_contract.py",
+    "ls -la out/formula-e-front-mgu-20260729-1432/drawings/*.{pdf,svg,png}",
+    "python3 -c (manifest_bbox_mm twin spot-check; SLD text/attr mechanical-noun scan; exception-abstain static audit)",
+    "rg -ni '\\b(housing|cover|shaft|bearing)\\b' out/.../drawings/single-line-diagram.svg"
+  ],
+  "findings": [
+    {
+      "claim": "drawing_gates 23/23 ALL-PASS on twin",
+      "where": "/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/formula-e-front-mgu-20260729-1432/drawing-gates.json",
+      "command": "python3 scripts/blender-universal/drawing_gates.py out/formula-e-front-mgu-20260729-1432",
+      "observed": "23 gates \u00b7 0 failing \u00b7 4 drawings skipped \u00b7 ALL-PASS=True; GA/SLD/renders pass",
+      "classification": "confirmed_pass",
+      "reader_would_conclude": "Deterministic drawing gates are green for this traction twin; fluid plant sheets correctly out of scope.",
+      "severity": "info"
+    },
+    {
+      "claim": "G23/projection abstain must not swallow exceptions into a green tick",
+      "where": "/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/scripts/blender-universal/drawing_gates.py:1727 and ~4245",
+      "command": "static audit of except blocks near abstain/True assignment",
+      "observed": "except Exception sets _g23_ok_r=True with detail 'projection gate skipped (\u2026) \u2014 abstain'; mirror path returns (True, 'projection contract unavailable'). Did not fire on this twin \u2014 live detail is real projection equality (142 pairs).",
+      "classification": "latent_code_risk",
+      "reader_would_conclude": "A future exception in G23 would still look like a pass; the twin bake itself is not masked.",
+      "severity": "med"
+    },
+    {
+      "claim": "manifest_bbox_mm prefers measured w/d/h over dia/len",
+      "where": "/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/scripts/blender-universal/ga_projection_contract.py:47-69",
+      "command": "python3 scripts/blender-universal/ga_projection_contract.py; twin row spot-check via manifest_bbox_mm",
+      "observed": "selftest OK (measured_triple_beats_nominal_dia); 17 twin rows carry both; X-204 bbox Y extent 6.5 not 76.4; G23 all 142 pairs match",
+      "classification": "confirmed_pass",
+      "reader_would_conclude": "GA projection contract uses Blender-measured boxes when present; gate agrees with the sheet.",
+      "severity": "info"
+    },
+    {
+      "claim": "SLD head-noun rule: no housing/cover/shaft/bearing on electrical diagram",
+      "where": "/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/formula-e-front-mgu-20260729-1432/drawings/single-line-diagram.svg",
+      "command": "python3 scan of SVG text/attrs + draw_single_line._NON_ELECTRICAL_HEAD_RE against parts-manifest",
+      "observed": "30 mechanical head-noun parts in manifest; 0 full-name leaks; 0 housing/cover/shaft/bearing text hits; electrical labels present",
+      "classification": "confirmed_pass",
+      "reader_would_conclude": "Single-line shows electrical topology only; passive mechanical nouns are filtered.",
+      "severity": "info"
+    },
+    {
+      "claim": "PDF/SVG drawing artefacts exist and are non-zero",
+      "where": "/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/formula-e-front-mgu-20260729-1432/drawings/",
+      "command": "ls -la drawings/*.{pdf,svg,png}",
+      "observed": "ga-A1.pdf 43136B; general-arrangement.svg 82910B; single-line-A1.pdf 36547B; single-line-diagram.svg 18896B; PNGs also non-zero",
+      "classification": "confirmed_pass",
+      "reader_would_conclude": "Print and vector deliverables are on disk with real content.",
+      "severity": "info"
+    },
+    {
+      "claim": "drawing-gates-final.log reflects current gate status",
+      "where": "/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/formula-e-front-mgu-20260729-1432/drawing-gates-final.log",
+      "command": "tail drawing-gates-final.log vs live drawing_gates.py run",
+      "observed": "Stale log shows plan_render_coherence/drawing_set_coherence/part_set_coherence FAIL; live run and drawing-gates.json are ALL-PASS",
+      "classification": "stale_artefact",
+      "reader_would_conclude": "Someone reading only the final log would wrongly believe drawings still fail.",
+      "severity": "low"
+    }
+  ],
+  "not_checked": [
+    "DRAWING_VISION_ENFORCING=1 hard-fail path (shadow mode only)",
+    "Full multimodal human glance of GA/SLD PDFs beyond gate/text scans",
+    "Excel-bound drawing tabs inside the design-pack workbook",
+    "Historical design-pack drawing folders under versioned V1.* trees"
+  ],
+  "summary": "Live drawing_gates on the FE front MGU twin: 23/23 ALL-PASS. GA projection uses measured w/d/h and matches the sheet; SLD has no mechanical housing/cover/shaft/bearing labels; PDF/SVG artefacts are present and non-zero. Latent G23 exception\u2192green-tick remains in code but did not fire. Stale drawing-gates-final.log must not be trusted over drawing-gates.json."
+}

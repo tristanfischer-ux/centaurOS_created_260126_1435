@@ -2897,23 +2897,45 @@ def compute_ship_axes(state: dict, run_dir: str, v: Optional[dict]) -> List[dict
                      "passed": True, "detail": "no PCB in this design"})
     # 4b. RACE-CRITICAL OPEN-BY-DESIGN HOLDS — HIL / supplier Gerbers / dyno holes.
     # INTENT (2026-07-29 JLR HoT): these must stay OPEN and must block SHIPS until
-    # real evidence lands. Universal: any decisionHold with blocks_homologation + OPEN.
+    # real evidence lands. Universal sources (either is enough to fail the axis):
+    #   - decisionHold with blocks_homologation / open_by_design + OPEN
+    #   - hardwareCorrelation.holds OPEN (dyno / HIL / flow bench / overspeed / …)
+    # R3 (FE Front 2026-08-03): decisionHolds was empty while hardwareCorrelation
+    # still had 6 OPEN holds and Quality listed DYNO/HIL OPEN — axis wrongly PASSed.
     _race_open = [
         h for h in (st.get("decisionHolds") or [])
         if isinstance(h, dict)
         and str(h.get("status") or "").upper() == "OPEN"
         and (h.get("blocks_homologation") or h.get("open_by_design"))
     ]
-    if _race_open or isinstance(st.get("homologationHonesty"), dict):
+    _hc = st.get("hardwareCorrelation") if isinstance(st.get("hardwareCorrelation"), dict) else {}
+    _hc_open = [
+        h for h in (_hc.get("holds") or [])
+        if isinstance(h, dict)
+        and str(h.get("status") or "OPEN").upper() == "OPEN"
+        and h.get("ship_ok") is not True  # closed holds may still be present
+    ]
+    if (
+        _race_open
+        or _hc_open
+        or isinstance(st.get("homologationHonesty"), dict)
+        or isinstance(_hc, dict) and _hc
+    ):
         _ids = [str(h.get("id") or "?") for h in _race_open]
+        _hc_ids = [str(h.get("hold_id") or h.get("id") or "?") for h in _hc_open]
+        _all_ids = _ids + _hc_ids
+        _n_open = len(_all_ids)
         axes.append({
             "axis": "Race homologation holds — no open dyno/HIL/supplier gaps",
             "applicable": True,
-            "passed": len(_race_open) == 0,
+            "passed": _n_open == 0,
             "detail": (
-                "clean — no OPEN blocks_homologation holds"
-                if not _race_open
-                else f"OPEN by design: {', '.join(_ids)} — NOT FIA race homologated"
+                "clean — no OPEN blocks_homologation / hardwareCorrelation holds"
+                if _n_open == 0
+                else (
+                    f"OPEN ({_n_open}): {', '.join(_all_ids[:12])}"
+                    f"{'…' if _n_open > 12 else ''} — NOT FIA race homologated"
+                )
             ),
         })
     # 5. RENDER VISION — a DELIVERED vision critique that flags the render broken blocks
@@ -7625,9 +7647,19 @@ def _render_fpk_power_thermal_trace(ws: Worksheet, state: dict, start_row: int) 
          "Coolant volumetric flow (EGW class)"),
         ("rho_egw", 1030.0, "kg/m³", "Coolant density assumption (EGW ~50/50)"),
         ("cp_egw", 3500.0, "J/(kg·K)", "Coolant specific heat assumption"),
+        # ⭐ NAME THE ENVELOPE AS AN ENVELOPE (Cursor R4, 2026-08-04). This row
+        # printed "Hardware PEAK class (nameplate) — not continuous" beside a
+        # number that also appears under `rear_axle_electrical_power_kw`, which
+        # is an ALIAS of this same front figure for shared IPMSM/SiC tooling. I
+        # read that alias as independent evidence that the rear's rating had
+        # leaked into the front, and proposed a 40% inverter down-rate on the
+        # strength of it. It is the same number wearing a second name.
         ("P_hw", _qval(state, "front_hardware_power_class_kw",
                        _qval(state, "rear_axle_electrical_power_kw", 350)), "kW",
-         "Hardware PEAK class (nameplate) — not continuous"),
+         "FRONT unit SURVIVABILITY ENVELOPE — what the machine, inverter and "
+         "gears must withstand. NOT the duty (that is the 250 kW regen cap) and "
+         "NOT the rear axle's rating, though rear_axle_electrical_power_kw "
+         "aliases this same front figure for shared tooling"),
         ("Vdc_min", _qval(state, "assumed_vdc_min_v",
                           _qval(state, "v_dc_min_v", 600)), "V",
          "Minimum DC bus for phase-current ceiling"),
@@ -7648,6 +7680,24 @@ def _render_fpk_power_thermal_trace(ws: Worksheet, state: dict, start_row: int) 
 
     b = {k: f"$B${row}" for k, row in input_rows.items()}
     # Green derived chain
+    # Read the canonical duty bar from the solver artefacts rather than
+    # recomputing it — one bar, one producer.
+    _duty_bar_nm, _duty_bar_src, _duty_bar_rpm = 0.0, "", 0.0
+    try:
+        import glob as _g_duty
+        for _f in sorted(_g_duty.glob(os.path.join(run_dir, "_motor_stack", "em_fia_*.json"))):
+            _d = json.load(open(_f, encoding="utf-8"))
+            _adc = _d.get("analytical_duty_check") or {}
+            _v = _adc.get("required_shaft_torque_nm")
+            if isinstance(_v, (int, float)) and _v > 0:
+                _duty_bar_nm = float(_v)
+                _duty_bar_src = os.path.basename(_f)
+                _duty_bar_rpm = float(_adc.get("duty_point_rpm")
+                                      or _qval(state, "mgu_base_speed_rpm", 0) or 0)
+                break
+    except Exception:  # noqa: BLE001 — an unreadable artefact leaves the row unavailable
+        _duty_bar_nm = 0.0
+
     derived = [
         ("P_ac", f"={b['P_dc_cont']}*{b['eta_inv']}", "kW",
          "P_dc × η_inv — AC into MGU", _qval(state, "mgu_ac_electrical_input_kw", 0)),
@@ -7659,9 +7709,34 @@ def _render_fpk_power_thermal_trace(ws: Worksheet, state: dict, start_row: int) 
          _qval(state, "gear_output_power_kw", 0)),
         ("omega", f"={b['rpm']}*2*PI()/60", "rad/s",
          "ω = rpm × 2π/60", _qval(state, "mgu_base_speed_rpm", 19500) * 2 * 3.14159265358979 / 60),
+        # ⭐⭐ THIS ROW IS THE DELIVERED TORQUE, NOT THE REQUIREMENT (S12,
+        # 2026-08-04). P_shaft is already post-efficiency, so P_shaft/ω is what
+        # the machine PUTS OUT at that shaft power. Calling it "the requirement
+        # implied by the duty" is the exact substitution the duty-torque guard
+        # exists to catch — and it sat in the workbook while I fixed the solver
+        # that made the same mistake. The requirement comes from the ELECTRICAL
+        # duty through the efficiency chain and is shown separately below.
         ("T_shaft", f"=P_shaft_REF*1000/omega_REF", "Nm",
-         "T = P_shaft/ω — REQUIREMENT implied by the duty",
+         "T = P_shaft/ω — DELIVERED at this shaft power (P_shaft is already "
+         "post-efficiency); this is NOT the duty requirement",
          _qval(state, "mgu_shaft_torque_nm", 0)),
+        # ⭐⭐ THE WORKBOOK MUST NOT MINT ITS OWN DUTY BAR (2026-08-04). My first
+        # version of this row derived T = P_elec/(eta_inv*eta_mgu*omega) from the
+        # CONTRACT quantities and produced 104.1 N·m — a FOURTH bar, because the
+        # contract carries eta 0.98766*0.96749 = 0.9556 at 24,000 rpm while the
+        # solver artefacts publish their bar at eta 0.9777 and 19,500 rpm. Adding
+        # a fifth derivation of a quantity whose multiplicity is the open finding
+        # makes the dossier worse, and I did it inside the very fix for that
+        # finding. The row now REPORTS the canonical published bar with its
+        # source and its operating point; it does not recompute one.
+        ("T_required", f"={_duty_bar_nm:.6f}" if _duty_bar_nm else "=NA()", "Nm",
+         (f"duty REQUIREMENT as published by {_duty_bar_src} at {_duty_bar_rpm:g} rpm — "
+          f"reported, not re-derived here. NOTE: the contract's own efficiency chain and "
+          f"speed imply a different bar; which operating point the duty is specified at is "
+          f"an OPEN decision (see Holds)." if _duty_bar_nm else
+          "duty REQUIREMENT — no canonical bar published by a solver artefact; deliberately "
+          "left unavailable rather than derived here from a second efficiency chain"),
+         _duty_bar_nm or 0),
     ]
     # ⭐⭐ REQUIREMENT AND CAPABILITY, SIDE BY SIDE (Tristan, 2026-08-03).
     # T_shaft is what the electrical duty IMPLIES the shaft must produce; the
@@ -19467,7 +19542,9 @@ def _pcb_readiness_verdict(pipeline_ok: bool, drc_ok: bool, routed_ok: bool, ger
                            n_architecture_gaps: int = 0,
                            firmware_proof_ok: Optional[bool] = None,
                            firmware_proof_tier: Optional[int] = None,
-                           firmware_honesty_why: Optional[str] = None) -> Tuple[str, str]:
+                           firmware_honesty_why: Optional[str] = None,
+                           release_not_fabrication_ready: Optional[bool] = None,
+                           release_supplier_gerbers: Optional[bool] = None) -> Tuple[str, str]:
     """FAB-READY | ENGINEERING DRAFT | FAIL. A DRC-clean, fully-routed, Gerber-complete
     board whose BoM is function_class-heavy (fitness_score < 7.5) or still carries an
     unresolved ELECTRONIC gap must read ENGINEERING DRAFT, never FAB-READY — the exact
@@ -19478,6 +19555,35 @@ def _pcb_readiness_verdict(pipeline_ok: bool, drc_ok: bool, routed_ok: bool, ger
     claims ~29 electronics must NEVER read FAB-READY — hygiene on a partial board is
     not a shippable PCBA for the product.
     Pure, no I/O — proveCatch in _selftest, both directions."""
+    # ⭐⭐ RELEASE STATE OUTRANKS HYGIENE (S5, verify-2 2026-08-03). The tab read
+    # "FAB-READY — UNPROVEN IN HARDWARE" while the pipeline's own record said
+    # NOT_FABRICATION_READY=true, forgeDraftOnly=true, supplierGerbers=false.
+    # Every hygiene input was honest — DRC clean, routed, Gerbers present — and
+    # the banner was still a lie, because hygiene answers "is this board
+    # internally consistent?" and the reader hears "can I send this to a fab
+    # house?". Those are different questions and only the release record answers
+    # the second.
+    #
+    # DERIVED, NOT WORDED (Sol, start council): the fix is not a ban on the
+    # phrase. The phrase is now a FUNCTION of the release flags, so a rebuild
+    # cannot reintroduce the contradiction and a genuinely released board still
+    # reads FAB-READY. The flags are READ-ONLY here — this never writes
+    # NOT_FABRICATION_READY, supplierGerbers or ship_ok (Grok45, start council).
+    if release_not_fabrication_ready is True:
+        return (
+            "ENGINEERING DRAFT",
+            "the electronics pipeline's own release record marks this "
+            "NOT_FABRICATION_READY — hygiene (DRC / routed / Gerbers) is clean, but "
+            "clean hygiene describes an internally consistent board, not a "
+            "releasable one; no fabrication package has been signed off",
+        )
+    if release_supplier_gerbers is False and not bespoke_missing:
+        return (
+            "ENGINEERING DRAFT",
+            "no supplier-issued Gerber set is on record — the boards are "
+            "engine-generated and have not been through a manufacturer's DFM "
+            "review, so they are not a fabrication release",
+        )
     hygiene_ok = pipeline_ok and drc_ok and routed_ok and gerbers_ok
     if bespoke_missing or not hygiene_ok:
         why = ("this design needs a bespoke PCB but no DRC-clean, fully-routed board with "
@@ -20430,7 +20536,16 @@ def _pcb_two_axis_assessment(pcb: dict, run_dir: str) -> dict:
         n_electronic_full=n_electronic_design,
         n_non_fab_tier=_n_non_fab_tier, all_on_board_fab_tier=_all_on_board_fab,
         n_architecture_gaps=_n_arch_gaps, firmware_proof_ok=_fw_ok,
-        firmware_proof_tier=_fw_tier, firmware_honesty_why=_fw_honesty_why)
+        firmware_proof_tier=_fw_tier, firmware_honesty_why=_fw_honesty_why,
+        # S5: read-only release state. `None` when the key is absent, so a twin
+        # that never recorded a release decision keeps its previous behaviour
+        # rather than being demoted for silence.
+        release_not_fabrication_ready=(
+            pcb.get("NOT_FABRICATION_READY")
+            if isinstance(pcb, dict) and "NOT_FABRICATION_READY" in pcb else None),
+        release_supplier_gerbers=(
+            pcb.get("supplierGerbers")
+            if isinstance(pcb, dict) and "supplierGerbers" in pcb else None))
     if readiness == "ENGINEERING DRAFT":
         if _channel_gap_detail:
             readiness_why += "; channel gaps: " + ", ".join(_channel_gap_detail[:8])
@@ -20652,11 +20767,27 @@ def tab_pcb(wb: Workbook, state: dict, run_dir: str) -> bool:
                    f"DRC-clean apart from {_drc_err_b} non-critical residual(s) "
                    f"(connector-pad annular-width / hole-clearance under the board min — "
                    f"waivable footprint-library noise)")
+    # ⭐⭐ RELEASE STATE IS AN OPERAND OF THE BANNER FORMULA TOO (2026-08-04).
+    # `_pcb_readiness_verdict` in Python was taught that NOT_FABRICATION_READY
+    # outranks hygiene — and the tab still printed FAB-READY, because the banner
+    # a reader actually sees is an EXCEL FORMULA computed live from its own
+    # operands, which tested only bespoke-missing and the four hygiene flags.
+    # Two implementations of one rule; fixing the Python one left the surface
+    # the customer reads unchanged, and the workbook contradicted its own
+    # Quality & Audit tab. The formula now takes the same release input.
+    _nfr = audit_operand(
+        "PCB", "release: NOT_FABRICATION_READY",
+        bool((state.get("pcb") or {}).get("NOT_FABRICATION_READY")),
+        "state.pcb.NOT_FABRICATION_READY — the pipeline's own release record")
     readiness_fx = (
         f'=IF(OR({_bm},NOT(AND({_po},{_do},{_ro},{_go}))),'
         f'"FAIL — "&IF({_bm},"this design needs a bespoke PCB but no DRC-clean, fully-routed '
         f'board with Gerbers landed","the pipeline hygiene checks (DRC / routed / Gerbers / '
         f'pipeline.ok) did not all pass"),'
+        f'IF({_nfr},'
+        f'"ENGINEERING DRAFT — NOT FABRICATION READY — the electronics pipeline\'s own release '
+        f'record marks this NOT_FABRICATION_READY. Hygiene (DRC / routed / Gerbers) is clean, but '
+        f'clean hygiene describes an internally consistent board, not a releasable one",'
         f'IF(OR({_fs}<7.5,{_gp}>0,{_ag}>0),'
         f'"ENGINEERING DRAFT — NOT FABRICATION READY — hygiene is clean, but fab readiness is open '
         f'(design-fitness "&TEXT({_fs},"0.0")&"/10"&IF({_gp}>0,"; "&TEXT({_gp},"0")&'
@@ -20664,7 +20795,7 @@ def tab_pcb(wb: Workbook, state: dict, run_dir: str) -> bool:
         f'" architecture/channel gap(s)","")&")",'
         f'"FAB-READY — UNPROVEN IN HARDWARE — {_drc_phrase}, fully routed, Gerbers complete, and the '
         f'BoM is verified-tier, but there is no hardware-in-the-loop firmware proof, so it is NOT '
-        f'FUNCTIONALLY VERIFIED"))'
+        f'FUNCTIONALLY VERIFIED")))'
     )
     bc = ws.cell(r, 1, readiness_fx)
     bc.fill = _fill
@@ -26391,6 +26522,8 @@ def tab_quality_audit(wb: Workbook, state: dict, run_dir: str, report) -> None:
         # INTENT (2026-07-29 JLR): LIVE OPEN ISSUES must also floor on race-critical
         # OPEN-by-design holds (HIL / supplier Gerbers / dyno). Tab-floor alone can
         # under-count (python 6 vs workbook 5) and greenwash homologation gaps.
+        # R3 (2026-08-03): also count hardwareCorrelation OPEN holds — decisionHolds
+        # alone was empty on FE Front while DYNO/HIL rows still rendered OPEN.
         _race_open_n_qa = int(_race_policy.get("hard_open_count") or 0)
         _race_open_n_qa = max(_race_open_n_qa, sum(
             1 for h in (state.get("decisionHolds") or [])
@@ -26398,6 +26531,16 @@ def tab_quality_audit(wb: Workbook, state: dict, run_dir: str, report) -> None:
             and str(h.get("status") or "").upper() == "OPEN"
             and (h.get("blocks_homologation") or h.get("open_by_design"))
         ))
+        _hc_qa = state.get("hardwareCorrelation") if isinstance(
+            state.get("hardwareCorrelation"), dict
+        ) else {}
+        _hc_open_n = sum(
+            1 for h in (_hc_qa.get("holds") or [])
+            if isinstance(h, dict)
+            and str(h.get("status") or "OPEN").upper() == "OPEN"
+            and h.get("ship_ok") is not True
+        )
+        _race_open_n_qa = max(_race_open_n_qa, _hc_open_n)
         ws.cell(r, 1, "LIVE OPEN ISSUES — max(tabs below 8/unscored, race OPEN-by-design "
                       "holds: HIL / supplier Gerbers / dyno)").font = FONT_SUB
         _opn_terms = [f'COUNTIF({_rg},"<8")+(COUNTA({_rg})-COUNT({_rg}))' for _rg in _rngs]
@@ -40640,6 +40783,40 @@ def main() -> None:
         print(f"  SHIP GATE   : {_aud.get('verdict')}  ·  {_aud.get('high', 0)} HIGH "
               f"· {_aud.get('med', 0)} MED · {_aud.get('low', 0)} LOW "
               f"· ship_ok={_aud.get('ship_ok')}")
+    # ⭐ UNIVERSAL (2026-08-03): pack zip MUST embed the same bytes as the workbook
+    # we just wrote. R2 was a pack that silently carried an older xlsx. Fail closed
+    # here so a future build cannot ship a mismatched zip.
+    try:
+        import hashlib as _hh
+        import zipfile as _zz
+        from pathlib import Path as _Pp
+        _run = _Pp(run_dir)
+        _dossier = _Pp(res["out_path"])
+        _packs = sorted(_run.glob("*-design-pack.zip"), key=lambda p: p.stat().st_mtime, reverse=True)
+        if _dossier.is_file() and _packs:
+            _pack = _packs[0]
+            def _sha(p):
+                h = _hh.sha256()
+                with open(p, "rb") as f:
+                    for c in iter(lambda: f.read(1 << 20), b""):
+                        h.update(c)
+                return h.hexdigest()
+            _wb_sha = _sha(_dossier)
+            with _zz.ZipFile(_pack) as _zf:
+                _names = [n for n in _zf.namelist() if n.endswith(".xlsx")]
+                _names.sort(key=lambda n: (0 if "engineering-workbook" in n else 1, n))
+                if _names:
+                    _psha = _hh.sha256(_zf.read(_names[0])).hexdigest()
+                    if _psha != _wb_sha:
+                        print(f"  DELIVERABLE COHERENCE: FAIL pack xlsx SHA ≠ dossier "
+                              f"({_pack.name} vs {_dossier.name})")
+                        raise SystemExit(49)
+                    print(f"  DELIVERABLE COHERENCE: pack==workbook SHA {_wb_sha[:12]}… OK")
+    except SystemExit:
+        raise
+    except Exception as _ce:  # noqa: BLE001
+        print(f"  ! deliverable coherence check skipped: {_ce}")
+
     # PER-TAB ≥8 FLOOR — the codified ship requirement (Tristan 2026-06-26): the dossier is
     # NOT validated until EVERY tab is a genuine ≥8 (a <8 tab OR an UNSCORED tab blocks). The
     # workbook is still written (so it is inspectable + carries the DRAFT banner), but the

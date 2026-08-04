@@ -1,0 +1,80 @@
+{
+  "id": "GUARDS",
+  "ok": true,
+  "ship_ok_still_false": true,
+  "commands_run": [
+    "bash scripts/verify-engine-guards.sh \u2192 exit 0",
+    "node scripts/check-typecheck-baseline.mjs \u2192 exit 0 (143 signatures, debt \u221222)",
+    ".venv/bin/python scripts/lib/check_falsifiability_audit.py --twin out/formula-e-front-mgu-20260729-1432 \u2192 exit 0 (169 checks, 0 cannot-fail)",
+    ".venv/bin/python scripts/lib/check_bar_b_register_freshness.py --twin out/formula-e-front-mgu-20260729-1432 \u2192 exit 0 (stale_count=0, stamped_ship_ok=false, live_ship_ok=false)",
+    ".venv/bin/python scripts/lib/physics_plausibility.py --twin out/formula-e-front-mgu-20260729-1432 \u2192 exit 0 ok=False (1 HIGH); --selftest \u2192 exit 0; --enforce \u2192 exit 45",
+    "adversarial: falsifiability tautology/same-source/tol-swallow/bare-PASS fire; negative control silent \u2192 PASS",
+    "adversarial: bar_b historical-stale six rows + ship_ok_minted + hold_closed_in_software fire; restamp silent \u2192 PASS",
+    "npx tsx scripts/lib/gate-registry.ts --selftest \u2192 exit 0 (28/28 catch; 7 block-by-default, 21 shadow/flag)",
+    "inspect JLR-FE-FRONT-FPK-BAR-B-READINESS.json + state.json ship_ok/holds",
+    "inspect tasks/harness-stubs/ESCALATE__formula_e_front_mgu__* vs drawing-gates.json + regen log"
+  ],
+  "findings": [
+    {
+      "claim": "ESCALATE stubs for formula_e_front_mgu drawing:cad_geometry_coverage, drawing_set_coherence, plan_render_coherence still assert recurring loss",
+      "where": "tasks/harness-stubs/ESCALATE__formula_e_front_mgu__drawing_{cad_geometry_coverage,drawing_set_coherence,plan_render_coherence}.md",
+      "command": "diff stubs vs drawing-gates.json + drawing-gates-regen.log",
+      "observed": "drawing-gates.json all_pass=true n_failing=0; regen log marks all three gates \u2713; stubs still open with no retract mechanism",
+      "classification": "STALE",
+      "reader_would_conclude": "Those three drawing gates are still failing on this twin and need council escalation",
+      "severity": "medium"
+    },
+    {
+      "claim": "state.json drawingGates is current with drawing-gates.json",
+      "where": "out/formula-e-front-mgu-20260729-1432/state.json#drawingGates vs drawing-gates.json",
+      "command": "python compare state.drawingGates vs drawing-gates.json (mtimes 18:13 vs 18:35)",
+      "observed": "state: all_pass=false n_failing=2 (manifest_svg_projection, material_diversity); drawing-gates.json: all_pass=true n_failing=0 \u2014 two-store drift",
+      "classification": "STALE",
+      "reader_would_conclude": "Drawing gates currently fail two checks on the twin if they only read state.json",
+      "severity": "high"
+    },
+    {
+      "claim": "Gate registry blocks defects by default across the canonical set",
+      "where": "scripts/lib/gate-registry.ts enforcedByDefault()",
+      "command": "npx tsx scripts/lib/gate-registry.ts --selftest + runtime enforcedByDefault() enumeration",
+      "observed": "28 gates proven catch; only 7 block by default (22,25,41,42,43,44,45); 21 are shadow/flag-gated including drawing-gates(35), physics-critic(33), design-closure(40). Handover said ~9/29; live is 7/28.",
+      "classification": "UNSUPPORTED",
+      "reader_would_conclude": "A failing gate in the registry will stop a bad ship without setting env flags",
+      "severity": "high"
+    },
+    {
+      "claim": "physics_plausibility findings block the default guard path",
+      "where": "scripts/lib/physics_plausibility.py main() / verify-engine-guards.sh (selftest only)",
+      "command": ".venv/bin/python scripts/lib/physics_plausibility.py --twin \u2026 (exit 0) vs --enforce (exit 45)",
+      "observed": "HIGH shaft_power_vs_class (244.5 kW shaft vs 350 kW class, 70%<85% floor) with ok=False but exit 0 unless --enforce; engine-guards only runs --selftest",
+      "classification": "UNSUPPORTED",
+      "reader_would_conclude": "Implausible power-class labelling would fail CI/guards without an extra flag",
+      "severity": "medium"
+    },
+    {
+      "claim": "Machine power class label is consistent with delivered shaft power",
+      "where": "physics_plausibility shaft_power_vs_class; contract front_hardware_power_class_kw=350 vs mgu_shaft_power_kw=244.49",
+      "command": ".venv/bin/python scripts/lib/physics_plausibility.py --twin out/formula-e-front-mgu-20260729-1432",
+      "observed": "Detector correctly fires HIGH: mgu_shaft_power_kw=244.49 vs class 350.0 (floor 85%)",
+      "classification": "WRONG",
+      "reader_would_conclude": "This unit delivers ~350 kW class performance at the shaft",
+      "severity": "high"
+    },
+    {
+      "claim": "ship_ok can be true or holds closed for this deliverable",
+      "where": "state.json ship_ok; JLR-FE-FRONT-FPK-BAR-B-READINESS.json ship_ok + rows[].homologation_status",
+      "command": "python inspect ship_ok + Bar B rows; bar_b freshness audit",
+      "observed": "ship_ok false everywhere checked; can_mint_ship_ok false; all 10 BARB-* rows homologation_status=OPEN; freshness ok with live_ship_ok false",
+      "classification": "COSMETIC",
+      "reader_would_conclude": "N/A \u2014 honesty surface is intact (negative finding: no minting)",
+      "severity": "info"
+    }
+  ],
+  "not_checked": [
+    "Full regression-harness run (--with-harness) \u2014 skipped by engine-guards default",
+    "Whether non-FE-front ESCALATE stubs (52 other product classes) are stale vs their twins",
+    "Whether CHAIN_GATE_ENFORCE / DRAWING_GATES_ENFORCING are set in deploy CI (only default registry evaluated)",
+    "Re-running drawing gate producer to resolve state.json vs drawing-gates.json (read-only verify)"
+  ],
+  "summary": "GUARDS pass: engine-guards and typecheck green; ship_ok false with all 10 Bar B holds OPEN; falsifiability and bar_b adversarial proveCatch still fire with silent negative controls. Material issues: only 7/28 registry gates block by default; physics HIGH is advisory without --enforce; three FE-front ESCALATE stubs are stale against drawing-gates.json all_pass; state.drawingGates disagrees with drawing-gates.json (two-store drift)."
+}

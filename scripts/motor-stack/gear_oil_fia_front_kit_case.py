@@ -24,6 +24,14 @@ from typing import Any, Mapping, Sequence
 
 import ijson
 
+# ⭐ ONE duty-torque identity for the whole motor stack (S12). Imported rather
+# than re-derived so a gear screen can never drift from the EM analytical duty
+# check again — that drift is exactly what published 119.7286 N·m into a field
+# named `required_shaft_torque_nm`.
+from shaft_torque_identity import (  # noqa: E402
+    ASSUMED_COMBINED_EFFICIENCY,
+    required_shaft_torque_nm as _canonical_required_shaft_torque_nm,
+)
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_TWIN = REPO_ROOT / "out" / "formula-e-front-mgu-20260729-1432"
@@ -243,9 +251,29 @@ def inputs_from_sections(
         ("max_rotor_speed_rpm", "mgu_base_speed_rpm"),
         default=19_500.0,
     )
-    # Analytical duty torque at continuous power / max rpm (EM case ~125 N·m).
+    # ⭐ QUANTITY IDENTITY, NOT ARITHMETIC (S12, verify-2 2026-08-03). This line
+    # used to read `(shaft_power_kw * 1000) / omega` under a comment claiming
+    # "EM case ~125 N·m". It is not: shaft_power_kw is ALREADY post-efficiency
+    # (244.49 kW), so P_shaft/ω = 119.7286 N·m — the torque the machine
+    # DELIVERS at that shaft power, published into a field named
+    # `required_shaft_torque_nm`. Nineteen sibling solver artefacts publish
+    # 125.21 there. Dividing the FE mean by 119.73 flatters the shortfall to
+    # 0.681× against a true 0.651×.
+    #
+    # Both numbers are correct; only one is the duty BAR. The requirement comes
+    # from the ELECTRICAL duty through the efficiency chain — the one canonical
+    # identity in shaft_torque_identity.required_shaft_torque_nm — never from a
+    # shaft power that has already had the losses taken out.
     omega = max_rpm * 2.0 * math.pi / 60.0
-    required_torque = (shaft_power_kw * 1000.0) / omega if omega > 0.0 else 125.0
+    required_torque = _canonical_required_shaft_torque_nm(
+        continuous_electrical_power_kw=_number(
+            quantities, ("continuous_power_kw", "continuous_design_duty_kw"),
+            default=250.0),
+        max_rotor_speed_rpm=max_rpm,
+        combined_efficiency=_number(
+            quantities, ("combined_regen_efficiency", "mgu_combined_efficiency"),
+            default=ASSUMED_COMBINED_EFFICIENCY),
+    ) if omega > 0.0 else 125.0
     twin_torque = _number(
         quantities,
         ("mgu_shaft_torque_nm",),

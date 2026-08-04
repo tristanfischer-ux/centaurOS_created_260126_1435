@@ -1,0 +1,126 @@
+{
+  "id": "EXCEL",
+  "ok": false,
+  "ship_ok_still_false": true,
+  "summary": "V1.280 workbook loads cleanly (31 sheets, honesty tabs present); design-pack zip is well-formed with all MANIFEST files non-zero and version-aligned; quality-scorecard floor=4 / release_readiness=4 / allPass=false / ship_ok=false deliberately held. Failures: Executive Summary presents brief-sourced targets as Achieved+PASS; PCB tab says FAB-READY while pcb-stage/Quality say ENGINEERING DRAFT/NOT_FABRICATION_READY; mgu_iron_loss_w and related power/torque quantities disagree across tool blocks (partially disclosed on Checks); Suppliers OBD Stator Windings mpn='(none)' disagrees with is_unresolved_part_number.",
+  "commands_run": [
+    ".venv/bin/python openpyxl load_workbook(data_only=False) and load_workbook(data_only=True) on 20260803-1357-V1.280-DRAFT-...xlsx",
+    ".venv/bin/python zipfile.ZipFile.testzip() on workbook xlsx and design-pack zip",
+    ".venv/bin/python sheetnames + honesty-tab inventory",
+    ".venv/bin/python cross-tab scan of torque/iron_loss/magnet_temp/ship_ok/power/rpm labels and values (data_only=True)",
+    ".venv/bin/python Executive Summary r38-46 + Verification brief rows source=brief/PASS audit",
+    ".venv/bin/python Suppliers OBD MPN scan + scripts.lib.homologation_honesty.is_unresolved_part_number agreement",
+    ".venv/bin/python PCB tab KV vs twin pcb-stage.json; PCB_SIDECAR_FILENAMES presence (pcb-stage.json / pcb-stage-result.json)",
+    ".venv/bin/python MANIFEST.txt claimed paths vs zip members sizes; workbook version stamp compare",
+    ".venv/bin/python json.load quality-scorecard.json (floor/allPass/release_readiness)"
+  ],
+  "not_checked": [
+    "Byte-identity of twin DRAFT xlsx vs pack-embedded xlsx (names differ: DRAFT vs design-pack-engineering-workbook)",
+    "Full formula dependency graph / every live Excel formula recompute beyond openpyxl cached data_only values",
+    "BoM ledger line-by-line cross-check of all 55 parts against Suppliers pinned/OBD lists",
+    "pcb/pcb-stage.json (smaller nested copy) vs root pcb-stage.json semantic merge policy",
+    "Visual render/PDF content inside the design pack beyond existence and non-zero size",
+    "Whether pinned MPNs (e.g. RRIA, Rack Manifold) are real catalogue numbers \u2014 only OBD fabrication rule was in scope"
+  ],
+  "findings": [
+    {
+      "claim": "Workbook opens without repair under openpyxl data_only=False and data_only=True; xlsx and design-pack zips are well-formed",
+      "where": "out/formula-e-front-mgu-20260729-1432/20260803-1357-V1.280-DRAFT-formula-e-front-mgu-engineering-workbook.xlsx ; 20260803-1357-V1.280-formula-e-front-mgu-design-pack.zip",
+      "command": ".venv/bin/python -c \"from openpyxl import load_workbook; import zipfile; load_workbook(WB,data_only=False); load_workbook(WB,data_only=True); print(zipfile.ZipFile(WB).testzip(), zipfile.ZipFile(ZIP).testzip())\"",
+      "observed": "data_only=False OK sheets=31; data_only=True OK sheets=31; xlsx testzip=None members=134; pack testzip=None members=78",
+      "classification": "PASS",
+      "reader_would_conclude": "File is a normal Excel workbook and pack; Excel should not prompt for repair",
+      "severity": "info"
+    },
+    {
+      "claim": "About 31 sheets including honesty tabs Holds, Checks, Decision Register, Questions, Quality",
+      "where": "workbook.sheetnames",
+      "command": ".venv/bin/python -c \"print(load_workbook(WB,data_only=False).sheetnames)\"",
+      "observed": "n=31; honesty map: Holds\u2192'Holds & exclusions', Checks\u2192'\u26a0 Checks', Decision Register\u2192'Decision Register', Questions\u2192'Questions for the customer', Quality\u2192'Quality & Audit'; full list starts Executive Summary\u2026Glossary",
+      "classification": "PASS",
+      "reader_would_conclude": "Governance/honesty surfaces are present and findable",
+      "severity": "info"
+    },
+    {
+      "claim": "source=brief values must not be presented as engineering achievements (Target/Achieved/PASS)",
+      "where": "Executive Summary!A37:I46 (Key specifications & brief compliance); also Verification!A7:H16 source=brief rows",
+      "command": ".venv/bin/python dump Exec Summary r37-46 data_only=True; dump Verification rows where colA=='brief'",
+      "observed": "Headers: Brief metric|Target|Unit|Matched contract quantity|Achieved|Direction|STATUS. All 9 rows r38-46 have Target==Achieved and STATUS=PASS with notes 'brief key: \u2026 \u2192 contract: \u2026'. Examples: Front hardware power class 350/350 PASS; Max rotor speed 19500/19500 PASS; Fpk mass cap 32/32 PASS; Magnet temp limit 150/150 PASS. Verification brief rows r7-16 also PASS with C==D echo (except Max mass 32 vs 28.8).",
+      "classification": "FAIL",
+      "reader_would_conclude": "The design has met every brief metric (including limits and assumptions) because Achieved equals Target with green PASS \u2014 even where the 'achievement' is only re-stating the brief input",
+      "severity": "high"
+    },
+    {
+      "claim": "Magnet temperature: same narrative quantity consistent across tabs",
+      "where": "Executive Summary!A46 vs \u26a0 Checks!A63 vs motor thermal outputs",
+      "command": ".venv/bin/python data_only values for magnet temp limit / mgu_magnet_temp_c",
+      "observed": "Exec Summary r46: Target=150 Achieved=150 STATUS=PASS (limit echoed). \u26a0 Checks r63: 'Brief target met: magnet_temp_limit_c' design=159.35 limit=150 delta=9.35 STATUS=FAIL ('design must stay \u2264 the brief cap'). Thermal tool magnet temp 101.82 also appears on Checks r115.",
+      "classification": "FAIL",
+      "reader_would_conclude": "From Exec Summary alone, magnet temperature compliance is PASS at 150\u00b0C; from Checks, the design magnet temp 159.35\u00b0C fails the 150\u00b0C ceiling",
+      "severity": "high"
+    },
+    {
+      "claim": "mgu_iron_loss_w / iron loss same name same value across tabs",
+      "where": "\u26a0 Checks!A109; Calculations!B59 / iron_loss_w; design-used 6035.1 vs tool 135.56",
+      "command": ".venv/bin/python scan mgu_iron_loss_w|iron_loss_w data_only=True",
+      "observed": "Checks r109: 'Tool output superseded: mgu_iron_loss_w' 135.56 vs 6035.1 STATUS=FAIL (delta -5899.54). Calculations r59 label shows 'mgu_iron_loss_w = 6035.1 (\u2260 tool 135.56)' with tool column 135.56. Dissipation blocks: first-principles total_dissipated_kw_continuous=6.634 vs front_fpk_power_reconcile=12.5336.",
+      "classification": "FAIL",
+      "reader_would_conclude": "Iron loss is either ~136 W or ~6 kW depending on which row/tool they trust; Checks discloses supersession but the dual values remain under the same quantity name",
+      "severity": "high"
+    },
+    {
+      "claim": "Torque required/delivered and shaft power consistent across high-value tabs",
+      "where": "Calculations first-principles r24-27 vs front_fpk_power_reconcile r73-75; Verification r21-22; Checks mgu_shaft_torque_nm",
+      "command": ".venv/bin/python dump Calculations r20-30 and r70-80; Verification r21-22",
+      "observed": "mgu_shaft_power_kw: 244.4902947 (first-principles) vs 238.88779335 (front_fpk_power_reconcile). mgu_shaft_torque_nm: 119.73 vs 116.99. Contract peak mgu_shaft_torque_max_nm=334 vs calc 119.7 on Verification r21 STATUS=FAIL (rel err 64.16%). Continuous shaft torque 119.7 matches across Verification r22 / Checks / first-principles. mtpa_torque_nm=74.23 and wheel_torque_nm=907.92 consistent where named.",
+      "classification": "WARN",
+      "reader_would_conclude": "Continuous shaft torque ~119.7 Nm is stable; peak 334 Nm is a different quantity that fails its own closure check; a second reconcile block silently uses different efficiency and yields ~117 Nm / ~239 kW",
+      "severity": "medium"
+    },
+    {
+      "claim": "ship_ok false consistently; rpm/power headline samples",
+      "where": "Quality & Audit!B109; pcb-stage.json ship_ok; Executive Summary power/rpm",
+      "command": ".venv/bin/python read ship_ok and key rpm/power cells",
+      "observed": "ship_ok='false' on Quality & Audit!B109; pcb-stage.json ship_ok=False. Max rotor speed 19500 consistent on Exec/Inputs/Brief/Checks; Verification physics row compares 19500 vs 21450 retention calc with PASS at 10% tol. continuous_power_kw=250 and gear_output_power_kw\u2248237.156 consistent on primary first-principles path. Exec status A16='DRAFT \u2014 7 open issues'.",
+      "classification": "PASS",
+      "reader_would_conclude": "Dossier is not ship-ready; headline rpm/power on the primary path are internally consistent",
+      "severity": "info"
+    },
+    {
+      "claim": "Suppliers OPEN BY DESIGN must not carry fabricated MPNs; is_unresolved_part_number must agree",
+      "where": "Suppliers!A17:D63 OPEN BY DESIGN block",
+      "command": ".venv/bin/python scan OBD rows + from lib.homologation_honesty import is_unresolved_part_number",
+      "observed": "Banner A17='OPEN BY DESIGN \u2014 45 part(s), no supplier yet'. Data rows r19-57,59-63: Manufacturer part number state='TBD (detailed design)' \u2192 is_unresolved_part_number True; no letter+digit catalogue-like MPN on OBD. Exception r58 Stator Windings mpn='(none)' \u2192 is_unresolved_part_number('(none)')=False (disagreement). Pinned r6-15 use real-looking MPNs (e.g. MKP1848C66012JY5, HASS 100-S) outside OBD.",
+      "classification": "WARN",
+      "reader_would_conclude": "Open parts are honestly TBD, not fake orderable MPNs; one OBD line uses '(none)' which the unresolved helper does not treat as unresolved",
+      "severity": "medium"
+    },
+    {
+      "claim": "PCB tab matches pcb-stage.json; PCB_SIDECAR_FILENAMES honoured; readiness wording aligned",
+      "where": "PCB sheet; twin pcb-stage.json; scripts/build-excel-export.py PCB_SIDECAR_FILENAMES; Quality & Audit!B11/D11",
+      "command": ".venv/bin/python compare PCB KV to pcb-stage.json; check sidecar files; read Quality PCB readiness",
+      "observed": "Match: disposition=bespoke, electronicPartCount=22, canAuthor/Route/Verify=Yes, boards traction_control+traction_gate_drive, components on board=62=pipeline.components. PCB!A6 starts 'FAB-READY \u2014 UNPROVEN IN HARDWARE \u2014 DRC-clean\u2026'. Quality!B11=0 D11='readiness: ENGINEERING DRAFT; supplierGerbers=False; hilPresent=False; forgeDraftOnly=True'. pcb-stage: NOT_FABRICATION_READY=True, forgeDraftOnly=True, ship_ok=False, supplierGerbers=False. PCB_SIDECAR_FILENAMES=('pcb-stage-result.json','pcb-stage.json'); root pcb-stage.json exists (50744 B); pcb-stage-result.json absent. pcb/ nested pcb-stage.json is a different smaller stale file (electronicPartCount=4).",
+      "classification": "FAIL",
+      "reader_would_conclude": "From the PCB tab headline the boards are fab-ready; from Quality ship-gate and pcb-stage.json they are still an engineering draft and not fabrication-ready",
+      "severity": "high"
+    },
+    {
+      "claim": "Design pack zip: every claimed file present and non-zero; workbook version matches pack",
+      "where": "20260803-1357-V1.280-formula-e-front-mgu-design-pack.zip MANIFEST.txt + members",
+      "command": ".venv/bin/python parse MANIFEST CONTENTS paths; compare to ZipInfo.file_size; check V1.280 stamp",
+      "observed": "claimed paths all present; zero-size files=[]; pack xlsx name '\u2026V1.280-formula-e-front-mgu-design-pack-engineering-workbook.xlsx' shares stamp 20260803-1357-V1.280 with twin DRAFT workbook (filename differs by DRAFT vs design-pack infix only). MANIFEST SKIPPED section honestly lists firmware/ and renders/01-top.png as absent.",
+      "classification": "PASS",
+      "reader_would_conclude": "The zip is a complete deliverable for what it claims; version is V1.280",
+      "severity": "info"
+    },
+    {
+      "claim": "quality-scorecard.json floor 4 release_readiness deliberate; allPass false; do not fix release_readiness",
+      "where": "out/formula-e-front-mgu-20260729-1432/quality-scorecard.json ; Overview/Quality release readiness surfaces",
+      "command": ".venv/bin/python json.load quality-scorecard.json; read Overview release readiness row",
+      "observed": "floor=4; mean=9.1; allPass=false; deterministicFloor=4; deterministicAllPass=false; section release_readiness score=4 defects include NOT_HOMOLOGATED (45 holds), NOT_FABRICATION_READY, concept-only renders; qualityLoopActionable=false. Overview r34 Release readiness 4 FAIL. ship_ok remains false.",
+      "classification": "PASS",
+      "reader_would_conclude": "Release readiness is intentionally scored at the floor with allPass false; the dossier does not claim ship/release",
+      "severity": "info"
+    }
+  ]
+}

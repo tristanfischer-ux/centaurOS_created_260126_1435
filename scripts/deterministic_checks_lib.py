@@ -2101,8 +2101,12 @@ def _checks_tool_provenance(state: dict, run_dir: str) -> List[Check]:
                             quantity_key=next((k for k in q if k.lower() == qk), qk),
                             actual_source=f"tool:{tid}:{field}",
                             expected_source=f"contract:{qk}",
+                            # Same absent-quantity case as below: a superseded value
+                            # may itself have been withdrawn rather than replaced.
                             detail=(f"{tid} computed {field}={val:g}; the design uses "
-                                    f"{qv:g} from {_owner} — deliberate supersession, "
+                                    + (f"{qv:g} from {_owner}" if qv is not None
+                                       else f"NO value — withdrawn by {_owner}")
+                                    + f" — deliberate supersession, "
                                     f"not drift: {_reason[:180]}")))
                         continue
                 # find the ORIGINAL-CASE contract key (qval dict is lower-cased) so the
@@ -2117,10 +2121,22 @@ def _checks_tool_provenance(state: dict, run_dir: str) -> List[Check]:
                     quantity_key=qk_orig,
                     actual_source=f"tool:{tid}:{field}",
                     expected_source=f"contract:{qk_orig}",
+                    # ⭐ A QUANTITY CAN BE DELIBERATELY ABSENT (2026-08-03). When a
+                    # value is withdrawn because it was never derived — the winding
+                    # temperature after DEC-008, which used to be the magnet's number
+                    # copied across — `qv` is None and `f"{qv:g}"` raised TypeError,
+                    # taking the whole workbook build down. An absent quantity is a
+                    # legitimate state and every consumer has to render it, not crash
+                    # on it; that is the cost of withdrawing a wrong number rather
+                    # than leaving it in place, and it is the right cost to pay.
                     detail=(f"{tid} {field}={val:g} matches contract {qk}." if ok else
-                            f"STALE: {tid} computed {field}={val:g} but the design uses {qk}="
-                            f"{qv:g} — the tool output is NOT the number shown (tool ran at a "
-                            f"different scale/input).")))
+                            (f"STALE: {tid} computed {field}={val:g} but the design uses "
+                             f"{qk}={qv:g} — the tool output is NOT the number shown "
+                             f"(tool ran at a different scale/input)." if qv is not None
+                             else f"{tid} computed {field}={val:g}, but contract {qk} is "
+                                  f"DELIBERATELY ABSENT — the quantity was withdrawn "
+                                  f"rather than published from a proxy, so there is "
+                                  f"nothing to compare the tool output against."))))
             else:
                 if abs(val) in (0.0, 1.0):              # un-checkable zero/unit value
                     continue
