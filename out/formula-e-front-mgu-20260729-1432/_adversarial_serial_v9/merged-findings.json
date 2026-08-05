@@ -1,0 +1,334 @@
+{
+  "schema": "fe_front_adversarial_serial_v9/v1",
+  "ran_at": "2026-08-05T15:44:35.060029+00:00",
+  "mode": "serial adversarial \u2014 Excel \u2192 BoM \u2192 PCB \u2192 Blender/GA (eyes on images)",
+  "verdict": "REJECT",
+  "counts": {
+    "FATAL": 7,
+    "HIGH": 11,
+    "MED": 7,
+    "LOW": 1,
+    "PASS": 2
+  },
+  "by_surface": {
+    "EXCEL": 6,
+    "BOM": 9,
+    "PCB": 5,
+    "BLENDER_GA": 8
+  },
+  "ship_ok": false,
+  "findings": [
+    {
+      "id": "XLS-001",
+      "surface": "EXCEL",
+      "severity": "FATAL",
+      "tag": "FIX",
+      "title": "Broken IFERROR formula corrupts FIA power-split feasible chain",
+      "where": "Calculations!B295 = '=IFERROR(B294),\"\u2014\")' \u2192 #VALUE!; C71=B295; H71 row-check #VALUE!",
+      "why": "IFERROR arity wrong (closing paren before comma). Live sheet shows formula errors on a USED duty chain row.",
+      "evidence": "data_only #VALUE! at B295,C71,H71; F71 prose still claims feasible=1",
+      "fix": "Replace B295 with honest boolean/1 matching fia_power_split_feasible (or correct IFERROR(expr,\"\u2014\")); rebuild check col"
+    },
+    {
+      "id": "XLS-002",
+      "surface": "EXCEL",
+      "severity": "HIGH",
+      "tag": "FIX",
+      "title": "FPK power/thermal LIVE trace disagrees with stamped twin values",
+      "where": "Calculations ~B445\u2013B452 vs column E twin stamps",
+      "why": "P_shaft live 238.89 vs stamp 244.49 (\u0394\u22125.6 kW); T_shaft live 95.05 Nm vs stamp 119.7 (\u0394\u221224.6 Nm); Q_loss 11.1 vs 12.5 kW. Sheet presents both as truth.",
+      "evidence": "openpyxl data_only deltas on FPK LIVE block",
+      "fix": "Single source: either live Inputs drive stamps, or stamps are inputs \u2014 eliminate dual columns that disagree without a FAIL flag"
+    },
+    {
+      "id": "XLS-003",
+      "surface": "EXCEL",
+      "severity": "HIGH",
+      "tag": "FIX",
+      "title": "T_required deliberately =NA() while dual bars exist on twin",
+      "where": "Calculations!B449 =NA(); G449 check #N/A",
+      "why": "Duty requirement is the programme spine (104.1 / 125.2). Blanking as NA() while T_shaft_FE=122.1 is published trains the wrong reading.",
+      "evidence": "B449 formula =NA(); covering note dual bars",
+      "fix": "Publish both bars as named rows (architecture_duty_nm, conservative_binding_nm) \u2014 not a single NA()"
+    },
+    {
+      "id": "XLS-004",
+      "surface": "EXCEL",
+      "severity": "MED",
+      "tag": "REVIEW",
+      "title": "T_gap formula comment contradicts arithmetic",
+      "where": "Calculations!B451 formula T_shaft/T_FE\u22480.78; comment says requirement\u00f7measured; E451=0.98",
+      "why": "Reader cannot tell which ratio is the screen",
+      "evidence": "B451, D451, E451, F451",
+      "fix": "Rename rows; one ratio definition only"
+    },
+    {
+      "id": "XLS-005",
+      "surface": "EXCEL",
+      "severity": "MED",
+      "tag": "GAP",
+      "title": "GA Excel tab is a 5-row pointer, not an engineering surface",
+      "where": "sheet 'GA \u2014 General Arrangement' max_row\u22485",
+      "why": "Score can pass while GA image is weak; no live dimension table from quantities",
+      "evidence": "openpyxl max_row=5; image on Drawings only",
+      "fix": "Embed GA + dimension table bound to design_envelope_* quantities"
+    },
+    {
+      "id": "XLS-006",
+      "surface": "EXCEL",
+      "severity": "LOW",
+      "tag": "REVIEW",
+      "title": "Lone '#' cells on several tabs",
+      "where": "Contents!A4, Engineering Analysis A20/A25, Drawings A11, Audit/Risk multiple",
+      "why": "May be intentional markers or corruption; not #REF! but noisy",
+      "evidence": "data_only value '#'",
+      "fix": "Confirm intentional section markers vs export glitch"
+    },
+    {
+      "id": "BOM-001",
+      "surface": "BOM",
+      "severity": "FATAL",
+      "tag": "FIX",
+      "title": "Film capacitor MPN assigned to HV DC busbar",
+      "where": "requirementsBom X-141 part=Vishay Roederstein MKP1848C66012JY5 requirement=Hv DC Busbar Link",
+      "why": "MKP1848C is a DC-link film capacitor family, not a busbar. Catalogue 'IDENTIFIED' is false identity.",
+      "evidence": "state.json X-141; Excel ledger MPN column; X-145 correctly uses same MPN for capacitor bank",
+      "fix": "Clear MPN on X-141; busbar = bespoke copper to drawing; keep MKP only on capacitor lines"
+    },
+    {
+      "id": "BOM-002",
+      "surface": "BOM",
+      "severity": "FATAL",
+      "tag": "FIX",
+      "title": "Data-centre CoolIT rack manifold on FE front MGU coolant",
+      "where": "EP-1 CoolIT Systems Rack Manifold / Coolant Manifold \u00a318 IDENTIFIED",
+      "why": "Wrong product domain (rack CDU) for a 350 kW race cassette. Fake catalogue grounding.",
+      "evidence": "requirementsBom EP-1",
+      "fix": "TBD / bespoke manifold or motorsport QD manifold class \u2014 not CoolIT rack"
+    },
+    {
+      "id": "BOM-003",
+      "surface": "BOM",
+      "severity": "FATAL",
+      "tag": "FIX",
+      "title": "Motor assembly cost triple-counted",
+      "where": "lines: Traction Motor \u00a318,566 + X-116 IPMSM \u00a34,158 + X-154 casing \u00a37,798 + X-156 jacket \u00a37,798 + X-159 shaft \u00a37,798",
+      "why": "Same 350 kW / 142\u00d7175\u00d7175 package appears as parent motor AND full-price structural children. Materials \u03a3 forced to gold \u00a352.5k after \u00d70.149 mask hides \u00a3349k parametric residue.",
+      "evidence": "top cost lines; basis CALIBRATION-MASKED \u00d70.149 on 40+ lines",
+      "fix": "One principal motor buy line; children \u00a30 or SUB-COMPONENT only; remove gold-band mask or show unmasked + masked both"
+    },
+    {
+      "id": "BOM-004",
+      "surface": "BOM",
+      "severity": "HIGH",
+      "tag": "FIX",
+      "title": "Cable/pipe language spammed onto nearly every line",
+      "where": "44/54 requirements contain 'DN8'; 47/54 contain '2\u00d76 mm\u00b2 Cu'",
+      "why": "Fuses, motor housings, SiC inverters, sensors all inherit interconnect CSA boilerplate \u2014 destroys sizing credibility",
+      "evidence": "requirementsBom requirement strings",
+      "fix": "Interconnect language only on actual cable/hose/bus lines"
+    },
+    {
+      "id": "BOM-005",
+      "surface": "BOM",
+      "severity": "HIGH",
+      "tag": "FIX",
+      "title": "38/54 parts literally named 'requirement stated'",
+      "where": "part field",
+      "why": "State BoM unusable as buy list; Excel Item column re-derived but state is source of truth for many tools",
+      "evidence": "count requirement stated = 38",
+      "fix": "part := human noun from requirement head; never the sentinel"
+    },
+    {
+      "id": "BOM-006",
+      "surface": "BOM",
+      "severity": "HIGH",
+      "tag": "FIX",
+      "title": "35/54 status NOT FOUND while costs still sum",
+      "where": "status field",
+      "why": "Buy-list claims money without catalogue identity",
+      "evidence": "Counter status",
+      "fix": "NOT FOUND \u21d2 unit_gbp estimate class low + no IDENTIFIED badge"
+    },
+    {
+      "id": "BOM-007",
+      "surface": "BOM",
+      "severity": "HIGH",
+      "tag": "FIX",
+      "title": "Current sensor HASS MPN vs HTFS footprint (BoM + PCB)",
+      "where": "I-1/I-3 LEM HASS 100-S; pcb main.ato mpn HASS + footprint LEM_HTFS",
+      "why": "Different LEM families; mixed identity is a procurement and footprint lie",
+      "evidence": "main.ato lines 3\u20135,13\u201315,23\u201325; BoM I-1/I-3",
+      "fix": "Pick one family; align MPN, footprint, BoM, Excel"
+    },
+    {
+      "id": "BOM-008",
+      "surface": "BOM",
+      "severity": "MED",
+      "tag": "FIX",
+      "title": "Duplicate blank tags '\u2014'",
+      "where": "tag '\u2014' appears 3\u00d7 including \u00a318.5k motor and \u00a32.7k inverter",
+      "why": "Cannot key lines; breaks traceability",
+      "evidence": "duplicate tag counter",
+      "fix": "Stable unique tags"
+    },
+    {
+      "id": "BOM-009",
+      "surface": "BOM",
+      "severity": "MED",
+      "tag": "REVIEW",
+      "title": "Overview still flags BoM vs costStack materials band tension",
+      "where": "Overview advisory / prior \u00a331k vs \u00a352k path",
+      "why": "After rebuild Overview 10 but cost narrative historically split; verify live Overview \u03a3 matches \u00a352,533.7",
+      "evidence": "tab issues history; costStack.raw_materials_bom_gbp=52533.7",
+      "fix": "One materials number on Overview, Cost waterfall, BoM foot"
+    },
+    {
+      "id": "PCB-001",
+      "surface": "PCB",
+      "severity": "FATAL",
+      "tag": "FIX",
+      "title": "HASS MPN bolted to HTFS footprint (identity fracture)",
+      "where": "pcb-project/traction_control/main.ato \u00d73 current sensors",
+      "why": "Same as BOM-007 on authoring surface \u2014 DRC0 does not catch wrong MPN family",
+      "evidence": "mpn=LEM HASS 100-S footprint=Sensor_Current:LEM_HTFS",
+      "fix": "Single curated identity; re-run densify if symbol changes"
+    },
+    {
+      "id": "PCB-002",
+      "surface": "PCB",
+      "severity": "HIGH",
+      "tag": "GAP",
+      "title": "26 package_family parts remain \u2014 gate-drive/desat not draft A",
+      "where": "pcb_grade_card tiers package_family:26; still_open gate-driver/desat",
+      "why": "A- is correct ceiling; do not imply fab or A",
+      "evidence": "grade card axes",
+      "fix": "Curate isolated SiC gate-driver MPNs or keep A- with open list (current honesty OK if not overclaimed)"
+    },
+    {
+      "id": "PCB-003",
+      "surface": "PCB",
+      "severity": "MED",
+      "tag": "REVIEW",
+      "title": "Board-3D images are low-detail tokens (~100\u2013140 KB)",
+      "where": "pcb-boards/*/pcb/board-3d.png",
+      "why": "Not review-grade for connector orientation / creepage storytelling",
+      "evidence": "file sizes 106586 / 141940",
+      "fix": "Higher-res KiCad raytrace or annotated orthographic plots"
+    },
+    {
+      "id": "PCB-004",
+      "surface": "PCB",
+      "severity": "PASS",
+      "tag": "OK",
+      "title": "Live DRC 0 / unconnected 0 on both boards (2026-08-05)",
+      "where": "pcb-boards/*/pcb/drc-report.json",
+      "why": "Routing hygiene OK under ignored courtyard rules",
+      "evidence": "violations=[], date 2026-08-05T12:55"
+    },
+    {
+      "id": "PCB-005",
+      "surface": "PCB",
+      "severity": "PASS",
+      "tag": "OK",
+      "title": "Fab axis correctly PROTOTYPE_PACKAGE; ship_ok false",
+      "where": "pcb_grade_card.json",
+      "why": "No greenwash on fab readiness in grade card",
+      "evidence": "NOT_FABRICATION_READY true; banner present"
+    },
+    {
+      "id": "GA-001",
+      "surface": "BLENDER_GA",
+      "severity": "FATAL",
+      "tag": "FIX",
+      "title": "GA is not informed by Blender morphology \u2014 rectangular stack vs cylindrical concentric EDU",
+      "where": "drawings/general-arrangement.png vs 00-hero / 08-ghost / 13-exploded",
+      "why": "Blender shows concentric black end-bells, copper end-windings, top PCB shelf, HV orange boom, dual coolant QD, shaft with star nut. GA shows nested axis-aligned boxes + abstract circles. Title block claims 'matches Blender' \u2014 false.",
+      "evidence": "visual exam 2026-08-05; render-ga-coherence.json broken=true (dome missing from 2D)",
+      "fix": "Regenerate GA from form-meshes / parts-ledger silhouette of current Blender; orthographic true outlines of housing, inverter tray, connectors, QDs"
+    },
+    {
+      "id": "GA-002",
+      "surface": "BLENDER_GA",
+      "severity": "FATAL",
+      "tag": "FIX",
+      "title": "Product envelope dimensions disagree twin quantities",
+      "where": "GA title: 352\u00d7314\u00d7256 mm; quantities design_envelope 343\u00d7259\u00d7267 mm (W\u00d7D\u00d7H)",
+      "why": "Setting-out dims not single-sourced",
+      "evidence": "GA PNG text; state quantities design_envelope_*_mm",
+      "fix": "GA dims = live quantities; fail CI on drift >1 mm"
+    },
+    {
+      "id": "GA-003",
+      "surface": "BLENDER_GA",
+      "severity": "HIGH",
+      "tag": "FIX",
+      "title": "GA detail level far below requirement for highly detailed GA",
+      "where": "general-arrangement.png 2160\u00d72212 ~300 KB; 3 views; only 10 of 54 items listed",
+      "why": "User asked for GA as highly detailed as possible. Current is preliminary block diagram. Missing: connector callouts with orientation, QD ports, mounting feet, busbar R/Y/B, film-cap bank, PCB stack section, gear nest, section cuts, datums beyond FFL.",
+      "evidence": "image size; principal equipment table top-10 only",
+      "fix": "Multi-sheet GA: overall + inverter shelf detail + motor/gear section + interface ICD views; \u22654k export"
+    },
+    {
+      "id": "GA-004",
+      "surface": "BLENDER_GA",
+      "severity": "HIGH",
+      "tag": "FIX",
+      "title": "Prior automated coherence already FAIL \u2014 dome/end structure missing on GA",
+      "where": "drawings/render-ga-coherence.json",
+      "why": "broken=true defect: solid dome metallic structure on right of 3D absent from all 2D views",
+      "evidence": "render-ga-coherence.json",
+      "fix": "Include end-bell OD on elevation B-B and plan; re-run coherence gate until ok"
+    },
+    {
+      "id": "GA-005",
+      "surface": "BLENDER_GA",
+      "severity": "HIGH",
+      "tag": "FIX",
+      "title": "Motor principal dims 142\u00d7175\u00d7175 ignore DEC-009 stack 130 mm language",
+      "where": "GA equipment X-116 / BoM motor dims vs stack_length_mm=130",
+      "why": "Reader cannot reconcile active stack with package box",
+      "evidence": "quantities stack_length_mm; GA principal list",
+      "fix": "Annotate L_stk=130, package envelope separately"
+    },
+    {
+      "id": "BLN-001",
+      "surface": "BLENDER_GA",
+      "severity": "HIGH",
+      "tag": "GAP",
+      "title": "Blender PE region still schematic (coloured prisms / flat PCB)",
+      "where": "00-hero, 08-ghost, 13-exploded",
+      "why": "Film-cap cylinders partially present on exploded PCB; SiC modules still blocky; not supplier-like. Good architecture pedagogy, not GA-grade geometry source without cleanup.",
+      "evidence": "visual exam hero/ghost/exploded",
+      "fix": "If GA driven from Blender, first harden PE tray mesh to match electrical story"
+    },
+    {
+      "id": "BLN-002",
+      "surface": "BLENDER_GA",
+      "severity": "MED",
+      "tag": "REVIEW",
+      "title": "Studio pedestal base in Blender is not a vehicle ICD",
+      "where": "hero/ghost base plate with bolts",
+      "why": "GA should show chassis pickups when claiming race kit; Blender show base is photography rig",
+      "evidence": "visual",
+      "fix": "Either remove pedestal from engineering views or label 'studio stand \u2014 not chassis ICD'"
+    },
+    {
+      "id": "BLN-003",
+      "surface": "BLENDER_GA",
+      "severity": "MED",
+      "tag": "REVIEW",
+      "title": "Floating bar / disconnected geometry cue on hero left",
+      "where": "00-hero upper-left thin bar",
+      "why": "Looks like stray mesh or incomplete harness",
+      "evidence": "visual exam",
+      "fix": "Delete or complete as harness/pipe"
+    }
+  ],
+  "method": {
+    "excel": "openpyxl formula+data_only scan of dossier.xlsx (30 sheets, 3540 formulas sampled)",
+    "bom": "requirementsBom 54 lines + Excel BoM ledger + costStack",
+    "pcb": "grade card + live DRC 2026-08-05 + main.ato identity read",
+    "blender_ga": "vision read 00-hero, 08-ghost, 13-exploded, general-arrangement.png + render-ga-coherence.json"
+  }
+}

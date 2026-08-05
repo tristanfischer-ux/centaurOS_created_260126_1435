@@ -1,0 +1,1339 @@
+{
+  "schema": "parts-manifest/1",
+  "count": 57,
+  "bbox_mm": {
+    "x_min_mm": -168.1,
+    "x_max_mm": 168.1,
+    "y_min_mm": -126.9,
+    "y_max_mm": 171.5,
+    "z_min_mm": 288.5,
+    "z_max_mm": 536.9,
+    "length_mm": 336.2,
+    "width_mm": 298.4,
+    "height_mm": 248.4
+  },
+  "site": null,
+  "rooms": [],
+  "density": {
+    "verdict": "pass",
+    "m2_per_m3h": null,
+    "m2_per_equip": 0.0,
+    "reason": "0.0 m²/equip (no circulation flow)",
+    "punch": null
+  },
+  "placement_fp": "76331114f6b32c6e",
+  "parts": [
+    {
+      "tag": "INV-1",
+      "equipment_tag": "INV-1",
+      "name": "SiC Traction Inverter · 350 kW · 240x142x40 mm",
+      "module": "energy_conversion_transduction",
+      "shape": "box",
+      "qty": 1,
+      "region_rank": 50,
+      "pos_mm": [
+        0.0,
+        5.1,
+        509.1
+      ],
+      "dims_mm": {
+        "w": 153.5,
+        "d": 128.1,
+        "h": 6.2
+      },
+      "geometry_source": "traction_drive_story_mesh",
+      "signature_family": "traction_pack",
+      "entity_type": "bom_component"
+    },
+    {
+      "tag": "INV-2",
+      "equipment_tag": "INV-2",
+      "name": "Gate Driver Board · gate-drive · 80x55x12 mm",
+      "module": "energy_conversion_transduction",
+      "shape": "box",
+      "qty": 1,
+      "region_rank": 50,
+      "pos_mm": [
+        0.0,
+        -5.2,
+        512.7
+      ],
+      "dims_mm": {
+        "w": 110.5,
+        "d": 70.5,
+        "h": 3.5
+      },
+      "geometry_source": "traction_drive_story_mesh",
+      "signature_family": "traction_pack",
+      "entity_type": "bom_component"
+    },
+    {
+      "tag": "INV-3",
+      "equipment_tag": "INV-3",
+      "name": "Oem Inverter Control Board",
+      "module": "energy_conversion_transduction",
+      "shape": "box",
+      "qty": 1,
+      "region_rank": 50,
+      "pos_mm": [
+        0.0,
+        0.0,
+        534.6
+      ],
+      "dims_mm": {
+        "w": 138.2,
+        "d": 99.9,
+        "h": 4.5
+      },
+      "geometry_source": "traction_drive_story_mesh",
+      "signature_family": "traction_pack",
+      "entity_type": "bom_component"
+    },
+    {
+      "tag": "X-103",
+      "equipment_tag": "X-103",
+      "name": "Traction Drive Housing",
+      "module": "energy_conversion_transduction",
+      "shape": "box",
+      "qty": 1,
+      "region_rank": 50,
+      "pos_mm": [
+        0.0,
+        14.0,
+        483.2
+      ],
+      "dims_mm": {
+        "w": 112.3,
+        "d": 6.3,
+        "h": 12.0
+      },
+      "geometry_source": "traction_drive_story_mesh",
+      "signature_family": "traction_pack",
+      "entity_type": "bom_component"
+    },
+    {
+      "tag": "X-104",
+      "equipment_tag": "X-104",
+      "name": "Traction Pack Base",
+      "module": "energy_conversion_transduction",
+      "shape": "box",
+      "qty": 1,
+      "region_rank": 50,
+      "pos_mm": [
+        0.0,
+        0.0,
+        311.0
+      ],
+      "dims_mm": {
+        "w": 336.1,
+        "d": 253.8,
+        "h": 5.5
+      },
+      "geometry_source": "traction_drive_story_mesh",
+      "signature_family": "traction_pack",
+      "entity_type": "bom_component"
+    },
+    {
+      "tag": "X-105",
+      "equipment_tag": "X-105",
+      "name": "AC Phase Busbar Pierce",
+      "module": "energy_conversion_transduction",
+      "shape": "box",
+      "qty": 1,
+      "region_rank": 50,
+      "pos_mm": [
+        -24.7,
+        5.1,
+        522.5
+      ],
+      "dims_mm": {
+        "w": 26.8,
+        "d": 14.4,
+        "h": 6.2
+      },
+      "geometry_source": "traction_drive_story_mesh",
+      "signature_family": "traction_pack",
+      "entity_type": "bom_component"
+    },
+    {
+      "tag": "X-110",
+      "equipment_tag": "X-110",
+      "name": "Hv DC Connector",
+      "module": "energy_conversion_transduction",
+      "shape": "box",
+      "qty": 1,
+      "region_rank": 50,
+      "pos_mm": [
+        -49.1,
+        -65.4,
+        515.3
+      ],
+      "dims_mm": {
+        "w": 34.1,
+        "d": 13.2,
+        "h": 26.6
+      },
+      "geometry_source": "traction_drive_story_mesh",
+      "signature_family": "traction_pack",
+      "entity_type": "bom_component"
+    },
+    {
+      "tag": "X-116",
+      "equipment_tag": "X-116",
+      "name": "Traction IPMSM motor-generator · L_stk=130 mm · package Ø178×187 mm",
+      "module": "energy_conversion_transduction",
+      "shape": "horizontal_cylinder",
+      "qty": 1,
+      "region_rank": 50,
+      "pos_mm": [
+        0.0,
+        5.1,
+        408.5
+      ],
+      "dims_mm": {
+        "w": 187.2,
+        "d": 177.9,
+        "h": 177.9,
+        "dia": 177.9,
+        "len": 187.2,
+        "axis": "x"
+      },
+      "geometry_source": "traction_drive_story_mesh",
+      "signature_family": "traction_pack",
+      "entity_type": "bom_component",
+      "stack_length_mm": 130
+    },
+    {
+      "tag": "X-117",
+      "equipment_tag": "X-117",
+      "name": "Reduction gear stage",
+      "module": "energy_conversion_transduction",
+      "shape": "horizontal_cylinder",
+      "qty": 1,
+      "region_rank": 50,
+      "pos_mm": [
+        0.0,
+        5.1,
+        408.5
+      ],
+      "dims_mm": {
+        "w": 14.0,
+        "d": 89.4,
+        "h": 89.4,
+        "dia": 89.4,
+        "len": 14.0,
+        "axis": "x"
+      },
+      "geometry_source": "traction_drive_story_mesh",
+      "signature_family": "traction_pack",
+      "entity_type": "bom_component"
+    },
+    {
+      "tag": "X-121",
+      "equipment_tag": "X-121",
+      "name": "Mgu Cold Plate · 17.5 kW · 140x119x18 mm",
+      "module": "energy_conversion_transduction",
+      "shape": "box",
+      "qty": 1,
+      "region_rank": 50,
+      "pos_mm": [
+        -24.0,
+        -119.0,
+        422.7
+      ],
+      "dims_mm": {
+        "w": 18.0,
+        "d": 4.0,
+        "h": 18.0
+      },
+      "geometry_source": "traction_drive_story_mesh",
+      "signature_family": "traction_pack",
+      "entity_type": "bom_component"
+    },
+    {
+      "tag": "X-133",
+      "equipment_tag": "X-133",
+      "name": "Mini Diff In Rotor",
+      "module": "energy_conversion_transduction",
+      "shape": "horizontal_cylinder",
+      "qty": 1,
+      "region_rank": 50,
+      "pos_mm": [
+        0.0,
+        5.1,
+        408.5
+      ],
+      "dims_mm": {
+        "w": 18.9,
+        "d": 19.2,
+        "h": 19.2,
+        "dia": 19.2,
+        "len": 18.9,
+        "axis": "x"
+      },
+      "geometry_source": "traction_drive_story_mesh",
+      "signature_family": "traction_pack",
+      "entity_type": "bom_component"
+    },
+    {
+      "tag": "X-138",
+      "equipment_tag": "X-138",
+      "name": "Hv Shield Cover",
+      "module": "energy_conversion_transduction",
+      "shape": "box",
+      "qty": 1,
+      "region_rank": 50,
+      "pos_mm": [
+        0.0,
+        -61.5,
+        515.3
+      ],
+      "dims_mm": {
+        "w": 130.5,
+        "d": 3.5,
+        "h": 25.2
+      },
+      "geometry_source": "traction_drive_story_mesh",
+      "signature_family": "traction_pack",
+      "entity_type": "bom_component"
+    },
+    {
+      "tag": "X-139",
+      "equipment_tag": "X-139",
+      "name": "Mounting Ear Set",
+      "module": "energy_conversion_transduction",
+      "shape": "box",
+      "qty": 1,
+      "region_rank": 50,
+      "pos_mm": [
+        -75.6,
+        -57.1,
+        309.0
+      ],
+      "dims_mm": {
+        "w": 18.0,
+        "d": 14.0,
+        "h": 6.0
+      },
+      "geometry_source": "traction_drive_story_mesh",
+      "signature_family": "traction_pack",
+      "entity_type": "bom_component"
+    },
+    {
+      "tag": "X-200",
+      "equipment_tag": "X-200",
+      "name": "Mcu Shelf",
+      "module": "energy_conversion_transduction",
+      "shape": "box",
+      "qty": 1,
+      "region_rank": 50,
+      "pos_mm": [
+        0.0,
+        5.1,
+        496.9
+      ],
+      "dims_mm": {
+        "w": 161.2,
+        "d": 138.3,
+        "h": 3.3
+      },
+      "geometry_source": "traction_drive_story_mesh",
+      "signature_family": "traction_pack",
+      "entity_type": "bom_component"
+    },
+    {
+      "tag": "X-201",
+      "equipment_tag": "X-201",
+      "name": "Hollow Rotor Barrel",
+      "module": "energy_conversion_transduction",
+      "shape": "horizontal_cylinder",
+      "qty": 1,
+      "region_rank": 50,
+      "pos_mm": [
+        0.0,
+        5.1,
+        408.5
+      ],
+      "dims_mm": {
+        "w": 118.6,
+        "d": 122.9,
+        "h": 122.9,
+        "dia": 122.9,
+        "len": 118.6,
+        "axis": "x"
+      },
+      "geometry_source": "traction_drive_story_mesh",
+      "signature_family": "traction_pack",
+      "entity_type": "bom_component"
+    },
+    {
+      "tag": "X-202",
+      "equipment_tag": "X-202",
+      "name": "Post Diff Final Drive Helical",
+      "module": "energy_conversion_transduction",
+      "shape": "horizontal_cylinder",
+      "qty": 1,
+      "region_rank": 50,
+      "pos_mm": [
+        0.0,
+        51.4,
+        408.5
+      ],
+      "dims_mm": {
+        "w": 240.0,
+        "d": 240.2,
+        "h": 163.1,
+        "dia": 240.2,
+        "len": 240.0,
+        "axis": "x"
+      },
+      "geometry_source": "traction_drive_story_mesh",
+      "signature_family": "traction_pack",
+      "entity_type": "bom_component"
+    },
+    {
+      "tag": "X-203",
+      "equipment_tag": "X-203",
+      "name": "Ring Gear",
+      "module": "energy_conversion_transduction",
+      "shape": "horizontal_cylinder",
+      "qty": 1,
+      "region_rank": 50,
+      "pos_mm": [
+        0.0,
+        5.1,
+        408.5
+      ],
+      "dims_mm": {
+        "w": 14.0,
+        "d": 94.6,
+        "h": 94.6,
+        "dia": 94.6,
+        "len": 14.0,
+        "axis": "x"
+      },
+      "geometry_source": "traction_drive_story_mesh",
+      "signature_family": "traction_pack",
+      "entity_type": "bom_component"
+    },
+    {
+      "tag": "X-204",
+      "equipment_tag": "X-204",
+      "name": "Permanent Magnet Set",
+      "module": "energy_conversion_transduction",
+      "shape": "horizontal_cylinder",
+      "qty": 1,
+      "region_rank": 50,
+      "pos_mm": [
+        0.0,
+        63.0,
+        408.5
+      ],
+      "dims_mm": {
+        "w": 26.8,
+        "d": 6.5,
+        "h": 101.1,
+        "dia": 101.1,
+        "len": 26.8,
+        "axis": "x"
+      },
+      "geometry_source": "traction_drive_story_mesh",
+      "signature_family": "traction_pack",
+      "entity_type": "bom_component"
+    },
+    {
+      "tag": "X-205",
+      "equipment_tag": "X-205",
+      "name": "Halfshaft Output Flange Pair",
+      "module": "energy_conversion_transduction",
+      "shape": "horizontal_cylinder",
+      "qty": 1,
+      "region_rank": 50,
+      "pos_mm": [
+        -120.8,
+        5.1,
+        408.5
+      ],
+      "dims_mm": {
+        "w": 8.0,
+        "d": 50.4,
+        "h": 50.4,
+        "dia": 50.4,
+        "len": 8.0,
+        "axis": "x"
+      },
+      "geometry_source": "traction_drive_story_mesh",
+      "signature_family": "traction_pack",
+      "entity_type": "bom_component"
+    },
+    {
+      "tag": "X-206",
+      "equipment_tag": "X-206",
+      "name": "Cassette Cover",
+      "module": "energy_conversion_transduction",
+      "shape": "box",
+      "qty": 1,
+      "region_rank": 50,
+      "pos_mm": [
+        0.0,
+        5.1,
+        531.6
+      ],
+      "dims_mm": {
+        "w": 215.3,
+        "d": 169.0,
+        "h": 4.0
+      },
+      "geometry_source": "traction_drive_story_mesh",
+      "signature_family": "traction_pack",
+      "entity_type": "bom_component"
+    },
+    {
+      "tag": "X-207",
+      "equipment_tag": "X-207",
+      "name": "Sun Gear",
+      "module": "energy_conversion_transduction",
+      "shape": "horizontal_cylinder",
+      "qty": 1,
+      "region_rank": 50,
+      "pos_mm": [
+        0.0,
+        5.1,
+        408.5
+      ],
+      "dims_mm": {
+        "w": 14.0,
+        "d": 13.1,
+        "h": 13.1,
+        "dia": 13.1,
+        "len": 14.0,
+        "axis": "x"
+      },
+      "geometry_source": "traction_drive_story_mesh",
+      "signature_family": "traction_pack",
+      "entity_type": "bom_component"
+    },
+    {
+      "tag": "X-208",
+      "equipment_tag": "X-208",
+      "name": "Planet Gears",
+      "module": "energy_conversion_transduction",
+      "shape": "horizontal_cylinder",
+      "qty": 1,
+      "region_rank": 50,
+      "pos_mm": [
+        0.0,
+        30.3,
+        408.5
+      ],
+      "dims_mm": {
+        "w": 14.0,
+        "d": 39.8,
+        "h": 39.7,
+        "dia": 39.8,
+        "len": 14.0,
+        "axis": "x"
+      },
+      "geometry_source": "traction_drive_story_mesh",
+      "signature_family": "traction_pack",
+      "entity_type": "bom_component"
+    },
+    {
+      "tag": "INV-4",
+      "equipment_tag": "INV-4",
+      "name": "Inverter Housing",
+      "module": "energy_conversion_transduction",
+      "shape": "box",
+      "qty": 1,
+      "region_rank": 55,
+      "pos_mm": [
+        0.0,
+        5.1,
+        515.3
+      ],
+      "dims_mm": {
+        "w": 153.4,
+        "d": 128.5,
+        "h": 26.6
+      },
+      "geometry_source": "traction_drive_story_mesh",
+      "signature_family": "traction_pack",
+      "entity_type": "bom_component"
+    },
+    {
+      "tag": "INV-5",
+      "equipment_tag": "INV-5",
+      "name": "Inverter Cover",
+      "module": "energy_conversion_transduction",
+      "shape": "box",
+      "qty": 1,
+      "region_rank": 55,
+      "pos_mm": [
+        0.0,
+        5.1,
+        533.7
+      ],
+      "dims_mm": {
+        "w": 156.6,
+        "d": 130.7,
+        "h": 3.0
+      },
+      "geometry_source": "traction_drive_story_mesh",
+      "signature_family": "traction_pack",
+      "entity_type": "bom_component"
+    },
+    {
+      "tag": "X-141",
+      "equipment_tag": "X-141",
+      "name": "Hv Dc Busbar Link",
+      "module": "energy_conversion_transduction",
+      "shape": "box",
+      "qty": 1,
+      "region_rank": 55,
+      "pos_mm": [
+        -30.7,
+        -82.3,
+        515.7
+      ],
+      "dims_mm": {
+        "w": 20.8,
+        "d": 8.4,
+        "h": 17.3
+      },
+      "geometry_source": "traction_drive_story_mesh",
+      "signature_family": "traction_pack",
+      "entity_type": "bom_component"
+    },
+    {
+      "tag": "X-144",
+      "equipment_tag": "X-144",
+      "name": "Sic Power Module Stack",
+      "module": "energy_conversion_transduction",
+      "shape": "box",
+      "qty": 1,
+      "region_rank": 55,
+      "pos_mm": [
+        0.0,
+        5.1,
+        516.6
+      ],
+      "dims_mm": {
+        "w": 153.5,
+        "d": 128.1,
+        "h": 21.0
+      },
+      "geometry_source": "traction_drive_story_mesh",
+      "signature_family": "traction_pack",
+      "entity_type": "bom_component"
+    },
+    {
+      "tag": "X-145",
+      "equipment_tag": "X-145",
+      "name": "Dc Link Capacitor Bank",
+      "module": "energy_conversion_transduction",
+      "shape": "box",
+      "qty": 1,
+      "region_rank": 55,
+      "pos_mm": [
+        -9.2,
+        -46.2,
+        515.3
+      ],
+      "dims_mm": {
+        "w": 85.5,
+        "d": 18.0,
+        "h": 28.0
+      },
+      "geometry_source": "traction_drive_story_mesh",
+      "signature_family": "traction_pack",
+      "entity_type": "bom_component"
+    },
+    {
+      "tag": "X-146",
+      "equipment_tag": "X-146",
+      "name": "Lv Signal Connector",
+      "module": "energy_conversion_transduction",
+      "shape": "box",
+      "qty": 1,
+      "region_rank": 55,
+      "pos_mm": [
+        43.0,
+        -65.4,
+        511.1
+      ],
+      "dims_mm": {
+        "w": 28.0,
+        "d": 10.8,
+        "h": 16.0
+      },
+      "geometry_source": "traction_drive_story_mesh",
+      "signature_family": "traction_pack",
+      "entity_type": "bom_component"
+    },
+    {
+      "tag": "X-147",
+      "equipment_tag": "X-147",
+      "name": "Coolant Port In",
+      "module": "energy_conversion_transduction",
+      "shape": "box",
+      "qty": 1,
+      "region_rank": 55,
+      "pos_mm": [
+        -24.0,
+        -114.3,
+        422.7
+      ],
+      "dims_mm": {
+        "w": 9.6,
+        "d": 22.0,
+        "h": 9.6
+      },
+      "geometry_source": "traction_drive_story_mesh",
+      "signature_family": "traction_pack",
+      "entity_type": "bom_component"
+    },
+    {
+      "tag": "X-148",
+      "equipment_tag": "X-148",
+      "name": "Coolant Port Out",
+      "module": "energy_conversion_transduction",
+      "shape": "box",
+      "qty": 1,
+      "region_rank": 55,
+      "pos_mm": [
+        24.0,
+        -114.3,
+        422.7
+      ],
+      "dims_mm": {
+        "w": 9.6,
+        "d": 22.0,
+        "h": 9.6
+      },
+      "geometry_source": "traction_drive_story_mesh",
+      "signature_family": "traction_pack",
+      "entity_type": "bom_component"
+    },
+    {
+      "tag": "X-151",
+      "equipment_tag": "X-151",
+      "name": "Resolver",
+      "module": "energy_conversion_transduction",
+      "shape": "box",
+      "qty": 1,
+      "region_rank": 55,
+      "pos_mm": [
+        99.6,
+        5.1,
+        408.5
+      ],
+      "dims_mm": {
+        "w": 14.0,
+        "d": 43.2,
+        "h": 43.2
+      },
+      "geometry_source": "traction_drive_story_mesh",
+      "signature_family": "traction_pack",
+      "entity_type": "bom_component"
+    },
+    {
+      "tag": "X-154",
+      "equipment_tag": "X-154",
+      "name": "Motor Outer Casing",
+      "module": "energy_conversion_transduction",
+      "shape": "horizontal_cylinder",
+      "qty": 1,
+      "region_rank": 55,
+      "pos_mm": [
+        0.0,
+        5.1,
+        408.5
+      ],
+      "dims_mm": {
+        "w": 187.2,
+        "d": 177.9,
+        "h": 177.9,
+        "dia": 177.9,
+        "len": 187.2,
+        "axis": "x"
+      },
+      "geometry_source": "traction_drive_story_mesh",
+      "signature_family": "traction_pack",
+      "entity_type": "bom_component"
+    },
+    {
+      "tag": "X-155",
+      "equipment_tag": "X-155",
+      "name": "Motor Cover",
+      "module": "energy_conversion_transduction",
+      "shape": "box",
+      "qty": 1,
+      "region_rank": 55,
+      "pos_mm": [
+        -95.6,
+        5.1,
+        408.5
+      ],
+      "dims_mm": {
+        "w": 4.0,
+        "d": 170.8,
+        "h": 170.8
+      },
+      "geometry_source": "traction_drive_story_mesh",
+      "signature_family": "traction_pack",
+      "entity_type": "bom_component"
+    },
+    {
+      "tag": "X-156",
+      "equipment_tag": "X-156",
+      "name": "Motor Cooling Jacket",
+      "module": "energy_conversion_transduction",
+      "shape": "box",
+      "qty": 1,
+      "region_rank": 55,
+      "pos_mm": [
+        0.0,
+        5.1,
+        408.5
+      ],
+      "dims_mm": {
+        "w": 153.5,
+        "d": 193.9,
+        "h": 193.9
+      },
+      "geometry_source": "traction_drive_story_mesh",
+      "signature_family": "traction_pack",
+      "entity_type": "bom_component"
+    },
+    {
+      "tag": "X-157",
+      "equipment_tag": "X-157",
+      "name": "Stator Laminations",
+      "module": "energy_conversion_transduction",
+      "shape": "horizontal_cylinder",
+      "qty": 1,
+      "region_rank": 55,
+      "pos_mm": [
+        0.0,
+        5.1,
+        408.5
+      ],
+      "dims_mm": {
+        "w": 134.8,
+        "d": 165.9,
+        "h": 165.9,
+        "dia": 165.9,
+        "len": 134.8,
+        "axis": "x"
+      },
+      "geometry_source": "traction_drive_story_mesh",
+      "signature_family": "traction_pack",
+      "entity_type": "bom_component"
+    },
+    {
+      "tag": "X-158",
+      "equipment_tag": "X-158",
+      "name": "Stator Windings",
+      "module": "energy_conversion_transduction",
+      "shape": "box",
+      "qty": 1,
+      "region_rank": 55,
+      "pos_mm": [
+        0.0,
+        5.1,
+        408.5
+      ],
+      "dims_mm": {
+        "w": 128.2,
+        "d": 159.3,
+        "h": 159.3
+      },
+      "geometry_source": "traction_drive_story_mesh",
+      "signature_family": "traction_pack",
+      "entity_type": "bom_component"
+    },
+    {
+      "tag": "X-159",
+      "equipment_tag": "X-159",
+      "name": "Motor Shaft",
+      "module": "energy_conversion_transduction",
+      "shape": "box",
+      "qty": 1,
+      "region_rank": 55,
+      "pos_mm": [
+        0.0,
+        5.1,
+        408.5
+      ],
+      "dims_mm": {
+        "w": 128.1,
+        "d": 15.3,
+        "h": 15.3
+      },
+      "geometry_source": "traction_drive_story_mesh",
+      "signature_family": "traction_pack",
+      "entity_type": "bom_component"
+    },
+    {
+      "tag": "X-160",
+      "equipment_tag": "X-160",
+      "name": "Front Bearing",
+      "module": "energy_conversion_transduction",
+      "shape": "box",
+      "qty": 1,
+      "region_rank": 55,
+      "pos_mm": [
+        0.0,
+        5.1,
+        408.5
+      ],
+      "dims_mm": {
+        "w": 203.2,
+        "d": 33.3,
+        "h": 33.3
+      },
+      "geometry_source": "traction_drive_story_mesh",
+      "signature_family": "traction_pack",
+      "entity_type": "bom_component"
+    },
+    {
+      "tag": "X-161",
+      "equipment_tag": "X-161",
+      "name": "Rear Bearing",
+      "module": "energy_conversion_transduction",
+      "shape": "box",
+      "qty": 1,
+      "region_rank": 55,
+      "pos_mm": [
+        0.0,
+        5.1,
+        408.5
+      ],
+      "dims_mm": {
+        "w": 203.2,
+        "d": 33.3,
+        "h": 33.3
+      },
+      "geometry_source": "traction_drive_story_mesh",
+      "signature_family": "traction_pack",
+      "entity_type": "bom_component"
+    },
+    {
+      "tag": "X-162",
+      "equipment_tag": "X-162",
+      "name": "Front End Bell",
+      "module": "energy_conversion_transduction",
+      "shape": "box",
+      "qty": 1,
+      "region_rank": 55,
+      "pos_mm": [
+        0.0,
+        5.1,
+        408.5
+      ],
+      "dims_mm": {
+        "w": 191.4,
+        "d": 185.9,
+        "h": 185.9
+      },
+      "geometry_source": "traction_drive_story_mesh",
+      "signature_family": "traction_pack",
+      "entity_type": "bom_component"
+    },
+    {
+      "tag": "X-209",
+      "equipment_tag": "X-209",
+      "name": "Differential Carrier",
+      "module": "energy_conversion_transduction",
+      "shape": "horizontal_cylinder",
+      "qty": 1,
+      "region_rank": 55,
+      "pos_mm": [
+        0.0,
+        5.1,
+        408.5
+      ],
+      "dims_mm": {
+        "w": 18.9,
+        "d": 19.2,
+        "h": 19.2,
+        "dia": 19.2,
+        "len": 18.9,
+        "axis": "x"
+      },
+      "geometry_source": "traction_drive_story_mesh",
+      "signature_family": "traction_pack",
+      "entity_type": "bom_component"
+    },
+    {
+      "tag": "X-210",
+      "equipment_tag": "X-210",
+      "name": "Encoder",
+      "module": "energy_conversion_transduction",
+      "shape": "box",
+      "qty": 1,
+      "region_rank": 55,
+      "pos_mm": [
+        -99.6,
+        5.1,
+        408.5
+      ],
+      "dims_mm": {
+        "w": 12.0,
+        "d": 37.8,
+        "h": 37.8
+      },
+      "geometry_source": "traction_drive_story_mesh",
+      "signature_family": "traction_pack",
+      "entity_type": "bom_component"
+    },
+    {
+      "tag": "X-211",
+      "equipment_tag": "X-211",
+      "name": "Gear Oil Charge",
+      "module": "energy_conversion_transduction",
+      "shape": "box",
+      "qty": 1,
+      "region_rank": 55,
+      "pos_mm": [
+        0.0,
+        5.1,
+        397.8
+      ],
+      "dims_mm": {
+        "w": 9.8,
+        "d": 62.6,
+        "h": 62.6
+      },
+      "geometry_source": "traction_drive_story_mesh",
+      "signature_family": "traction_pack",
+      "entity_type": "bom_component"
+    },
+    {
+      "tag": "X-212",
+      "equipment_tag": "X-212",
+      "name": "Gearbox Bearings",
+      "module": "energy_conversion_transduction",
+      "shape": "horizontal_cylinder",
+      "qty": 1,
+      "region_rank": 55,
+      "pos_mm": [
+        0.0,
+        5.1,
+        408.5
+      ],
+      "dims_mm": {
+        "w": 110.4,
+        "d": 28.3,
+        "h": 28.3,
+        "dia": 28.3,
+        "len": 110.4,
+        "axis": "x"
+      },
+      "geometry_source": "traction_drive_story_mesh",
+      "signature_family": "traction_pack",
+      "entity_type": "bom_component"
+    },
+    {
+      "tag": "X-213",
+      "equipment_tag": "X-213",
+      "name": "Gearbox Cover",
+      "module": "energy_conversion_transduction",
+      "shape": "horizontal_cylinder",
+      "qty": 1,
+      "region_rank": 55,
+      "pos_mm": [
+        51.2,
+        5.1,
+        408.5
+      ],
+      "dims_mm": {
+        "w": 3.5,
+        "d": 85.8,
+        "h": 85.8,
+        "dia": 85.8,
+        "len": 3.5,
+        "axis": "x"
+      },
+      "geometry_source": "traction_drive_story_mesh",
+      "signature_family": "traction_pack",
+      "entity_type": "bom_component"
+    },
+    {
+      "tag": "X-214",
+      "equipment_tag": "X-214",
+      "name": "Gearbox Housing",
+      "module": "energy_conversion_transduction",
+      "shape": "horizontal_cylinder",
+      "qty": 1,
+      "region_rank": 55,
+      "pos_mm": [
+        0.0,
+        5.1,
+        408.5
+      ],
+      "dims_mm": {
+        "w": 14.0,
+        "d": 89.4,
+        "h": 89.4,
+        "dia": 89.4,
+        "len": 14.0,
+        "axis": "x"
+      },
+      "geometry_source": "traction_drive_story_mesh",
+      "signature_family": "traction_pack",
+      "entity_type": "bom_component"
+    },
+    {
+      "tag": "X-215",
+      "equipment_tag": "X-215",
+      "name": "Intermediate Shaft",
+      "module": "energy_conversion_transduction",
+      "shape": "box",
+      "qty": 1,
+      "region_rank": 55,
+      "pos_mm": [
+        0.0,
+        5.1,
+        408.5
+      ],
+      "dims_mm": {
+        "w": 20.8,
+        "d": 12.6,
+        "h": 12.6
+      },
+      "geometry_source": "traction_drive_story_mesh",
+      "signature_family": "traction_pack",
+      "entity_type": "bom_component"
+    },
+    {
+      "tag": "X-216",
+      "equipment_tag": "X-216",
+      "name": "Mcu Cold Plate",
+      "module": "energy_conversion_transduction",
+      "shape": "box",
+      "qty": 1,
+      "region_rank": 55,
+      "pos_mm": [
+        0.0,
+        5.1,
+        531.9
+      ],
+      "dims_mm": {
+        "w": 141.2,
+        "d": 112.7,
+        "h": 2.7
+      },
+      "geometry_source": "traction_drive_story_mesh",
+      "signature_family": "traction_pack",
+      "entity_type": "bom_component"
+    },
+    {
+      "tag": "X-217",
+      "equipment_tag": "X-217",
+      "name": "Motor Power Terminals",
+      "module": "energy_conversion_transduction",
+      "shape": "box",
+      "qty": 1,
+      "region_rank": 55,
+      "pos_mm": [
+        0.0,
+        5.1,
+        476.1
+      ],
+      "dims_mm": {
+        "w": 45.0,
+        "d": 9.0,
+        "h": 14.0
+      },
+      "geometry_source": "traction_drive_story_mesh",
+      "signature_family": "traction_pack",
+      "entity_type": "bom_component"
+    },
+    {
+      "tag": "X-218",
+      "equipment_tag": "X-218",
+      "name": "Oil Seals",
+      "module": "energy_conversion_transduction",
+      "shape": "box",
+      "qty": 1,
+      "region_rank": 55,
+      "pos_mm": [
+        0.0,
+        5.1,
+        408.5
+      ],
+      "dims_mm": {
+        "w": 200.2,
+        "d": 27.9,
+        "h": 27.9
+      },
+      "geometry_source": "traction_drive_story_mesh",
+      "signature_family": "traction_pack",
+      "entity_type": "bom_component"
+    },
+    {
+      "tag": "X-219",
+      "equipment_tag": "X-219",
+      "name": "Output Gears",
+      "module": "energy_conversion_transduction",
+      "shape": "box",
+      "qty": 1,
+      "region_rank": 55,
+      "pos_mm": [
+        0.0,
+        5.1,
+        408.5
+      ],
+      "dims_mm": {
+        "w": 165.2,
+        "d": 28.8,
+        "h": 28.8
+      },
+      "geometry_source": "traction_drive_story_mesh",
+      "signature_family": "traction_pack",
+      "entity_type": "bom_component"
+    },
+    {
+      "tag": "X-220",
+      "equipment_tag": "X-220",
+      "name": "Output Shaft Left",
+      "module": "energy_conversion_transduction",
+      "shape": "box",
+      "qty": 1,
+      "region_rank": 55,
+      "pos_mm": [
+        -106.4,
+        5.1,
+        408.5
+      ],
+      "dims_mm": {
+        "w": 32.0,
+        "d": 18.0,
+        "h": 18.0
+      },
+      "geometry_source": "traction_drive_story_mesh",
+      "signature_family": "traction_pack",
+      "entity_type": "bom_component"
+    },
+    {
+      "tag": "X-221",
+      "equipment_tag": "X-221",
+      "name": "Output Shaft Right",
+      "module": "energy_conversion_transduction",
+      "shape": "box",
+      "qty": 1,
+      "region_rank": 55,
+      "pos_mm": [
+        106.4,
+        5.1,
+        408.5
+      ],
+      "dims_mm": {
+        "w": 32.0,
+        "d": 18.0,
+        "h": 18.0
+      },
+      "geometry_source": "traction_drive_story_mesh",
+      "signature_family": "traction_pack",
+      "entity_type": "bom_component"
+    },
+    {
+      "tag": "X-222",
+      "equipment_tag": "X-222",
+      "name": "Pinion Gear",
+      "module": "energy_conversion_transduction",
+      "shape": "box",
+      "qty": 1,
+      "region_rank": 55,
+      "pos_mm": [
+        0.0,
+        8.5,
+        408.5
+      ],
+      "dims_mm": {
+        "w": 10.4,
+        "d": 8.0,
+        "h": 8.0
+      },
+      "geometry_source": "traction_drive_story_mesh",
+      "signature_family": "traction_pack",
+      "entity_type": "bom_component"
+    },
+    {
+      "tag": "X-223",
+      "equipment_tag": "X-223",
+      "name": "Planet Carrier",
+      "module": "energy_conversion_transduction",
+      "shape": "horizontal_cylinder",
+      "qty": 1,
+      "region_rank": 55,
+      "pos_mm": [
+        0.0,
+        5.1,
+        408.5
+      ],
+      "dims_mm": {
+        "w": 8.0,
+        "d": 64.3,
+        "h": 64.3,
+        "dia": 64.3,
+        "len": 8.0,
+        "axis": "x"
+      },
+      "geometry_source": "traction_drive_story_mesh",
+      "signature_family": "traction_pack",
+      "entity_type": "bom_component"
+    },
+    {
+      "tag": "X-224",
+      "equipment_tag": "X-224",
+      "name": "Rear End Bell",
+      "module": "energy_conversion_transduction",
+      "shape": "box",
+      "qty": 1,
+      "region_rank": 55,
+      "pos_mm": [
+        0.0,
+        5.1,
+        408.5
+      ],
+      "dims_mm": {
+        "w": 191.4,
+        "d": 185.9,
+        "h": 185.9
+      },
+      "geometry_source": "traction_drive_story_mesh",
+      "signature_family": "traction_pack",
+      "entity_type": "bom_component"
+    },
+    {
+      "tag": "X-225",
+      "equipment_tag": "X-225",
+      "name": "Side Gears",
+      "module": "energy_conversion_transduction",
+      "shape": "box",
+      "qty": 1,
+      "region_rank": 55,
+      "pos_mm": [
+        0.0,
+        5.1,
+        408.5
+      ],
+      "dims_mm": {
+        "w": 16.6,
+        "d": 12.0,
+        "h": 12.0
+      },
+      "geometry_source": "traction_drive_story_mesh",
+      "signature_family": "traction_pack",
+      "entity_type": "bom_component"
+    }
+  ],
+  "design_envelope_mm": {
+    "w": 343.0,
+    "d": 259.0,
+    "h": 267.0
+  },
+  "ga_title_envelope_note": "Product envelope from twin quantities: 343×259×267 mm (W×D×H). Parts-manifest bbox L×W×H=336.2×298.4×248.4 mm."
+}

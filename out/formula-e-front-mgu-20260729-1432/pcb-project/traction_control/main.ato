@@ -1,8 +1,8 @@
 component Part_phase_current_sensor_word__1:
     designator_prefix = "U"
     footprint = "Sensor_Current:LEM_HTFS"
-    mpn = "LEM HASS 100-S"
-    value = "HASS 100-S"
+    mpn = "LEM HTFS 100-P"
+    value = "HTFS 100-P"
     signal VCC ~ pin 1
     signal GND ~ pin 2
     signal OUT ~ pin 3
@@ -11,8 +11,8 @@ component Part_phase_current_sensor_word__1:
 component Part_phase_current_sensor_word__2:
     designator_prefix = "U"
     footprint = "Sensor_Current:LEM_HTFS"
-    mpn = "LEM HASS 100-S"
-    value = "HASS 100-S"
+    mpn = "LEM HTFS 100-P"
+    value = "HTFS 100-P"
     signal VCC ~ pin 1
     signal GND ~ pin 2
     signal OUT ~ pin 3
@@ -21,8 +21,8 @@ component Part_phase_current_sensor_word__2:
 component Part_phase_current_sensor_word__3:
     designator_prefix = "U"
     footprint = "Sensor_Current:LEM_HTFS"
-    mpn = "LEM HASS 100-S"
-    value = "HASS 100-S"
+    mpn = "LEM HTFS 100-P"
+    value = "HTFS 100-P"
     signal VCC ~ pin 1
     signal GND ~ pin 2
     signal OUT ~ pin 3
@@ -181,17 +181,17 @@ component Part_lv_buck_rails_word__3:
 
 component Part_hv_lv_isolation_barrier_word:
     designator_prefix = "U"
-    footprint = "Package_SO:SOIC-8_3.81x9.347mm_P2.54mm"
-    mpn = "TBD (detailed design) - isolator_ic"
-    value = "isolator_ic"
-    signal VDD1 ~ pin 1
-    signal GND1 ~ pin 2
-    signal VIA ~ pin 3
-    signal VOB ~ pin 4
-    signal VDD2 ~ pin 5
-    signal GND2 ~ pin 6
-    signal VOA ~ pin 7
-    signal VIB ~ pin 8
+    footprint = "Package_SO:SOIC-8_3.9x4.9mm_P1.27mm"
+    mpn = "Analog Devices ADUM1201ARZ-RL7"
+    value = "ADUM1201ARZ-RL7"
+    signal VDD1__1 ~ pin 1
+    signal VOA__2 ~ pin 2
+    signal VIB__3 ~ pin 3
+    signal GND1__4 ~ pin 4
+    signal GND2__5 ~ pin 5
+    signal VOB__6 ~ pin 6
+    signal VIA__7 ~ pin 7
+    signal VDD2__8 ~ pin 8
 
 component Part_decouple_phase_current_sensor_word__1:
     designator_prefix = "C"
@@ -369,8 +369,8 @@ module App:
     lv_buck_rails_word__2.VOUT ~ VCC
     lv_buck_rails_word__3.VIN ~ VCC
     lv_buck_rails_word__3.VOUT ~ VCC
-    hv_lv_isolation_barrier_word.VDD1 ~ VCC
-    hv_lv_isolation_barrier_word.VDD2 ~ VCC
+    hv_lv_isolation_barrier_word.VDD1__1 ~ VCC
+    hv_lv_isolation_barrier_word.VDD2__8 ~ VCC
     decouple_phase_current_sensor_word__1.___1 ~ VCC
     decouple_phase_current_sensor_word__2.___1 ~ VCC
     decouple_phase_current_sensor_word__3.___1 ~ VCC
@@ -401,8 +401,8 @@ module App:
     lv_buck_rails_word__1.GND ~ GND
     lv_buck_rails_word__2.GND ~ GND
     lv_buck_rails_word__3.GND ~ GND
-    hv_lv_isolation_barrier_word.GND1 ~ GND
-    hv_lv_isolation_barrier_word.GND2 ~ GND
+    hv_lv_isolation_barrier_word.GND1__4 ~ GND
+    hv_lv_isolation_barrier_word.GND2__5 ~ GND
     decouple_phase_current_sensor_word__1.___2 ~ GND
     decouple_phase_current_sensor_word__2.___2 ~ GND
     decouple_phase_current_sensor_word__3.___2 ~ GND

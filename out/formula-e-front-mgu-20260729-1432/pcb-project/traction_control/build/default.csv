@@ -1,0 +1,10 @@
+Comment,Designator,Footprint,LCSC,Price
+LEM HTFS 100-P,"U1,U2,U3",Sensor_Current:LEM_HTFS,LEM HTFS 100-P,0.00
+ABB RRIA,U4,Package_SO:SOIC-8_3.9x4.9mm_P1.27mm,ABB RRIA,0.00
+Texas Instruments TMP1075DSGR,U5,Package_SO:SOIC-8_3.9x4.9mm_P1.27mm,Texas Instruments TMP1075DSGR,0.00
+Microchip Technology ATSAMD21G18A-AU,U6,Package_QFP:TQFP-48_7x7mm_P0.5mm,Microchip Technology ATSAMD21G18A-AU,0.00
+TBD (detailed design) - connectivity_ic,U7,Package_DFN_QFN:QFN-24-1EP_4x4mm_P0.5mm_EP2.6x2.6mm,TBD (detailed design) - connectivity_ic,0.00
+TBD (detailed design) - op_amp,"U8,U9,U10",Package_SO:SOIC-8_3.9x4.9mm_P1.27mm,TBD (detailed design) - op_amp,0.00
+TBD (detailed design) - regulator,"U11,U12,U13",Package_TO_SOT_SMD:SOT-23,TBD (detailed design) - regulator,0.00
+Analog Devices ADUM1201ARZ-RL7,U14,Package_SO:SOIC-8_3.9x4.9mm_P1.27mm,Analog Devices ADUM1201ARZ-RL7,0.00
+YAGEO CC0603KRX7R9BB104,"C1,C2,C3,C4,C5,C6,C7,C8,C9,C10,C11,C12,C13,C14",Capacitor_SMD:C_0603_1608Metric,YAGEO CC0603KRX7R9BB104,0.00

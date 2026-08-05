@@ -1,0 +1,1063 @@
+{
+  "excel_formula_errors": [
+    {
+      "sheet": "Contents",
+      "cell": "A4",
+      "error": "#",
+      "formula": "#"
+    },
+    {
+      "sheet": "Engineering Analysis",
+      "cell": "A20",
+      "error": "#",
+      "formula": "#"
+    },
+    {
+      "sheet": "Engineering Analysis",
+      "cell": "A25",
+      "error": "#",
+      "formula": "#"
+    },
+    {
+      "sheet": "Drawings",
+      "cell": "A11",
+      "error": "#",
+      "formula": "#"
+    },
+    {
+      "sheet": "Audit data",
+      "cell": "A5",
+      "error": "#",
+      "formula": "#"
+    },
+    {
+      "sheet": "Risk & Regulatory",
+      "cell": "A6",
+      "error": "#",
+      "formula": "#"
+    },
+    {
+      "sheet": "Risk & Regulatory",
+      "cell": "A11",
+      "error": "#",
+      "formula": "#"
+    },
+    {
+      "sheet": "Risk & Regulatory",
+      "cell": "A23",
+      "error": "#",
+      "formula": "#"
+    },
+    {
+      "sheet": "Risk & Regulatory",
+      "cell": "A30",
+      "error": "#",
+      "formula": "#"
+    },
+    {
+      "sheet": "Calculations",
+      "cell": "C71",
+      "error": "#VALUE!",
+      "formula": "=B295"
+    },
+    {
+      "sheet": "Calculations",
+      "cell": "H71",
+      "error": "#VALUE!",
+      "formula": "=IF(AND(LEN(TRIM(A71&\"\"))>0,TRIM(A71&\"\")<>\"\u2014\",LEN(TRIM(B71&\"\"))>0,TRIM(B71&\"\")<>\"\u2014\",LEN(TRIM(C71&\"\"))>0,TRIM(C71&\"\")<>\"\u2014\",LEN(TRIM(G71&\"\"))>0,TRIM(G71"
+    },
+    {
+      "sheet": "Calculations",
+      "cell": "B295",
+      "error": "#VALUE!",
+      "formula": "=IFERROR(B294),\"\u2014\")"
+    },
+    {
+      "sheet": "Calculations",
+      "cell": "B449",
+      "error": "#N/A",
+      "formula": "=NA()"
+    },
+    {
+      "sheet": "Calculations",
+      "cell": "G449",
+      "error": "#N/A",
+      "formula": "=IF(AND(LEN(TRIM(A449&\"\"))>0,TRIM(A449&\"\")<>\"\u2014\",LEN(TRIM(B449&\"\"))>0,TRIM(B449&\"\")<>\"\u2014\",ISNUMBER(B449),LEN(TRIM(C449&\"\"))>0,TRIM(C449&\"\")<>\"\u2014\",LEN(TRI"
+    }
+  ],
+  "excel_error_context": [
+    {
+      "cell": "C71",
+      "formula": "=B295",
+      "cached": "#VALUE!",
+      "context": {
+        "A69": "powertrain:duty-cycle-energy",
+        "A70": "powertrain:fia-net-usable-energy",
+        "A71": "powertrain:fia-power-regen-split",
+        "A72": "front_fpk_power_reconcile",
+        "A73": "front_fpk_power_reconcile",
+        "B69": "regen_time_s",
+        "B70": "net_usable_energy_kwh",
+        "B71": "feasible",
+        "B72": "mgu_ac_electrical_input_kw",
+        "B73": "mgu_shaft_power_kw",
+        "C69": "24",
+        "C70": "=B285",
+        "C71": "=B295",
+        "C72": "=B400",
+        "C73": "=B405",
+        "D69": "s",
+        "D70": "kWh",
+        "D71": "bool",
+        "D72": "kW",
+        "D73": "kW",
+        "E69": "inputs from: inverter:sic-loss, motor:loss-point, gear:traction-ratio + brief",
+        "E70": "inputs from: powertrain:fia-power-regen-split + brief",
+        "E71": "inputs from: brief",
+        "E72": "mgu_ac_electrical_input_kw = continuous_power_kw*inverter_efficiency",
+        "E73": "mgu_shaft_power_kw = continuous_power_kw*inverter_efficiency*mgu_efficiency",
+        "F69": "duty_regen_time_s = 24",
+        "F70": "fia_net_usable_energy_kwh = 25.26",
+        "F71": "fia_power_split_feasible = 1",
+        "F72": "mgu_ac_electrical_input_kw = 246.915",
+        "F73": "mgu_shaft_power_kw = 244.49",
+        "G69": "USED",
+        "G70": "USED",
+        "G71": "USED",
+        "G72": "USED",
+        "G73": "USED",
+        "H69": "=IF(AND(LEN(TRIM(A69&\"\"))>0,TRIM(A69&\"\")<>\"\u2014\",LEN(TRIM(B69&\"\"))>0,TRIM(B69&\"\")<>\"\u2014\",LEN(TRIM(C69&\"\"))>0,TRIM(C69&\"\")<>\"\u2014",
+        "H70": "=IF(AND(LEN(TRIM(A70&\"\"))>0,TRIM(A70&\"\")<>\"\u2014\",LEN(TRIM(B70&\"\"))>0,TRIM(B70&\"\")<>\"\u2014\",LEN(TRIM(C70&\"\"))>0,TRIM(C70&\"\")<>\"\u2014",
+        "H71": "=IF(AND(LEN(TRIM(A71&\"\"))>0,TRIM(A71&\"\")<>\"\u2014\",LEN(TRIM(B71&\"\"))>0,TRIM(B71&\"\")<>\"\u2014\",LEN(TRIM(C71&\"\"))>0,TRIM(C71&\"\")<>\"\u2014",
+        "H72": "=IF(AND(LEN(TRIM(A72&\"\"))>0,TRIM(A72&\"\")<>\"\u2014\",LEN(TRIM(B72&\"\"))>0,TRIM(B72&\"\")<>\"\u2014\",LEN(TRIM(C72&\"\"))>0,TRIM(C72&\"\")<>\"\u2014",
+        "H73": "=IF(AND(LEN(TRIM(A73&\"\"))>0,TRIM(A73&\"\")<>\"\u2014\",LEN(TRIM(B73&\"\"))>0,TRIM(B73&\"\")<>\"\u2014\",LEN(TRIM(C73&\"\"))>0,TRIM(C73&\"\")<>\"\u2014"
+      }
+    },
+    {
+      "cell": "H71",
+      "formula": "=IF(AND(LEN(TRIM(A71&\"\"))>0,TRIM(A71&\"\")<>\"\u2014\",LEN(TRIM(B71&\"\"))>0,TRIM(B71&\"\")<>\"\u2014\",LEN(TRIM(C71&\"\"))>0,TRIM(C71&\"\")<>\"\u2014\",LEN(TRIM(G71&\"\"))>0,TRIM(G71&\"\")<>\"\u2014\"),\"PASS\",\"\u26a0 FAIL \u2014 \"&\"a required cell is empty/placeholder or wrong type\")",
+      "cached": "#VALUE!",
+      "context": {
+        "A69": "powertrain:duty-cycle-energy",
+        "A70": "powertrain:fia-net-usable-energy",
+        "A71": "powertrain:fia-power-regen-split",
+        "A72": "front_fpk_power_reconcile",
+        "A73": "front_fpk_power_reconcile",
+        "B69": "regen_time_s",
+        "B70": "net_usable_energy_kwh",
+        "B71": "feasible",
+        "B72": "mgu_ac_electrical_input_kw",
+        "B73": "mgu_shaft_power_kw",
+        "C69": "24",
+        "C70": "=B285",
+        "C71": "=B295",
+        "C72": "=B400",
+        "C73": "=B405",
+        "D69": "s",
+        "D70": "kWh",
+        "D71": "bool",
+        "D72": "kW",
+        "D73": "kW",
+        "E69": "inputs from: inverter:sic-loss, motor:loss-point, gear:traction-ratio + brief",
+        "E70": "inputs from: powertrain:fia-power-regen-split + brief",
+        "E71": "inputs from: brief",
+        "E72": "mgu_ac_electrical_input_kw = continuous_power_kw*inverter_efficiency",
+        "E73": "mgu_shaft_power_kw = continuous_power_kw*inverter_efficiency*mgu_efficiency",
+        "F69": "duty_regen_time_s = 24",
+        "F70": "fia_net_usable_energy_kwh = 25.26",
+        "F71": "fia_power_split_feasible = 1",
+        "F72": "mgu_ac_electrical_input_kw = 246.915",
+        "F73": "mgu_shaft_power_kw = 244.49",
+        "G69": "USED",
+        "G70": "USED",
+        "G71": "USED",
+        "G72": "USED",
+        "G73": "USED",
+        "H69": "=IF(AND(LEN(TRIM(A69&\"\"))>0,TRIM(A69&\"\")<>\"\u2014\",LEN(TRIM(B69&\"\"))>0,TRIM(B69&\"\")<>\"\u2014\",LEN(TRIM(C69&\"\"))>0,TRIM(C69&\"\")<>\"\u2014",
+        "H70": "=IF(AND(LEN(TRIM(A70&\"\"))>0,TRIM(A70&\"\")<>\"\u2014\",LEN(TRIM(B70&\"\"))>0,TRIM(B70&\"\")<>\"\u2014\",LEN(TRIM(C70&\"\"))>0,TRIM(C70&\"\")<>\"\u2014",
+        "H71": "=IF(AND(LEN(TRIM(A71&\"\"))>0,TRIM(A71&\"\")<>\"\u2014\",LEN(TRIM(B71&\"\"))>0,TRIM(B71&\"\")<>\"\u2014\",LEN(TRIM(C71&\"\"))>0,TRIM(C71&\"\")<>\"\u2014",
+        "H72": "=IF(AND(LEN(TRIM(A72&\"\"))>0,TRIM(A72&\"\")<>\"\u2014\",LEN(TRIM(B72&\"\"))>0,TRIM(B72&\"\")<>\"\u2014\",LEN(TRIM(C72&\"\"))>0,TRIM(C72&\"\")<>\"\u2014",
+        "H73": "=IF(AND(LEN(TRIM(A73&\"\"))>0,TRIM(A73&\"\")<>\"\u2014\",LEN(TRIM(B73&\"\"))>0,TRIM(B73&\"\")<>\"\u2014\",LEN(TRIM(C73&\"\"))>0,TRIM(C73&\"\")<>\"\u2014"
+      }
+    },
+    {
+      "cell": "B295",
+      "formula": "=IFERROR(B294),\"\u2014\")",
+      "cached": "#VALUE!",
+      "context": {
+        "A293": "  R_front",
+        "A294": "  R_total_max",
+        "A295": "  = result",
+        "A297": "decision:DEC-009   \u00b7   decision:DEC-009",
+        "B293": "0",
+        "B294": "600",
+        "B295": "=IFERROR(B294),\"\u2014\")",
+        "C293": "kW",
+        "C294": "kW",
+        "C295": "feasible",
+        "D295": "R_total_max)",
+        "E295": "1",
+        "F295": "=IFERROR(B295-E295,\"\u2014\")",
+        "G295": "feasible",
+        "H295": "profile=gen3 from public FIA FE fact sheets / tech regs",
+        "I295": "\u2014 intermediate/step value (not a standalone contract quantity)",
+        "J293": "=IF(AND(LEN(TRIM(A293&\"\"))>0,TRIM(A293&\"\")<>\"\u2014\"),\"PASS\",\"\u26a0 FAIL \u2014 \"&\"a required cell is empty/placeholder or wrong type\"",
+        "J294": "=IF(AND(LEN(TRIM(A294&\"\"))>0,TRIM(A294&\"\")<>\"\u2014\"),\"PASS\",\"\u26a0 FAIL \u2014 \"&\"a required cell is empty/placeholder or wrong type\"",
+        "J295": "=IF(AND(LEN(TRIM(A295&\"\"))>0,TRIM(A295&\"\")<>\"\u2014\"),\"PASS\",\"\u26a0 FAIL \u2014 \"&\"a required cell is empty/placeholder or wrong type\""
+      }
+    },
+    {
+      "cell": "B449",
+      "formula": "=NA()",
+      "cached": "#N/A",
+      "context": {
+        "A447": "omega",
+        "A448": "T_shaft",
+        "A449": "T_required",
+        "A450": "T_shaft_FE",
+        "A451": "T_gap",
+        "B447": "=$B$437*2*PI()/60",
+        "B448": "=$B$445*1000/$B$447",
+        "B449": "=NA()",
+        "B450": "=122.1",
+        "B451": "=IF($B$450<=0,\"\u2014\",$B$448/$B$450)",
+        "C447": "rad/s",
+        "C448": "Nm",
+        "C449": "Nm",
+        "C450": "Nm",
+        "C451": "x",
+        "D447": "\u03c9 = rpm \u00d7 2\u03c0/60",
+        "D448": "T = P_shaft/\u03c9 \u2014 DELIVERED at this shaft power (P_shaft is already post-efficiency); this is NOT the duty requirement",
+        "D449": "duty REQUIREMENT \u2014 no canonical bar published by a solver artefact; deliberately left unavailable rather than derived he",
+        "D450": "MEASURED \u2014 finite-element rotor sweep at the same duty point",
+        "D451": "requirement \u00f7 measured capability \u2014 >1 means the machine is SHORT",
+        "E447": "2513.27412287183",
+        "E448": "119.7",
+        "E449": "0",
+        "E450": "122.1",
+        "E451": "0.98034398034398",
+        "F447": "=IF(ISNUMBER(E447),B447-E447,\"\u2014\")",
+        "F448": "=IF(ISNUMBER(E448),B448-E448,\"\u2014\")",
+        "F449": "\u2014",
+        "F450": "=IF(ISNUMBER(E450),B450-E450,\"\u2014\")",
+        "F451": "=IF(ISNUMBER(E451),B451-E451,\"\u2014\")",
+        "G447": "=IF(AND(LEN(TRIM(A447&\"\"))>0,TRIM(A447&\"\")<>\"\u2014\",LEN(TRIM(B447&\"\"))>0,TRIM(B447&\"\")<>\"\u2014\",ISNUMBER(B447),LEN(TRIM(C447&\"\")",
+        "G448": "=IF(AND(LEN(TRIM(A448&\"\"))>0,TRIM(A448&\"\")<>\"\u2014\",LEN(TRIM(B448&\"\"))>0,TRIM(B448&\"\")<>\"\u2014\",ISNUMBER(B448),LEN(TRIM(C448&\"\")",
+        "G449": "=IF(AND(LEN(TRIM(A449&\"\"))>0,TRIM(A449&\"\")<>\"\u2014\",LEN(TRIM(B449&\"\"))>0,TRIM(B449&\"\")<>\"\u2014\",ISNUMBER(B449),LEN(TRIM(C449&\"\")",
+        "G450": "=IF(AND(LEN(TRIM(A450&\"\"))>0,TRIM(A450&\"\")<>\"\u2014\",LEN(TRIM(B450&\"\"))>0,TRIM(B450&\"\")<>\"\u2014\",ISNUMBER(B450),LEN(TRIM(C450&\"\")",
+        "G451": "=IF(AND(LEN(TRIM(A451&\"\"))>0,TRIM(A451&\"\")<>\"\u2014\",LEN(TRIM(B451&\"\"))>0,TRIM(B451&\"\")<>\"\u2014\",ISNUMBER(B451),LEN(TRIM(C451&\"\")"
+      }
+    },
+    {
+      "cell": "G449",
+      "formula": "=IF(AND(LEN(TRIM(A449&\"\"))>0,TRIM(A449&\"\")<>\"\u2014\",LEN(TRIM(B449&\"\"))>0,TRIM(B449&\"\")<>\"\u2014\",ISNUMBER(B449),LEN(TRIM(C449&\"\"))>0,TRIM(C449&\"\")<>\"\u2014\",LEN(TRIM(D449&\"\"))>0,TRIM(D449&\"\")<>\"\u2014\"),\"PASS\",\"\u26a0 FAIL \u2014 \"&\"a required cell is empty/placeholder or wrong type\")",
+      "cached": "#N/A",
+      "context": {
+        "A447": "omega",
+        "A448": "T_shaft",
+        "A449": "T_required",
+        "A450": "T_shaft_FE",
+        "A451": "T_gap",
+        "B447": "=$B$437*2*PI()/60",
+        "B448": "=$B$445*1000/$B$447",
+        "B449": "=NA()",
+        "B450": "=122.1",
+        "B451": "=IF($B$450<=0,\"\u2014\",$B$448/$B$450)",
+        "C447": "rad/s",
+        "C448": "Nm",
+        "C449": "Nm",
+        "C450": "Nm",
+        "C451": "x",
+        "D447": "\u03c9 = rpm \u00d7 2\u03c0/60",
+        "D448": "T = P_shaft/\u03c9 \u2014 DELIVERED at this shaft power (P_shaft is already post-efficiency); this is NOT the duty requirement",
+        "D449": "duty REQUIREMENT \u2014 no canonical bar published by a solver artefact; deliberately left unavailable rather than derived he",
+        "D450": "MEASURED \u2014 finite-element rotor sweep at the same duty point",
+        "D451": "requirement \u00f7 measured capability \u2014 >1 means the machine is SHORT",
+        "E447": "2513.27412287183",
+        "E448": "119.7",
+        "E449": "0",
+        "E450": "122.1",
+        "E451": "0.98034398034398",
+        "F447": "=IF(ISNUMBER(E447),B447-E447,\"\u2014\")",
+        "F448": "=IF(ISNUMBER(E448),B448-E448,\"\u2014\")",
+        "F449": "\u2014",
+        "F450": "=IF(ISNUMBER(E450),B450-E450,\"\u2014\")",
+        "F451": "=IF(ISNUMBER(E451),B451-E451,\"\u2014\")",
+        "G447": "=IF(AND(LEN(TRIM(A447&\"\"))>0,TRIM(A447&\"\")<>\"\u2014\",LEN(TRIM(B447&\"\"))>0,TRIM(B447&\"\")<>\"\u2014\",ISNUMBER(B447),LEN(TRIM(C447&\"\")",
+        "G448": "=IF(AND(LEN(TRIM(A448&\"\"))>0,TRIM(A448&\"\")<>\"\u2014\",LEN(TRIM(B448&\"\"))>0,TRIM(B448&\"\")<>\"\u2014\",ISNUMBER(B448),LEN(TRIM(C448&\"\")",
+        "G449": "=IF(AND(LEN(TRIM(A449&\"\"))>0,TRIM(A449&\"\")<>\"\u2014\",LEN(TRIM(B449&\"\"))>0,TRIM(B449&\"\")<>\"\u2014\",ISNUMBER(B449),LEN(TRIM(C449&\"\")",
+        "G450": "=IF(AND(LEN(TRIM(A450&\"\"))>0,TRIM(A450&\"\")<>\"\u2014\",LEN(TRIM(B450&\"\"))>0,TRIM(B450&\"\")<>\"\u2014\",ISNUMBER(B450),LEN(TRIM(C450&\"\")",
+        "G451": "=IF(AND(LEN(TRIM(A451&\"\"))>0,TRIM(A451&\"\")<>\"\u2014\",LEN(TRIM(B451&\"\"))>0,TRIM(B451&\"\")<>\"\u2014\",ISNUMBER(B451),LEN(TRIM(C451&\"\")"
+      }
+    }
+  ],
+  "bom_ledger_n": 65,
+  "bom_ledger_sum_line_gbp": 157601.4,
+  "costStack_materials": 52533.7,
+  "bom_adversarial": [
+    {
+      "sev": "HIGH",
+      "id": "BOM-MATERIAL-MISMATCH-FUSE-FR4",
+      "row": {
+        "tag": "X-140",
+        "item": "Hv DC Fuse  \u00b7 2\u00d76 mm\u00b2 Cu, DN8, shielded pair 0.5 mm\u00b2",
+        "qty": 1,
+        "unit_gbp": 3,
+        "line_gbp": 3,
+        "method": "llm_estimate",
+        "material": "AlSiC / Cu bus / FR4 power electronics (SiC MCU)",
+        "mpn": "bespoke fabrication to drawing \u2014 see sizing basis",
+        "check": "PASS",
+        "row": 5
+      }
+    },
+    {
+      "sev": "HIGH",
+      "id": "BOM-FUSE-HAS-DN-PIPE-LANGUAGE",
+      "row": {
+        "tag": "X-140",
+        "item": "Hv DC Fuse  \u00b7 2\u00d76 mm\u00b2 Cu, DN8, shielded pair 0.5 mm\u00b2",
+        "qty": 1,
+        "unit_gbp": 3,
+        "line_gbp": 3,
+        "method": "llm_estimate",
+        "material": "AlSiC / Cu bus / FR4 power electronics (SiC MCU)",
+        "mpn": "bespoke fabrication to drawing \u2014 see sizing basis",
+        "check": "PASS",
+        "row": 5
+      }
+    },
+    {
+      "sev": "MED",
+      "id": "BOM-GENERIC-SIC-MATERIAL-SPAM",
+      "row": {
+        "tag": "X-140",
+        "item": "Hv DC Fuse  \u00b7 2\u00d76 mm\u00b2 Cu, DN8, shielded pair 0.5 mm\u00b2",
+        "qty": 1,
+        "unit_gbp": 3,
+        "line_gbp": 3,
+        "method": "llm_estimate",
+        "material": "AlSiC / Cu bus / FR4 power electronics (SiC MCU)",
+        "mpn": "bespoke fabrication to drawing \u2014 see sizing basis",
+        "check": "PASS",
+        "row": 5
+      }
+    },
+    {
+      "sev": "FATAL",
+      "id": "BOM-MPN-BUSBAR-IS-FILMCAP",
+      "row": {
+        "tag": "X-141",
+        "item": "Hv DC Busbar Link  \u00b7 2\u00d76 mm\u00b2 Cu, DN8, shielded pair 0.5 mm\u00b2",
+        "qty": 1,
+        "unit_gbp": 38,
+        "line_gbp": 38,
+        "method": "catalogue",
+        "material": "ETP copper bar, tin-plated (stamped/formed to drawing)",
+        "mpn": "Vishay Roederstein MKP1848C66012JY5",
+        "check": "PASS",
+        "row": 6
+      }
+    },
+    {
+      "sev": "FATAL",
+      "id": "BOM-BUSBAR-CAP-MPN",
+      "row": {
+        "tag": "X-141",
+        "item": "Hv DC Busbar Link  \u00b7 2\u00d76 mm\u00b2 Cu, DN8, shielded pair 0.5 mm\u00b2",
+        "qty": 1,
+        "unit_gbp": 38,
+        "line_gbp": 38,
+        "method": "catalogue",
+        "material": "ETP copper bar, tin-plated (stamped/formed to drawing)",
+        "mpn": "Vishay Roederstein MKP1848C66012JY5",
+        "check": "PASS",
+        "row": 6
+      }
+    },
+    {
+      "sev": "HIGH",
+      "id": "BOM-HASS-VS-HTFS",
+      "note": "PCB path moved to LEM_HTFS; BoM may still cite HASS",
+      "row": {
+        "tag": "I-1",
+        "item": "Phase Current Sensor  \u00b7 2\u00d76 mm\u00b2 Cu, DN8, shielded pair 0.5 mm\u00b2",
+        "qty": 1,
+        "unit_gbp": 12,
+        "line_gbp": 12,
+        "method": "catalogue",
+        "material": "N/A \u2014 proprietary assembly / bought-out package, see datasheet",
+        "mpn": "LEM HASS 100-S",
+        "check": "PASS",
+        "row": 16
+      }
+    },
+    {
+      "sev": "HIGH",
+      "id": "BOM-HASS-VS-HTFS",
+      "note": "PCB path moved to LEM_HTFS; BoM may still cite HASS",
+      "row": {
+        "tag": "I-3",
+        "item": "Current Sensor  \u00b7 2\u00d76 mm\u00b2 Cu, DN8, shielded pair 0.5 mm\u00b2",
+        "qty": 1,
+        "unit_gbp": 12,
+        "line_gbp": 12,
+        "method": "catalogue",
+        "material": "N/A \u2014 proprietary assembly / bought-out package, see datasheet",
+        "mpn": "LEM HASS 100-S",
+        "check": "PASS",
+        "row": 27
+      }
+    }
+  ],
+  "state_bom_adversarial": [
+    {
+      "sev": "HIGH",
+      "id": "STATE-BOM-PART-IS-REQUIREMENT-STATED",
+      "tag": "X-140",
+      "req": "Hv DC Fuse \u00b7 2\u00d76 mm\u00b2 Cu, DN8, shielded pair 0.5 mm\u00b2"
+    },
+    {
+      "sev": "FATAL",
+      "id": "STATE-BOM-FILMCAP-AS-BUS",
+      "tag": "X-141",
+      "part": "Vishay Roederstein MKP1848C66012JY5",
+      "req": "Hv DC Busbar Link \u00b7 2\u00d76 mm\u00b2 Cu, DN8, shielded pair 0.5 mm\u00b2"
+    },
+    {
+      "sev": "HIGH",
+      "id": "STATE-BOM-PART-IS-REQUIREMENT-STATED",
+      "tag": "X-105",
+      "req": "AC Phase Busbar Pierce \u00b7 2\u00d76 mm\u00b2 Cu"
+    },
+    {
+      "sev": "HIGH",
+      "id": "STATE-BOM-PART-IS-REQUIREMENT-STATED",
+      "tag": "X-143",
+      "req": "Shield Drain Bond \u00b7 2\u00d76 mm\u00b2 Cu, DN8, shielded pair 0.5 mm\u00b2"
+    },
+    {
+      "sev": "HIGH",
+      "id": "STATE-BOM-PART-IS-REQUIREMENT-STATED",
+      "tag": "INV-1",
+      "req": "SiC Traction Inverter \u00b7 350 kW \u00b7 240x142x40 mm \u00b7 2\u00d76 mm\u00b2 Cu, DN8"
+    },
+    {
+      "sev": "HIGH",
+      "id": "STATE-BOM-PART-IS-REQUIREMENT-STATED",
+      "tag": "INV-4",
+      "req": "Inverter Housing \u00b7 350 kW \u00b7 240x142x28 mm \u00b7 2\u00d76 mm\u00b2 Cu, DN8, shielded pair 0.5 mm\u00b2"
+    },
+    {
+      "sev": "HIGH",
+      "id": "STATE-BOM-PART-IS-REQUIREMENT-STATED",
+      "tag": "INV-5",
+      "req": "Inverter Cover \u00b7 350 kW \u00b7 240x142x28 mm \u00b7 2\u00d76 mm\u00b2 Cu, DN8, shielded pair 0.5 mm\u00b2"
+    },
+    {
+      "sev": "HIGH",
+      "id": "STATE-BOM-PART-IS-REQUIREMENT-STATED",
+      "tag": "X-144",
+      "req": "SiC Power Module Stack \u00b7 477 A \u00b7 2\u00d76 mm\u00b2 Cu, DN8, shielded pair 0.5 mm\u00b2"
+    },
+    {
+      "sev": "HIGH",
+      "id": "STATE-BOM-HASS",
+      "tag": "I-1",
+      "part": "LEM HASS 100-S"
+    },
+    {
+      "sev": "HIGH",
+      "id": "STATE-BOM-PART-IS-REQUIREMENT-STATED",
+      "tag": "X-147",
+      "req": "Coolant Port In \u00b7 2\u00d76 mm\u00b2 Cu, DN8, shielded pair 0.5 mm\u00b2"
+    },
+    {
+      "sev": "HIGH",
+      "id": "STATE-BOM-PART-IS-REQUIREMENT-STATED",
+      "tag": "X-148",
+      "req": "Coolant Port Out \u00b7 2\u00d76 mm\u00b2 Cu, DN8, shielded pair 0.5 mm\u00b2"
+    },
+    {
+      "sev": "HIGH",
+      "id": "STATE-BOM-PART-IS-REQUIREMENT-STATED",
+      "tag": "INV-3",
+      "req": "Oem Inverter Control Board \u00b7 2\u00d76 mm\u00b2 Cu, shielded pair 0.5 mm\u00b2"
+    },
+    {
+      "sev": "HIGH",
+      "id": "STATE-BOM-PART-IS-REQUIREMENT-STATED",
+      "tag": "X-149",
+      "req": "Can Fd Vehicle Interface \u00b7 2\u00d76 mm\u00b2 Cu, DN8, shielded pair 0.5 mm\u00b2"
+    },
+    {
+      "sev": "HIGH",
+      "id": "STATE-BOM-PART-IS-REQUIREMENT-STATED",
+      "tag": "X-150",
+      "req": "Hv Interlock Interface \u00b7 2\u00d76 mm\u00b2 Cu, DN8, shielded pair 0.5 mm\u00b2"
+    },
+    {
+      "sev": "HIGH",
+      "id": "STATE-BOM-PART-IS-REQUIREMENT-STATED",
+      "tag": "X-152",
+      "req": "Control Harness Set \u00b7 2\u00d76 mm\u00b2 Cu, DN8, shielded pair 0.5 mm\u00b2"
+    },
+    {
+      "sev": "HIGH",
+      "id": "STATE-BOM-HASS",
+      "tag": "I-3",
+      "part": "LEM HASS 100-S"
+    },
+    {
+      "sev": "HIGH",
+      "id": "STATE-BOM-PART-IS-REQUIREMENT-STATED",
+      "tag": "X-116",
+      "req": "Traction Ipmsm Motor Generator \u00b7 350 kW \u00b7 142x175x175 mm \u00b7 2\u00d76 mm\u00b2 Cu, DN8"
+    },
+    {
+      "sev": "HIGH",
+      "id": "STATE-BOM-PART-IS-REQUIREMENT-STATED",
+      "tag": "X-154",
+      "req": "Motor Outer Casing \u00b7 350 kW \u00b7 142x175x175 mm \u00b7 2\u00d76 mm\u00b2 Cu, DN8, shielded pair 0.5 mm\u00b2"
+    },
+    {
+      "sev": "HIGH",
+      "id": "STATE-BOM-PART-IS-REQUIREMENT-STATED",
+      "tag": "X-155",
+      "req": "Motor Cover \u00b7 350 kW \u00b7 142x175x175 mm \u00b7 2\u00d76 mm\u00b2 Cu, DN8, shielded pair 0.5 mm\u00b2"
+    },
+    {
+      "sev": "HIGH",
+      "id": "STATE-BOM-PART-IS-REQUIREMENT-STATED",
+      "tag": "X-156",
+      "req": "Motor Cooling Jacket \u00b7 350 kW \u00b7 142x175x175 mm \u00b7 2\u00d76 mm\u00b2 Cu, DN8, shielded pair 0.5 mm\u00b2"
+    },
+    {
+      "sev": "HIGH",
+      "id": "STATE-BOM-PART-IS-REQUIREMENT-STATED",
+      "tag": "X-157",
+      "req": "Stator Laminations \u00b7 2\u00d76 mm\u00b2 Cu, DN8, shielded pair 0.5 mm\u00b2"
+    },
+    {
+      "sev": "HIGH",
+      "id": "STATE-BOM-PART-IS-REQUIREMENT-STATED",
+      "tag": "X-158",
+      "req": "Stator Windings \u00b7 2\u00d76 mm\u00b2 Cu, DN8, shielded pair 0.5 mm\u00b2"
+    },
+    {
+      "sev": "HIGH",
+      "id": "STATE-BOM-PART-IS-REQUIREMENT-STATED",
+      "tag": "u_permanent_magnet_set",
+      "req": "Permanent Magnet Set"
+    },
+    {
+      "sev": "HIGH",
+      "id": "STATE-BOM-PART-IS-REQUIREMENT-STATED",
+      "tag": "u_hollow_rotor_barrel",
+      "req": "Hollow Rotor Barrel"
+    },
+    {
+      "sev": "HIGH",
+      "id": "STATE-BOM-PART-IS-REQUIREMENT-STATED",
+      "tag": "X-159",
+      "req": "Motor Shaft \u00b7 350 kW \u00b7 142x175x175 mm \u00b7 2\u00d76 mm\u00b2 Cu, DN8, shielded pair 0.5 mm\u00b2"
+    },
+    {
+      "sev": "HIGH",
+      "id": "STATE-BOM-PART-IS-REQUIREMENT-STATED",
+      "tag": "X-160",
+      "req": "Front Bearing \u00b7 2\u00d76 mm\u00b2 Cu, DN8, shielded pair 0.5 mm\u00b2"
+    },
+    {
+      "sev": "HIGH",
+      "id": "STATE-BOM-PART-IS-REQUIREMENT-STATED",
+      "tag": "X-161",
+      "req": "Rear Bearing \u00b7 2\u00d76 mm\u00b2 Cu, DN8, shielded pair 0.5 mm\u00b2"
+    },
+    {
+      "sev": "HIGH",
+      "id": "STATE-BOM-PART-IS-REQUIREMENT-STATED",
+      "tag": "X-162",
+      "req": "Front End Bell \u00b7 2\u00d76 mm\u00b2 Cu, DN8, shielded pair 0.5 mm\u00b2"
+    },
+    {
+      "sev": "HIGH",
+      "id": "STATE-BOM-PART-IS-REQUIREMENT-STATED",
+      "tag": "X-103",
+      "req": "Traction Drive Housing \u00b7 2\u00d76 mm\u00b2 Cu"
+    },
+    {
+      "sev": "HIGH",
+      "id": "STATE-BOM-PART-IS-REQUIREMENT-STATED",
+      "tag": "u_cassette_cover",
+      "req": "Cassette Cover"
+    },
+    {
+      "sev": "HIGH",
+      "id": "STATE-BOM-PART-IS-REQUIREMENT-STATED",
+      "tag": "X-138",
+      "req": "Hv Shield Cover"
+    },
+    {
+      "sev": "HIGH",
+      "id": "STATE-BOM-PART-IS-REQUIREMENT-STATED",
+      "tag": "X-139",
+      "req": "Mounting Ear Set"
+    },
+    {
+      "sev": "HIGH",
+      "id": "STATE-BOM-PART-IS-REQUIREMENT-STATED",
+      "tag": "\u2014",
+      "req": "Traction Motor \u00b7 350 kW \u00b7 142x175x175 mm \u00b7 2\u00d76 mm\u00b2 Cu, DN8, shielded pair 0.5 mm\u00b2"
+    },
+    {
+      "sev": "HIGH",
+      "id": "STATE-BOM-PART-IS-REQUIREMENT-STATED",
+      "tag": "\u2014",
+      "req": "Traction Inverter \u00b7 350 kW \u00b7 240x142x28 mm \u00b7 2\u00d76 mm\u00b2 Cu, DN8, shielded pair 0.5 mm\u00b2"
+    },
+    {
+      "sev": "HIGH",
+      "id": "STATE-BOM-PART-IS-REQUIREMENT-STATED",
+      "tag": "X-163",
+      "req": "Hv Interlock Loop \u00b7 2\u00d76 mm\u00b2 Cu, DN8, shielded pair 0.5 mm\u00b2"
+    },
+    {
+      "sev": "HIGH",
+      "id": "STATE-BOM-PART-IS-REQUIREMENT-STATED",
+      "tag": "\u2014",
+      "req": "Phase Overcurrent Trip \u00b7 gate-drive \u00b7 80x55x12 mm \u00b7 2\u00d76 mm\u00b2 Cu, DN8, shielded pair 0.5 mm\u00b2"
+    },
+    {
+      "sev": "HIGH",
+      "id": "STATE-BOM-PART-IS-REQUIREMENT-STATED",
+      "tag": "INV-6",
+      "req": "Inverter Desat Protection \u00b7 gate-drive \u00b7 80x55x12 mm \u00b7 2\u00d76 mm\u00b2 Cu, DN8, shielded pair 0.5 mm\u00b2"
+    },
+    {
+      "sev": "HIGH",
+      "id": "STATE-BOM-PART-IS-REQUIREMENT-STATED",
+      "tag": "X-164",
+      "req": "Coolant Flow Interlock \u00b7 2\u00d76 mm\u00b2 Cu, DN8, shielded pair 0.5 mm\u00b2"
+    },
+    {
+      "sev": "HIGH",
+      "id": "STATE-BOM-PART-IS-REQUIREMENT-STATED",
+      "tag": "INV-7",
+      "req": "Isolation Monitor Interface \u00b7 gate-drive \u00b7 80x55x12 mm \u00b7 2\u00d76 mm\u00b2 Cu, DN8, shielded pair 0.5 mm\u00b2"
+    },
+    {
+      "sev": "FATAL",
+      "id": "STATE-BOM-RACK-MANIFOLD",
+      "tag": "EP-1",
+      "part": "CoolIT Systems Rack Manifold",
+      "req": "Coolant Manifold \u00b7 2\u00d76 mm\u00b2 Cu, DN8, shielded pair 0.5 mm\u00b2"
+    },
+    {
+      "sev": "HIGH",
+      "id": "STATE-BOM-PART-IS-REQUIREMENT-STATED",
+      "tag": "X-165",
+      "req": "Coolant Hose Set \u00b7 2\u00d76 mm\u00b2 Cu, DN8, shielded pair 0.5 mm\u00b2"
+    },
+    {
+      "sev": "HIGH",
+      "id": "STATE-BOM-PART-IS-REQUIREMENT-STATED",
+      "tag": "X-166",
+      "req": "Coolant Expansion Bottle \u00b7 2\u00d76 mm\u00b2 Cu, DN8, shielded pair 0.5 mm\u00b2"
+    }
+  ],
+  "state_bom_sample": [
+    {
+      "tag": "X-140",
+      "part": "requirement stated",
+      "requirement": "Hv DC Fuse \u00b7 2\u00d76 mm\u00b2 Cu, DN8, shielded pair 0.5 mm\u00b2",
+      "qty": 1,
+      "unit_gbp": 3,
+      "line_gbp": 3,
+      "basis": "bottom-up parametric \u00b7 \u26a0 CALIBRATION-MASKED: instrument gold-band rescale \u00d70.149 (parametric residue; catalogue pins held; materials were \u00a3349,727 = 6.66\u00d7 gold \u2192 target \u00a352,500 gold mid)",
+      "status": "NOT FOUND"
+    },
+    {
+      "tag": "X-141",
+      "part": "Vishay Roederstein MKP1848C66012JY5",
+      "requirement": "Hv DC Busbar Link \u00b7 2\u00d76 mm\u00b2 Cu, DN8, shielded pair 0.5 mm\u00b2",
+      "qty": 1,
+      "unit_gbp": 38,
+      "line_gbp": 38,
+      "basis": "catalogue",
+      "status": "IDENTIFIED"
+    },
+    {
+      "tag": "X-142",
+      "part": "TBD (detailed design)",
+      "requirement": "Connector Interlock Pin \u00b7 2\u00d76 mm\u00b2 Cu, DN8, shielded pair 0.5 mm\u00b2",
+      "qty": 1,
+      "unit_gbp": 8.91,
+      "line_gbp": 8.91,
+      "basis": "class_reference \u00b7 floored to min credible price \u00b7 \u26a0 CALIBRATION-MASKED: instrument gold-band rescale \u00d70.149 (parametric residue; catalogue pins held; materials were \u00a3349,727 = 6.66\u00d7 gold \u2192 target \u00a352,500 gold mid)",
+      "status": "TBD"
+    },
+    {
+      "tag": "X-105",
+      "part": "requirement stated",
+      "requirement": "AC Phase Busbar Pierce \u00b7 2\u00d76 mm\u00b2 Cu",
+      "qty": 1,
+      "unit_gbp": 17.82,
+      "line_gbp": 17.82,
+      "basis": "bottom-up parametric \u00b7 floored to min credible price \u00b7 \u26a0 CALIBRATION-MASKED: instrument gold-band rescale \u00d70.149 (parametric residue; catalogue pins held; materials were \u00a3349,727 = 6.66\u00d7 gold \u2192 target \u00a352,500 gold mid)",
+      "status": "NOT FOUND"
+    },
+    {
+      "tag": "X-143",
+      "part": "requirement stated",
+      "requirement": "Shield Drain Bond \u00b7 2\u00d76 mm\u00b2 Cu, DN8, shielded pair 0.5 mm\u00b2",
+      "qty": 1,
+      "unit_gbp": 3,
+      "line_gbp": 3,
+      "basis": "bottom-up parametric \u00b7 \u26a0 CALIBRATION-MASKED: instrument gold-band rescale \u00d70.149 (parametric residue; catalogue pins held; materials were \u00a3349,727 = 6.66\u00d7 gold \u2192 target \u00a352,500 gold mid)",
+      "status": "NOT FOUND"
+    },
+    {
+      "tag": "INV-1",
+      "part": "requirement stated",
+      "requirement": "SiC Traction Inverter \u00b7 350 kW \u00b7 240x142x40 mm \u00b7 2\u00d76 mm\u00b2 Cu, DN8",
+      "qty": 1,
+      "unit_gbp": 2747.84,
+      "line_gbp": 2747.84,
+      "basis": "real DB median of 1 comparable 350kw 'inverter' parts (forge-truth.db) \u00b7 \u26a0 CALIBRATION-MASKED: instrument gold-band rescale \u00d70.149 (parametric residue; catalogue pins held; materials were \u00a3349,727 = 6.66\u00d7 gold \u2192 target \u00a352,500 gold mid)",
+      "status": "NOT FOUND"
+    },
+    {
+      "tag": "INV-4",
+      "part": "requirement stated",
+      "requirement": "Inverter Housing \u00b7 350 kW \u00b7 240x142x28 mm \u00b7 2\u00d76 mm\u00b2 Cu, DN8, shielded pair 0.5 mm\u00b2",
+      "qty": 1,
+      "unit_gbp": 5.94,
+      "line_gbp": 5.94,
+      "basis": "bottom-up parametric \u00b7 \u26a0 CALIBRATION-MASKED: instrument gold-band rescale \u00d70.149 (parametric residue; catalogue pins held; materials were \u00a3349,727 = 6.66\u00d7 gold \u2192 target \u00a352,500 gold mid)",
+      "status": "NOT FOUND"
+    },
+    {
+      "tag": "INV-5",
+      "part": "requirement stated",
+      "requirement": "Inverter Cover \u00b7 350 kW \u00b7 240x142x28 mm \u00b7 2\u00d76 mm\u00b2 Cu, DN8, shielded pair 0.5 mm\u00b2",
+      "qty": 1,
+      "unit_gbp": 42.33,
+      "line_gbp": 42.33,
+      "basis": "real DB median of 1 comparable 350kw 'cover' parts (forge-truth.db) \u00b7 \u26a0 CALIBRATION-MASKED: instrument gold-band rescale \u00d70.149 (parametric residue; catalogue pins held; materials were \u00a3349,727 = 6.66\u00d7 gold \u2192 target \u00a352,500 gold mid)",
+      "status": "NOT FOUND"
+    },
+    {
+      "tag": "X-144",
+      "part": "requirement stated",
+      "requirement": "SiC Power Module Stack \u00b7 477 A \u00b7 2\u00d76 mm\u00b2 Cu, DN8, shielded pair 0.5 mm\u00b2",
+      "qty": 1,
+      "unit_gbp": 15.45,
+      "line_gbp": 15.45,
+      "basis": "bottom-up parametric \u00b7 \u26a0 CALIBRATION-MASKED: instrument gold-band rescale \u00d70.149 (parametric residue; catalogue pins held; materials were \u00a3349,727 = 6.66\u00d7 gold \u2192 target \u00a352,500 gold mid)",
+      "status": "NOT FOUND"
+    },
+    {
+      "tag": "X-145",
+      "part": "Vishay Roederstein MKP1848C66012JY5",
+      "requirement": "DC Link Capacitor Bank \u00b7 2\u00d76 mm\u00b2 Cu, DN8, shielded pair 0.5 mm\u00b2",
+      "qty": 1,
+      "unit_gbp": 38,
+      "line_gbp": 38,
+      "basis": "catalogue",
+      "status": "IDENTIFIED"
+    },
+    {
+      "tag": "INV-2",
+      "part": "TBD (detailed design)",
+      "requirement": "Gate Driver Board \u00b7 gate-drive \u00b7 80x55x12 mm \u00b7 2\u00d76 mm\u00b2 Cu",
+      "qty": 1,
+      "unit_gbp": 3,
+      "line_gbp": 3,
+      "basis": "class_reference \u00b7 \u26a0 CALIBRATION-MASKED: instrument gold-band rescale \u00d70.149 (parametric residue; catalogue pins held; materials were \u00a3349,727 = 6.66\u00d7 gold \u2192 target \u00a352,500 gold mid)",
+      "status": "TBD"
+    },
+    {
+      "tag": "I-1",
+      "part": "LEM HASS 100-S",
+      "requirement": "Phase Current Sensor \u00b7 2\u00d76 mm\u00b2 Cu, DN8, shielded pair 0.5 mm\u00b2",
+      "qty": 1,
+      "unit_gbp": 12,
+      "line_gbp": 12,
+      "basis": "catalogue",
+      "status": "IDENTIFIED"
+    },
+    {
+      "tag": "X-110",
+      "part": "TBD (detailed design)",
+      "requirement": "Hv DC Connector",
+      "qty": 1,
+      "unit_gbp": 3,
+      "line_gbp": 3,
+      "basis": "class_reference \u00b7 \u26a0 CALIBRATION-MASKED: instrument gold-band rescale \u00d70.149 (parametric residue; catalogue pins held; materials were \u00a3349,727 = 6.66\u00d7 gold \u2192 target \u00a352,500 gold mid)",
+      "status": "TBD"
+    },
+    {
+      "tag": "X-146",
+      "part": "TBD (detailed design)",
+      "requirement": "LV Signal Connector \u00b7 2\u00d76 mm\u00b2 Cu, DN8, shielded pair 0.5 mm\u00b2",
+      "qty": 1,
+      "unit_gbp": 3,
+      "line_gbp": 3,
+      "basis": "class_reference \u00b7 \u26a0 CALIBRATION-MASKED: instrument gold-band rescale \u00d70.149 (parametric residue; catalogue pins held; materials were \u00a3349,727 = 6.66\u00d7 gold \u2192 target \u00a352,500 gold mid)",
+      "status": "TBD"
+    },
+    {
+      "tag": "X-147",
+      "part": "requirement stated",
+      "requirement": "Coolant Port In \u00b7 2\u00d76 mm\u00b2 Cu, DN8, shielded pair 0.5 mm\u00b2",
+      "qty": 1,
+      "unit_gbp": 3,
+      "line_gbp": 3,
+      "basis": "bottom-up parametric \u00b7 \u26a0 CALIBRATION-MASKED: instrument gold-band rescale \u00d70.149 (parametric residue; catalogue pins held; materials were \u00a3349,727 = 6.66\u00d7 gold \u2192 target \u00a352,500 gold mid)",
+      "status": "NOT FOUND"
+    }
+  ],
+  "ledger_sample_wrongish": [
+    {
+      "tag": "X-140",
+      "item": "Hv DC Fuse  \u00b7 2\u00d76 mm\u00b2 Cu, DN8, shielded pair 0.5 mm\u00b2",
+      "qty": 1,
+      "unit_gbp": 3,
+      "line_gbp": 3,
+      "method": "llm_estimate",
+      "material": "AlSiC / Cu bus / FR4 power electronics (SiC MCU)",
+      "mpn": "bespoke fabrication to drawing \u2014 see sizing basis",
+      "check": "PASS",
+      "row": 5
+    },
+    {
+      "tag": "X-141",
+      "item": "Hv DC Busbar Link  \u00b7 2\u00d76 mm\u00b2 Cu, DN8, shielded pair 0.5 mm\u00b2",
+      "qty": 1,
+      "unit_gbp": 38,
+      "line_gbp": 38,
+      "method": "catalogue",
+      "material": "ETP copper bar, tin-plated (stamped/formed to drawing)",
+      "mpn": "Vishay Roederstein MKP1848C66012JY5",
+      "check": "PASS",
+      "row": 6
+    },
+    {
+      "tag": "X-142",
+      "item": "Connector Interlock Pin  \u00b7 2\u00d76 mm\u00b2 Cu, DN8, shielded pair 0.5 mm\u00b2",
+      "qty": 1,
+      "unit_gbp": 8.91,
+      "line_gbp": 8.91,
+      "method": "class_reference",
+      "material": "custom fabricated (traction pack \u2014 material at detailed design)",
+      "mpn": "bespoke fabrication to drawing \u2014 see sizing basis",
+      "check": "PASS",
+      "row": 7
+    },
+    {
+      "tag": "X-143",
+      "item": "Shield Drain Bond  \u00b7 2\u00d76 mm\u00b2 Cu, DN8, shielded pair 0.5 mm\u00b2",
+      "qty": 1,
+      "unit_gbp": 3,
+      "line_gbp": 3,
+      "method": "llm_estimate",
+      "material": "custom fabricated (traction pack \u2014 material at detailed design)",
+      "mpn": "bespoke fabrication to drawing \u2014 see sizing basis",
+      "check": "PASS",
+      "row": 9
+    },
+    {
+      "tag": "INV-1",
+      "item": "SiC Traction Inverter  \u00b7 350 kW \u00b7 240x142x40 mm \u00b7 2\u00d76 mm\u00b2 Cu, DN8",
+      "qty": 1,
+      "unit_gbp": 2747.84,
+      "line_gbp": 2747.84,
+      "method": "class_reference",
+      "material": "AlSiC / Cu bus / FR4 power electronics (SiC MCU)",
+      "mpn": "bespoke fabrication to drawing \u2014 see sizing basis",
+      "check": "PASS",
+      "row": 10
+    },
+    {
+      "tag": "INV-4",
+      "item": "Inverter Housing  \u00b7 350 kW \u00b7 240x142x28 mm \u00b7 2\u00d76 mm\u00b2 Cu, DN8, shielded pair 0.5 mm\u00b2",
+      "qty": 1,
+      "unit_gbp": 5.94,
+      "line_gbp": 5.94,
+      "method": "llm_estimate",
+      "material": "aluminium / electrical steel (motor housing + laminations)",
+      "mpn": "bespoke fabrication to drawing \u2014 see sizing basis",
+      "check": "PASS",
+      "row": 11
+    },
+    {
+      "tag": "INV-5",
+      "item": "Inverter Cover  \u00b7 350 kW \u00b7 240x142x28 mm \u00b7 2\u00d76 mm\u00b2 Cu, DN8, shielded pair 0.5 mm\u00b2",
+      "qty": 1,
+      "unit_gbp": 42.33,
+      "line_gbp": 42.33,
+      "method": "llm_estimate",
+      "material": "AlSiC / Cu bus / FR4 power electronics (SiC MCU)",
+      "mpn": "bespoke fabrication to drawing \u2014 see sizing basis",
+      "check": "PASS",
+      "row": 12
+    },
+    {
+      "tag": "X-144",
+      "item": "SiC Power Module Stack  \u00b7 477 A \u00b7 2\u00d76 mm\u00b2 Cu, DN8, shielded pair 0.5 mm\u00b2",
+      "qty": 1,
+      "unit_gbp": 15.45,
+      "line_gbp": 15.45,
+      "method": "class_reference",
+      "material": "AlSiC / Cu bus / FR4 power electronics (SiC MCU)",
+      "mpn": "bespoke fabrication to drawing \u2014 see sizing basis",
+      "check": "PASS",
+      "row": 13
+    },
+    {
+      "tag": "X-145",
+      "item": "DC Link Capacitor Bank  \u00b7 2\u00d76 mm\u00b2 Cu, DN8, shielded pair 0.5 mm\u00b2",
+      "qty": 1,
+      "unit_gbp": 38,
+      "line_gbp": 38,
+      "method": "catalogue",
+      "material": "N/A \u2014 proprietary assembly / bought-out package, see datasheet",
+      "mpn": "Vishay Roederstein MKP1848C66012JY5",
+      "check": "PASS",
+      "row": 14
+    },
+    {
+      "tag": "I-1",
+      "item": "Phase Current Sensor  \u00b7 2\u00d76 mm\u00b2 Cu, DN8, shielded pair 0.5 mm\u00b2",
+      "qty": 1,
+      "unit_gbp": 12,
+      "line_gbp": 12,
+      "method": "catalogue",
+      "material": "N/A \u2014 proprietary assembly / bought-out package, see datasheet",
+      "mpn": "LEM HASS 100-S",
+      "check": "PASS",
+      "row": 16
+    },
+    {
+      "tag": "X-146",
+      "item": "LV Signal Connector  \u00b7 2\u00d76 mm\u00b2 Cu, DN8, shielded pair 0.5 mm\u00b2",
+      "qty": 1,
+      "unit_gbp": 3,
+      "line_gbp": 3,
+      "method": "class_reference",
+      "material": "custom fabricated (traction pack \u2014 material at detailed design)",
+      "mpn": "bespoke fabrication to drawing \u2014 see sizing basis",
+      "check": "PASS",
+      "row": 18
+    },
+    {
+      "tag": "X-147",
+      "item": "Coolant Port In  \u00b7 2\u00d76 mm\u00b2 Cu, DN8, shielded pair 0.5 mm\u00b2",
+      "qty": 1,
+      "unit_gbp": 3,
+      "line_gbp": 3,
+      "method": "llm_estimate",
+      "material": "aluminium / EPDM (coolant path)",
+      "mpn": "bespoke fabrication to drawing \u2014 see sizing basis",
+      "check": "PASS",
+      "row": 19
+    },
+    {
+      "tag": "X-148",
+      "item": "Coolant Port Out  \u00b7 2\u00d76 mm\u00b2 Cu, DN8, shielded pair 0.5 mm\u00b2",
+      "qty": 1,
+      "unit_gbp": 3,
+      "line_gbp": 3,
+      "method": "llm_estimate",
+      "material": "aluminium / EPDM (coolant path)",
+      "mpn": "bespoke fabrication to drawing \u2014 see sizing basis",
+      "check": "PASS",
+      "row": 20
+    },
+    {
+      "tag": "X-149",
+      "item": "Can Fd Vehicle Interface  \u00b7 2\u00d76 mm\u00b2 Cu, DN8, shielded pair 0.5 mm\u00b2",
+      "qty": 1,
+      "unit_gbp": 3,
+      "line_gbp": 3,
+      "method": "class_reference",
+      "material": "custom fabricated (traction pack \u2014 material at detailed design)",
+      "mpn": "bespoke fabrication to drawing \u2014 see sizing basis",
+      "check": "PASS",
+      "row": 22
+    },
+    {
+      "tag": "X-150",
+      "item": "Hv Interlock Interface  \u00b7 2\u00d76 mm\u00b2 Cu, DN8, shielded pair 0.5 mm\u00b2",
+      "qty": 1,
+      "unit_gbp": 8.91,
+      "line_gbp": 8.91,
+      "method": "llm_estimate",
+      "material": "AlSiC / Cu bus / FR4 power electronics (SiC MCU)",
+      "mpn": "bespoke fabrication to drawing \u2014 see sizing basis",
+      "check": "PASS",
+      "row": 23
+    },
+    {
+      "tag": "X-151",
+      "item": "Resolver Signal Interface  \u00b7 2\u00d76 mm\u00b2 Cu, DN8, shielded pair 0.5 mm\u00b2",
+      "qty": 1,
+      "unit_gbp": 12,
+      "line_gbp": 12,
+      "method": "llm_estimate",
+      "material": "N/A \u2014 proprietary assembly / bought-out package, see datasheet",
+      "mpn": "ABB RRIA",
+      "check": "PASS",
+      "row": 24
+    },
+    {
+      "tag": "X-152",
+      "item": "Control Harness Set  \u00b7 2\u00d76 mm\u00b2 Cu, DN8, shielded pair 0.5 mm\u00b2",
+      "qty": 1,
+      "unit_gbp": 3,
+      "line_gbp": 3,
+      "method": "class_reference",
+      "material": "custom fabricated (traction pack \u2014 material at detailed design)",
+      "mpn": "bespoke fabrication to drawing \u2014 see sizing basis",
+      "check": "PASS",
+      "row": 25
+    },
+    {
+      "tag": "I-2",
+      "item": "Voltage Sensor  \u00b7 2\u00d76 mm\u00b2 Cu, DN8, shielded pair 0.5 mm\u00b2",
+      "qty": 1,
+      "unit_gbp": 4.46,
+      "line_gbp": 4.46,
+      "method": "class_reference",
+      "material": "sensor / harness (pack-integrated)",
+      "mpn": "bespoke fabrication to drawing \u2014 see sizing basis",
+      "check": "PASS",
+      "row": 26
+    },
+    {
+      "tag": "I-3",
+      "item": "Current Sensor  \u00b7 2\u00d76 mm\u00b2 Cu, DN8, shielded pair 0.5 mm\u00b2",
+      "qty": 1,
+      "unit_gbp": 12,
+      "line_gbp": 12,
+      "method": "catalogue",
+      "material": "N/A \u2014 proprietary assembly / bought-out package, see datasheet",
+      "mpn": "LEM HASS 100-S",
+      "check": "PASS",
+      "row": 27
+    },
+    {
+      "tag": "I-4",
+      "item": "Temperature Probe  \u00b7 2\u00d76 mm\u00b2 Cu, DN8, shielded pair 0.5 mm\u00b2",
+      "qty": 1,
+      "unit_gbp": 1,
+      "line_gbp": 1,
+      "method": "catalogue",
+      "material": "N/A \u2014 proprietary assembly / bought-out package, see datasheet",
+      "mpn": "Texas Instruments TMP1075DSGR",
+      "check": "PASS",
+      "row": 28
+    }
+  ]
+}

@@ -1,0 +1,18 @@
+{
+  "excel_errors": [],
+  "bom_issues": [
+    "MKP-on-busbar",
+    "coolit"
+  ],
+  "det_fails": [],
+  "tab_fail": [
+    "Executive Summary",
+    "Quality & Audit"
+  ],
+  "calculations": 9.8,
+  "verification": 9.4,
+  "overview": 10,
+  "bom_sum": 22208.35,
+  "ship_ok": false,
+  "honest_floor_reason": "release_readiness / not homologated (Exec+QA mirror floor 4)"
+}

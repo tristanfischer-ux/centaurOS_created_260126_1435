@@ -30,9 +30,7 @@
       "score": 10,
       "target": 8,
       "status": "PASS",
-      "issues": [
-        "[INFO] requirementsBom line sum \u00a331,219 differs from costStack materials \u00a352,534 (gold-band / rescale path) \u2014 Overview table follows the line roll-up"
-      ],
+      "issues": [],
       "fix": "",
       "basis": "dashboard integrity (every quoted number vs its engine source) \u2014 section scores match the engine scorecard 14/14; capex category % = 100 \u00d7 \u00a3 / \u03a3 (per-row arithmetic) 8/8; \u03a3 capex categories \u2248 the BoM materials total 1/1; cell completeness+type contract 90/90 \u00b7 score = min over checks of 10 \u00d7 passed/checked",
       "content_score": 10.0,
@@ -89,11 +87,11 @@
         "1 worked calc(s) never resolve to a live/disclosed result \u2014 e.g. lamination_grade  [static \u2014 no auto-check]"
       ],
       "fix": "bind the RHS's symbols to this block's own input cells at the calc renderer source (formula_to_excel), or honestly disclose the pick",
-      "basis": "worked-calc coverage (every definition resolves to a LIVE Excel formula or an honestly-disclosed non-arithmetic pick; inputs populated) + tool-flow consumption + duty coverage vs the contract's calculator quantities \u2014 worked-calc definitions resolve to a LIVE computed result 51/52; calc input rows carry their value 107/107; tool outputs consumed downstream 64/64; worked-calc coverage of the contract's calculator duties (\u22655 calcs for 23 calculator quantities) 5/5; cell completeness+type contract 615/615 \u00b7 score = min over checks of 10 \u00d7 passed/checked",
+      "basis": "worked-calc coverage (every definition resolves to a LIVE Excel formula or an honestly-disclosed non-arithmetic pick; inputs populated) + tool-flow consumption + duty coverage vs the contract's calculator quantities \u2014 worked-calc definitions resolve to a LIVE computed result 51/52; calc input rows carry their value 107/107; tool outputs consumed downstream 60/60; worked-calc coverage of the contract's calculator duties (\u22655 calcs for 23 calculator quantities) 5/5; cell completeness+type contract 611/611 \u00b7 score = min over checks of 10 \u00d7 passed/checked",
       "content_score": 9.8,
-      "content_basis": "worked-calc coverage (every definition resolves to a LIVE Excel formula or an honestly-disclosed non-arithmetic pick; inputs populated) + tool-flow consumption + duty coverage vs the contract's calculator quantities \u2014 worked-calc definitions resolve to a LIVE computed result 51/52; calc input rows carry their value 107/107; tool outputs consumed downstream 64/64; worked-calc coverage of the contract's calculator duties (\u22655 calcs for 23 calculator quantities) 5/5; cell completeness+type contract 615/615 \u00b7 score = min over checks of 10 \u00d7 passed/checked",
-      "checked": 843,
-      "passed": 842,
+      "content_basis": "worked-calc coverage (every definition resolves to a LIVE Excel formula or an honestly-disclosed non-arithmetic pick; inputs populated) + tool-flow consumption + duty coverage vs the contract's calculator quantities \u2014 worked-calc definitions resolve to a LIVE computed result 51/52; calc input rows carry their value 107/107; tool outputs consumed downstream 60/60; worked-calc coverage of the contract's calculator duties (\u22655 calcs for 23 calculator quantities) 5/5; cell completeness+type contract 611/611 \u00b7 score = min over checks of 10 \u00d7 passed/checked",
+      "checked": 835,
+      "passed": 834,
       "components": [
         {
           "check": "worked-calc definitions resolve to a LIVE computed result",
@@ -107,8 +105,8 @@
         },
         {
           "check": "tool outputs consumed downstream",
-          "passed": 64,
-          "checked": 64
+          "passed": 60,
+          "checked": 60
         },
         {
           "check": "worked-calc coverage of the contract's calculator duties (\u22655 calcs for 23 calculator quantities)",
@@ -117,28 +115,28 @@
         },
         {
           "check": "cell completeness+type contract",
-          "passed": 615,
-          "checked": 615
+          "passed": 611,
+          "checked": 611
         }
       ]
     },
     "Bill of Materials (Ledger)": {
-      "score": 9.9,
+      "score": 9.5,
       "target": 8,
       "status": "PASS",
       "issues": [
-        "cell contract: 5 of 502 required cells empty/invalid across 3 row(s) \u2014 e.g. row 48: 'Tag' placeholder '\u2014'"
+        "cell contract: 26 of 502 required cells empty/invalid across 14 row(s) \u2014 e.g. row 5: 'Est class' empty"
       ],
       "fix": "price the \u00a30 lines at source (requirements_bom.py emitter), state the material on fabricated parts in the sizing pass, and close ENGINEERED MPN TBDs by growing the parts DB (Stage 17.6 ingest) so partVerifications resolves them (commodity / generic-spec valve lines resolve at procurement \u2014 no hold; OEM-proprietary lines never resolve by design)",
-      "basis": "column-contract arithmetic: 10 \u00d7 54/54 rows passing; content checks: BoM ledger column contract (per-row Row check) \u2014 cell completeness+type contract 497/502 \u00b7 score = min over checks of 10 \u00d7 passed/checked",
-      "content_score": 9.9,
-      "content_basis": "BoM ledger column contract (per-row Row check) \u2014 cell completeness+type contract 497/502 \u00b7 score = min over checks of 10 \u00d7 passed/checked",
+      "basis": "column-contract arithmetic: 10 \u00d7 54/54 rows passing; content checks: BoM ledger column contract (per-row Row check) \u2014 cell completeness+type contract 476/502 \u00b7 score = min over checks of 10 \u00d7 passed/checked",
+      "content_score": 9.5,
+      "content_basis": "BoM ledger column contract (per-row Row check) \u2014 cell completeness+type contract 476/502 \u00b7 score = min over checks of 10 \u00d7 passed/checked",
       "checked": 502,
-      "passed": 497,
+      "passed": 476,
       "components": [
         {
           "check": "cell completeness+type contract",
-          "passed": 497,
+          "passed": 476,
           "checked": 502
         }
       ]
@@ -210,11 +208,11 @@
       "status": "PASS",
       "issues": [],
       "fix": "fix the topology edge / parts_ledger connectivity classifier (orphan_instrument must not fire on consumables; device MCU counts as control); prune ghost ledger connections after gold-spine bake",
-      "basis": "resolved-endpoint fraction (every \u2190 / \u2192 tag must exist) + per-row status + ledger connectivity concerns/stale ties (proportionate vs equipment count) + ledger-vs-rendered connection coverage \u2014 endpoint tags resolve to a real BoM/part tag 3/3; connection rows carry a computed OK status (0 unresolved endpoints, no missing-tie evidence) 20/20; ledger connectivity clean (no unconnected electrical parts, no stale topology ties) 1/1; cell completeness+type contract 114/114 \u00b7 score = min over checks of 10 \u00d7 passed/checked",
+      "basis": "resolved-endpoint fraction (every \u2190 / \u2192 tag must exist) + per-row status + ledger connectivity concerns/stale ties (proportionate vs equipment count) + ledger-vs-rendered connection coverage \u2014 endpoint tags resolve to a real BoM/part tag 3/3; connection rows carry a computed OK status (0 unresolved endpoints, no missing-tie evidence) 19/19; ledger connectivity clean (no unconnected electrical parts, no stale topology ties) 1/1; cell completeness+type contract 112/112 \u00b7 score = min over checks of 10 \u00d7 passed/checked",
       "content_score": 10.0,
-      "content_basis": "resolved-endpoint fraction (every \u2190 / \u2192 tag must exist) + per-row status + ledger connectivity concerns/stale ties (proportionate vs equipment count) + ledger-vs-rendered connection coverage \u2014 endpoint tags resolve to a real BoM/part tag 3/3; connection rows carry a computed OK status (0 unresolved endpoints, no missing-tie evidence) 20/20; ledger connectivity clean (no unconnected electrical parts, no stale topology ties) 1/1; cell completeness+type contract 114/114 \u00b7 score = min over checks of 10 \u00d7 passed/checked",
-      "checked": 138,
-      "passed": 138,
+      "content_basis": "resolved-endpoint fraction (every \u2190 / \u2192 tag must exist) + per-row status + ledger connectivity concerns/stale ties (proportionate vs equipment count) + ledger-vs-rendered connection coverage \u2014 endpoint tags resolve to a real BoM/part tag 3/3; connection rows carry a computed OK status (0 unresolved endpoints, no missing-tie evidence) 19/19; ledger connectivity clean (no unconnected electrical parts, no stale topology ties) 1/1; cell completeness+type contract 112/112 \u00b7 score = min over checks of 10 \u00d7 passed/checked",
+      "checked": 135,
+      "passed": 135,
       "components": [
         {
           "check": "endpoint tags resolve to a real BoM/part tag",
@@ -223,8 +221,8 @@
         },
         {
           "check": "connection rows carry a computed OK status (0 unresolved endpoints, no missing-tie evidence)",
-          "passed": 20,
-          "checked": 20
+          "passed": 19,
+          "checked": 19
         },
         {
           "check": "ledger connectivity clean (no unconnected electrical parts, no stale topology ties)",
@@ -233,24 +231,24 @@
         },
         {
           "check": "cell completeness+type contract",
-          "passed": 114,
-          "checked": 114
+          "passed": 112,
+          "checked": 112
         }
       ]
     },
     "Part names": {
-      "score": 9.9,
+      "score": 8.1,
       "target": 8,
       "status": "PASS",
       "issues": [
-        "cell contract: 2 of 265 required cells empty/invalid across 2 row(s) \u2014 e.g. row 54: 'Tag' placeholder '\u2014'"
+        "9 principal(s) with no MPN and no honest status: X-154, X-155, X-156, X-157"
       ],
       "fix": "fix the master merge / tag registry at tab_parts_master source",
-      "basis": "dedupe + completeness (every BoM tag present exactly once) + cross-link + MPN/status coverage (parts-ledger.json) \u2014 part tags unique (each physical thing named once) 48/48; every principal carries an MPN or an honest TBD status 48/48; master tags cross-linked to >=1 drawing/manifest reference 22/22; parts-ledger equipment free of orphan/not-found status 52/52; cell completeness+type contract 263/265 \u00b7 score = min over checks of 10 \u00d7 passed/checked",
-      "content_score": 9.9,
-      "content_basis": "dedupe + completeness (every BoM tag present exactly once) + cross-link + MPN/status coverage (parts-ledger.json) \u2014 part tags unique (each physical thing named once) 48/48; every principal carries an MPN or an honest TBD status 48/48; master tags cross-linked to >=1 drawing/manifest reference 22/22; parts-ledger equipment free of orphan/not-found status 52/52; cell completeness+type contract 263/265 \u00b7 score = min over checks of 10 \u00d7 passed/checked",
-      "checked": 435,
-      "passed": 433,
+      "basis": "dedupe + completeness (every BoM tag present exactly once) + cross-link + MPN/status coverage (parts-ledger.json) \u2014 part tags unique (each physical thing named once) 48/48; every principal carries an MPN or an honest TBD status 39/48; master tags cross-linked to >=1 drawing/manifest reference 14/14; parts-ledger equipment free of orphan/not-found status 43/43; cell completeness+type contract 265/265 \u00b7 score = min over checks of 10 \u00d7 passed/checked",
+      "content_score": 8.1,
+      "content_basis": "dedupe + completeness (every BoM tag present exactly once) + cross-link + MPN/status coverage (parts-ledger.json) \u2014 part tags unique (each physical thing named once) 48/48; every principal carries an MPN or an honest TBD status 39/48; master tags cross-linked to >=1 drawing/manifest reference 14/14; parts-ledger equipment free of orphan/not-found status 43/43; cell completeness+type contract 265/265 \u00b7 score = min over checks of 10 \u00d7 passed/checked",
+      "checked": 418,
+      "passed": 409,
       "components": [
         {
           "check": "part tags unique (each physical thing named once)",
@@ -259,22 +257,22 @@
         },
         {
           "check": "every principal carries an MPN or an honest TBD status",
-          "passed": 48,
+          "passed": 39,
           "checked": 48
         },
         {
           "check": "master tags cross-linked to >=1 drawing/manifest reference",
-          "passed": 22,
-          "checked": 22
+          "passed": 14,
+          "checked": 14
         },
         {
           "check": "parts-ledger equipment free of orphan/not-found status",
-          "passed": 52,
-          "checked": 52
+          "passed": 43,
+          "checked": 43
         },
         {
           "check": "cell completeness+type contract",
-          "passed": 263,
+          "passed": 265,
           "checked": 265
         }
       ]
@@ -356,7 +354,18 @@
         "out of scope for this archetype \u2014 VERIFIED, not scored: a plant pipe/cable line list with velocity / volt-drop \u2014 a sealed traction MGU+MCU pack has short HV/phase leads and coolant hoses scored on the Connection trace + SLD, not a distribution line list. (this is a sealed traction MGU+MCU pack \u2014 plant process/distribution deliverables are inapplicable, not a vacuous pass)."
       ],
       "fix": "none \u2014 inapplicable to a sealed traction drive pack",
-      "basis": "verified out-of-scope: traction drive pack (MGU+MCU) \u2014 not a process plant"
+      "basis": "verified out-of-scope: traction drive pack (MGU+MCU) \u2014 not a process plant",
+      "content_score": 10.0,
+      "content_basis": "line & velocity column contract (per-row Row check) \u2014 cell completeness+type contract 175/175 \u00b7 score = min over checks of 10 \u00d7 passed/checked",
+      "checked": 175,
+      "passed": 175,
+      "components": [
+        {
+          "check": "cell completeness+type contract",
+          "passed": 175,
+          "checked": 175
+        }
+      ]
     },
     "Glossary": {
       "score": 10,
@@ -364,42 +373,40 @@
       "status": "PASS",
       "issues": [],
       "fix": "drop orphan terms / define the missing ones in _GLOSSARY",
-      "basis": "glossary contract (every term defined + no orphan terms) \u2014 every rendered term carries a definition 34/34; terms actually used somewhere in the workbook 34/34 \u00b7 score = min over checks of 10 \u00d7 passed/checked",
+      "basis": "glossary contract (every term defined + no orphan terms) \u2014 every rendered term carries a definition 35/35; terms actually used somewhere in the workbook 35/35 \u00b7 score = min over checks of 10 \u00d7 passed/checked",
       "content_score": 10.0,
-      "content_basis": "glossary contract (every term defined + no orphan terms) \u2014 every rendered term carries a definition 34/34; terms actually used somewhere in the workbook 34/34 \u00b7 score = min over checks of 10 \u00d7 passed/checked",
-      "checked": 68,
-      "passed": 68,
+      "content_basis": "glossary contract (every term defined + no orphan terms) \u2014 every rendered term carries a definition 35/35; terms actually used somewhere in the workbook 35/35 \u00b7 score = min over checks of 10 \u00d7 passed/checked",
+      "checked": 70,
+      "passed": 70,
       "components": [
         {
           "check": "every rendered term carries a definition",
-          "passed": 34,
-          "checked": 34
+          "passed": 35,
+          "checked": 35
         },
         {
           "check": "terms actually used somewhere in the workbook",
-          "passed": 34,
-          "checked": 34
+          "passed": 35,
+          "checked": 35
         }
       ]
     },
     "Engineering Analysis": {
-      "score": 9.8,
+      "score": 10.0,
       "target": 8,
       "status": "PASS",
-      "issues": [
-        "cell contract: 3 of 159 required cells empty/invalid across 3 row(s) \u2014 e.g. row 84: 'Tag' placeholder '\u2014'"
-      ],
+      "issues": [],
       "fix": "add the missing material to the universal reference table (_EA_MATERIALS) or the missing P=/\u03c3= figures to the row's own materials-take-off basis string (requirements_bom.py::_materials_takeoff) \u2014 never hand-type a value into this tab",
-      "basis": "column-contract arithmetic: 10 \u00d7 21/21 rows passing; content checks: safety-factor/allowable column contract (per-part material + allowable + actual stress + utilisation triage) + material stress-strain characterisation \u2014 cell completeness+type contract 156/159 \u00b7 score = min over checks of 10 \u00d7 passed/checked",
-      "content_score": 9.8,
-      "content_basis": "safety-factor/allowable column contract (per-part material + allowable + actual stress + utilisation triage) + material stress-strain characterisation \u2014 cell completeness+type contract 156/159 \u00b7 score = min over checks of 10 \u00d7 passed/checked",
-      "checked": 159,
-      "passed": 156,
+      "basis": "column-contract arithmetic: 10 \u00d7 22/22 rows passing; content checks: safety-factor/allowable column contract (per-part material + allowable + actual stress + utilisation triage) + material stress-strain characterisation \u2014 cell completeness+type contract 164/164 \u00b7 score = min over checks of 10 \u00d7 passed/checked",
+      "content_score": 10.0,
+      "content_basis": "safety-factor/allowable column contract (per-part material + allowable + actual stress + utilisation triage) + material stress-strain characterisation \u2014 cell completeness+type contract 164/164 \u00b7 score = min over checks of 10 \u00d7 passed/checked",
+      "checked": 164,
+      "passed": 164,
       "components": [
         {
           "check": "cell completeness+type contract",
-          "passed": 156,
-          "checked": 159
+          "passed": 164,
+          "checked": 164
         }
       ]
     },
@@ -570,24 +577,24 @@
       "target": 8,
       "status": "PASS",
       "issues": [
-        "18 open question(s) for the customer \u2014 every row derived live from a named engine artefact (brief augmentation / plausibility critic / decisions register / client-offer reconciliation); an answered question disappears on rebuild"
+        "15 open question(s) for the customer \u2014 every row derived live from a named engine artefact (brief augmentation / plausibility critic / decisions register / client-offer reconciliation); an answered question disappears on rebuild"
       ],
       "fix": "answer each question in the brief (or record a scope decision in briefs-loop/<brief>.decisions.json) and re-run",
-      "basis": "live-derivation check (each question re-derived from the run's own artefacts: brief augmentation, plausibility critic, decisions register, client-offer reconciliation) \u2014 rendered questions match the LIVE re-derivation (stale/dropped question = fail) 18/18; cell completeness+type contract 90/90 \u00b7 score = min over checks of 10 \u00d7 passed/checked",
+      "basis": "live-derivation check (each question re-derived from the run's own artefacts: brief augmentation, plausibility critic, decisions register, client-offer reconciliation) \u2014 rendered questions match the LIVE re-derivation (stale/dropped question = fail) 15/15; cell completeness+type contract 75/75 \u00b7 score = min over checks of 10 \u00d7 passed/checked",
       "content_score": 10.0,
-      "content_basis": "live-derivation check (each question re-derived from the run's own artefacts: brief augmentation, plausibility critic, decisions register, client-offer reconciliation) \u2014 rendered questions match the LIVE re-derivation (stale/dropped question = fail) 18/18; cell completeness+type contract 90/90 \u00b7 score = min over checks of 10 \u00d7 passed/checked",
-      "checked": 108,
-      "passed": 108,
+      "content_basis": "live-derivation check (each question re-derived from the run's own artefacts: brief augmentation, plausibility critic, decisions register, client-offer reconciliation) \u2014 rendered questions match the LIVE re-derivation (stale/dropped question = fail) 15/15; cell completeness+type contract 75/75 \u00b7 score = min over checks of 10 \u00d7 passed/checked",
+      "checked": 90,
+      "passed": 90,
       "components": [
         {
           "check": "rendered questions match the LIVE re-derivation (stale/dropped question = fail)",
-          "passed": 18,
-          "checked": 18
+          "passed": 15,
+          "checked": 15
         },
         {
           "check": "cell completeness+type contract",
-          "passed": 90,
-          "checked": 90
+          "passed": 75,
+          "checked": 75
         }
       ]
     },
@@ -596,24 +603,24 @@
       "target": 8,
       "status": "PASS",
       "issues": [
-        "148/148 invariants pass"
+        "149/149 invariants pass"
       ],
       "fix": "fix each failing invariant at source",
-      "basis": "fail-count formula: 10 if 0 FAIL else max(0, 8 \u2212 2 \u00d7 fails) \u2014 deterministic invariants pass 94/94; cell completeness+type contract 311/311 \u00b7 score = min over checks of 10 \u00d7 passed/checked",
+      "basis": "fail-count formula: 10 if 0 FAIL else max(0, 8 \u2212 2 \u00d7 fails) \u2014 deterministic invariants pass 105/105; cell completeness+type contract 291/291 \u00b7 score = min over checks of 10 \u00d7 passed/checked",
       "content_score": 10.0,
-      "content_basis": "fail-count formula: 10 if 0 FAIL else max(0, 8 \u2212 2 \u00d7 fails) \u2014 deterministic invariants pass 94/94; cell completeness+type contract 311/311 \u00b7 score = min over checks of 10 \u00d7 passed/checked",
-      "checked": 405,
-      "passed": 405,
+      "content_basis": "fail-count formula: 10 if 0 FAIL else max(0, 8 \u2212 2 \u00d7 fails) \u2014 deterministic invariants pass 105/105; cell completeness+type contract 291/291 \u00b7 score = min over checks of 10 \u00d7 passed/checked",
+      "checked": 396,
+      "passed": 396,
       "components": [
         {
           "check": "deterministic invariants pass",
-          "passed": 94,
-          "checked": 94
+          "passed": 105,
+          "checked": 105
         },
         {
           "check": "cell completeness+type contract",
-          "passed": 311,
-          "checked": 311
+          "passed": 291,
+          "checked": 291
         }
       ]
     },
@@ -622,19 +629,19 @@
       "target": 8,
       "status": "PASS",
       "issues": [
-        "Render part coverage 23/23 (100%)"
+        "Render part coverage 16/16 (100%)"
       ],
       "fix": "raise the drawing's part coverage at its generator (parts-ledger names the misses)",
-      "basis": "render mechanism: parts-ledger coverage \u00d7 default-size litter \u00d7 typed-shape \u00d7 vision-critic verdict (render-vision-critique.json) \u2014 drawing part coverage (blender) 23/23 \u00b7 score = min over checks of 10 \u00d7 passed/checked",
+      "basis": "render mechanism: parts-ledger coverage \u00d7 default-size litter \u00d7 typed-shape \u00d7 vision-critic verdict (render-vision-critique.json) \u2014 drawing part coverage (blender) 16/16 \u00b7 score = min over checks of 10 \u00d7 passed/checked",
       "content_score": 10.0,
-      "content_basis": "render mechanism: parts-ledger coverage \u00d7 default-size litter \u00d7 typed-shape \u00d7 vision-critic verdict (render-vision-critique.json) \u2014 drawing part coverage (blender) 23/23 \u00b7 score = min over checks of 10 \u00d7 passed/checked",
-      "checked": 23,
-      "passed": 23,
+      "content_basis": "render mechanism: parts-ledger coverage \u00d7 default-size litter \u00d7 typed-shape \u00d7 vision-critic verdict (render-vision-critique.json) \u2014 drawing part coverage (blender) 16/16 \u00b7 score = min over checks of 10 \u00d7 passed/checked",
+      "checked": 16,
+      "passed": 16,
       "components": [
         {
           "check": "drawing part coverage (blender)",
-          "passed": 23,
-          "checked": 23
+          "passed": 16,
+          "checked": 16
         }
       ]
     },
@@ -643,19 +650,19 @@
       "target": 8,
       "status": "PASS",
       "issues": [
-        "GA part coverage 23/23 (100%)"
+        "GA part coverage 16/16 (100%)"
       ],
       "fix": "raise the drawing's part coverage at its generator (parts-ledger names the misses)",
-      "basis": "GA mechanism: parts-ledger coverage \u00d7 default-size litter \u00d7 layout-divergence \u00d7 typed-shape checks \u2014 drawing part coverage (general-arrangement) 23/23 \u00b7 score = min over checks of 10 \u00d7 passed/checked",
+      "basis": "GA mechanism: parts-ledger coverage \u00d7 default-size litter \u00d7 layout-divergence \u00d7 typed-shape checks \u2014 drawing part coverage (general-arrangement) 16/16 \u00b7 score = min over checks of 10 \u00d7 passed/checked",
       "content_score": 10.0,
-      "content_basis": "GA mechanism: parts-ledger coverage \u00d7 default-size litter \u00d7 layout-divergence \u00d7 typed-shape checks \u2014 drawing part coverage (general-arrangement) 23/23 \u00b7 score = min over checks of 10 \u00d7 passed/checked",
-      "checked": 23,
-      "passed": 23,
+      "content_basis": "GA mechanism: parts-ledger coverage \u00d7 default-size litter \u00d7 layout-divergence \u00d7 typed-shape checks \u2014 drawing part coverage (general-arrangement) 16/16 \u00b7 score = min over checks of 10 \u00d7 passed/checked",
+      "checked": 16,
+      "passed": 16,
       "components": [
         {
           "check": "drawing part coverage (general-arrangement)",
-          "passed": 23,
-          "checked": 23
+          "passed": 16,
+          "checked": 16
         }
       ]
     },
@@ -733,20 +740,20 @@
     "Equipment & Dimensions Register": {
       "target": 8,
       "issues": [
-        "cell contract: 50 of 513 required cells empty/invalid across 25 row(s) \u2014 e.g. row 12: 'Material' placeholder '\u2014'; 'Drawing appearances' placeholder '\u2014'"
+        "cell contract: 59 of 513 required cells empty/invalid across 34 row(s) \u2014 e.g. row 12: 'Material' placeholder '\u2014'; 'Drawing appearances' placeholder '\u2014'"
       ],
       "fix": "",
-      "score": 9.0,
+      "score": 8.8,
       "status": "PASS",
-      "basis": "cell completeness+type contract 463/513 \u00b7 score = min over checks of 10 \u00d7 passed/checked",
-      "content_score": 9.0,
-      "content_basis": "cell completeness+type contract 463/513 \u00b7 score = min over checks of 10 \u00d7 passed/checked",
+      "basis": "cell completeness+type contract 454/513 \u00b7 score = min over checks of 10 \u00d7 passed/checked",
+      "content_score": 8.8,
+      "content_basis": "cell completeness+type contract 454/513 \u00b7 score = min over checks of 10 \u00d7 passed/checked",
       "checked": 513,
-      "passed": 463,
+      "passed": 454,
       "components": [
         {
           "check": "cell completeness+type contract",
-          "passed": 463,
+          "passed": 454,
           "checked": 513
         }
       ]
@@ -950,26 +957,26 @@
       "fix": "",
       "score": 10.0,
       "status": "PASS",
-      "basis": "index integrity (both directions) \u2014 index rows point at an existing tab 29/29; every sheet listed in the index 29/29; cell completeness+type contract 87/87 \u00b7 score = min over checks of 10 \u00d7 passed/checked",
+      "basis": "index integrity (both directions) \u2014 index rows point at an existing tab 30/30; every sheet listed in the index 30/30; cell completeness+type contract 90/90 \u00b7 score = min over checks of 10 \u00d7 passed/checked",
       "content_score": 10.0,
-      "content_basis": "index integrity (both directions) \u2014 index rows point at an existing tab 29/29; every sheet listed in the index 29/29; cell completeness+type contract 87/87 \u00b7 score = min over checks of 10 \u00d7 passed/checked",
-      "checked": 145,
-      "passed": 145,
+      "content_basis": "index integrity (both directions) \u2014 index rows point at an existing tab 30/30; every sheet listed in the index 30/30; cell completeness+type contract 90/90 \u00b7 score = min over checks of 10 \u00d7 passed/checked",
+      "checked": 150,
+      "passed": 150,
       "components": [
         {
           "check": "index rows point at an existing tab",
-          "passed": 29,
-          "checked": 29
+          "passed": 30,
+          "checked": 30
         },
         {
           "check": "every sheet listed in the index",
-          "passed": 29,
-          "checked": 29
+          "passed": 30,
+          "checked": 30
         },
         {
           "check": "cell completeness+type contract",
-          "passed": 87,
-          "checked": 87
+          "passed": 90,
+          "checked": 90
         }
       ]
     }

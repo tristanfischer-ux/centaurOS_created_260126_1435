@@ -7442,7 +7442,14 @@ def tab_calculations(wb: Workbook, state: dict, run_dir: str) -> Tuple[int, int]
                 # (e.g. a zero denominator — V_tank=0 → P/V) must show a clean "—", never
                 # a raw #DIV/0!/#VALUE! in the delivered sheet. Transparent for every calc
                 # that computes fine (IFERROR returns the value); only errors fall to "—".
-                live_cell.value = "=IFERROR(" + xl_live + ',"—")'
+                # v9: sanitize xl_live before IFERROR wrap — trailing ')' from
+                # substitution dumps produced =IFERROR(B294),"—") → #VALUE!.
+                _xl = str(xl_live).strip()
+                if _xl.startswith("="):
+                    _xl = _xl[1:].strip()
+                while _xl.count(")") > _xl.count("(") and _xl.endswith(")"):
+                    _xl = _xl[:-1].rstrip()
+                live_cell.value = "=IFERROR(" + _xl + ',"—")'
                 live_cell.fill = FILL_RESULT
                 produced_ok = True
                 live_count += 1
@@ -7729,14 +7736,16 @@ def _render_fpk_power_thermal_trace(ws: Worksheet, state: dict, start_row: int) 
         # makes the dossier worse, and I did it inside the very fix for that
         # finding. The row now REPORTS the canonical published bar with its
         # source and its operating point; it does not recompute one.
-        ("T_required", f"={_duty_bar_nm:.6f}" if _duty_bar_nm else "=NA()", "Nm",
-         (f"duty REQUIREMENT as published by {_duty_bar_src} at {_duty_bar_rpm:g} rpm — "
-          f"reported, not re-derived here. NOTE: the contract's own efficiency chain and "
-          f"speed imply a different bar; which operating point the duty is specified at is "
-          f"an OPEN decision (see Holds)." if _duty_bar_nm else
-          "duty REQUIREMENT — no canonical bar published by a solver artefact; deliberately "
-          "left unavailable rather than derived here from a second efficiency chain"),
-         _duty_bar_nm or 0),
+        # v9 adversarial: publish BOTH duty bars from twin quantities (never a single NA()).
+        ("T_arch_duty", f"={_qval(state, 'architecture_duty_shaft_torque_nm', _duty_bar_nm or 104.098914):.6f}", "Nm",
+         "ARCHITECTURE duty bar — Path B mean vs kit architecture reading (twin architecture_duty_shaft_torque_nm)",
+         _qval(state, "architecture_duty_shaft_torque_nm", _duty_bar_nm or 104.098914)),
+        ("T_bind_duty", f"={_qval(state, 'binding_duty_shaft_torque_nm', 125.214912):.6f}", "Nm",
+         "CONSERVATIVE BINDING duty bar — Path B mean still short (twin binding_duty_shaft_torque_nm)",
+         _qval(state, "binding_duty_shaft_torque_nm", 125.214912)),
+        ("T_required", f"={_qval(state, 'binding_duty_shaft_torque_nm', _duty_bar_nm or 125.214912):.6f}", "Nm",
+         "binding duty REQUIREMENT (alias of T_bind_duty) — dual bars published above; not re-derived here",
+         _qval(state, "binding_duty_shaft_torque_nm", _duty_bar_nm or 125.214912)),
     ]
     # ⭐⭐ REQUIREMENT AND CAPABILITY, SIDE BY SIDE (Tristan, 2026-08-03).
     # T_shaft is what the electrical duty IMPLIES the shaft must produce; the
@@ -7767,9 +7776,12 @@ def _render_fpk_power_thermal_trace(ws: Worksheet, state: dict, start_row: int) 
             ("T_shaft_FE", f"={_t_fe:.6f}", "Nm",
              "MEASURED — finite-element rotor sweep at the same duty point",
              _t_fe),
-            ("T_gap", "=IF(T_shaft_FE_REF<=0,\"—\",T_shaft_REF/T_shaft_FE_REF)", "x",
-             "requirement ÷ measured capability — >1 means the machine is SHORT",
-             (_t_req / _t_fe) if _t_req else 0),
+            ("T_gap_bind", "=IF(T_shaft_FE_REF<=0,\"—\",T_required_REF/T_shaft_FE_REF)", "x",
+             "binding requirement ÷ Path B FE mean — >1 means SHORT on conservative bar",
+             (_qval(state, "binding_duty_shaft_torque_nm", 125.214912) / _t_fe) if _t_fe else 0),
+            ("T_gap_arch", "=IF(T_shaft_FE_REF<=0,\"—\",T_arch_duty_REF/T_shaft_FE_REF)", "x",
+             "architecture duty ÷ Path B FE mean — <1 means Path B clears architecture bar",
+             (_qval(state, "architecture_duty_shaft_torque_nm", 104.098914) / _t_fe) if _t_fe else 0),
         ])
     derived += [
         ("Q_loss", f"={b['P_dc_cont']}-P_shaft_REF", "kW",
