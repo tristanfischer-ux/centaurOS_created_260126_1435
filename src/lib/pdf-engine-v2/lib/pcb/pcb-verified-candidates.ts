@@ -194,7 +194,10 @@ const CANDIDATE_RULES: readonly CandidateRule[] = [
   },
   {
     // INTENT: LV buck rails — real 3.3 V LDO/buck package instead of bare SOT-23.
-    roleTest: /lv[_ -]?buck[_ -]?rails?|buck[_ -]?(?:regulator|rail)|(?:^|[_ -])dc[_ -]?dc(?:$|[_ -])/i,
+    // GOTCHA: must NOT match generic regulator/LDO roles (MCP1700, CJT1117) —
+    // only FE traction LV buck rail densification nouns.
+    roleTest: /lv[_ -]?buck[_ -]?rails?(?:$|[_ -])|buck[_ -]?power[_ -]?rails?/i,
+    excludedRoleTest: /ldo|linear[_ -]?regulator|mcp1700|cjt1117|3\.3[_ -]?v[_ -]?regulator/i,
     functionClass: 'regulator',
     manufacturer: 'Texas Instruments',
     partNumber: 'TPS62160DSGR',
