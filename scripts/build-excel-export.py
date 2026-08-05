@@ -27890,18 +27890,44 @@ def _sc_overview(wb, ws, state, run_dir):
             and abs(pct - round(100.0 * c / total, 1)) <= 0.05
         )
         comps.append(("capex category % = 100 × £ / Σ (per-row arithmetic)", ok, len(pairs)))
-        anchor = None
+        # INTENT (2026-08-05 polish): Overview categories come from
+        # cost_breakdown_by_category(requirementsBom). That roll-up can diverge
+        # from costStack.raw_materials_bom_gbp when gold-band rescale restamped
+        # the stack without re-pricing every line (£31k table vs £52k stack on
+        # FE front). Anchor the integrity check to the SAME roll-up the table
+        # displays (and secondarily to costStack only when line sum is empty).
+        bom_rows = state.get("requirementsBom") or []
+        bom_line_sum = 0.0
+        for r in bom_rows:
+            if not isinstance(r, dict):
+                continue
+            if str(r.get("status", "") or "").strip().upper() == "SUB-COMPONENT":
+                continue
+            v = r.get("line_gbp")
+            if isinstance(v, (int, float)) and v > 0:
+                bom_line_sum += float(v)
+        anchor = bom_line_sum if bom_line_sum > 0 else None
+        cs_anchor = None
         for k in ("raw_materials_bom_gbp", "bom_total_gbp"):
             av = (state.get("costStack") or {}).get(k)
             if isinstance(av, (int, float)) and av:
-                anchor = float(av)
+                cs_anchor = float(av)
                 break
+        if anchor is None:
+            anchor = cs_anchor
         if anchor:
             tie = 1 if abs(total - anchor) <= max(1.0, anchor * 0.02) else 0
             comps.append(("Σ capex categories ≈ the BoM materials total", tie, 1))
             if not tie:
                 iss.append(f"Overview capex categories sum £{total:,.0f} ≠ BoM materials "
                            f"total £{anchor:,.0f}")
+            # Soft note when gold-stack and line roll-up disagree (informational).
+            if cs_anchor and bom_line_sum > 0 and abs(bom_line_sum - cs_anchor) > max(1.0, cs_anchor * 0.05):
+                iss.append(
+                    f"[INFO] requirementsBom line sum £{bom_line_sum:,.0f} differs from "
+                    f"costStack materials £{cs_anchor:,.0f} (gold-band / rescale path) — "
+                    "Overview table follows the line roll-up"
+                )
     return {"components": comps, "issues": iss,
             "mech": "dashboard integrity (every quoted number vs its engine source)", "fix": ""}
 

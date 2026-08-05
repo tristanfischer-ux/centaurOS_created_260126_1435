@@ -1,0 +1,997 @@
+{
+  "tabs": {
+    "Executive Summary": {
+      "score": 4.0,
+      "target": 8,
+      "status": "FAIL",
+      "issues": [
+        "capped at the dossier FLOOR (4/10): the cover cannot claim a higher score than its weakest sheet \u2014 fix that sheet to raise this one"
+      ],
+      "fix": "",
+      "basis": "MIRROR of the dossier floor (min of every deterministic section & non-mirror tab) \u2014 re-stamped from the CURRENT scores, never a stale earlier cap; own content check: cover compliance arithmetic (achieved vs target re-evaluated per row) \u2014 brief-compliance rows recompute to PASS 9/9; cell completeness+type contract 27/27 \u00b7 score = min over checks of 10 \u00d7 passed/checked",
+      "content_score": 10.0,
+      "content_basis": "cover compliance arithmetic (achieved vs target re-evaluated per row) \u2014 brief-compliance rows recompute to PASS 9/9; cell completeness+type contract 27/27 \u00b7 score = min over checks of 10 \u00d7 passed/checked",
+      "checked": 36,
+      "passed": 36,
+      "components": [
+        {
+          "check": "brief-compliance rows recompute to PASS",
+          "passed": 9,
+          "checked": 9
+        },
+        {
+          "check": "cell completeness+type contract",
+          "passed": 27,
+          "checked": 27
+        }
+      ]
+    },
+    "Overview": {
+      "score": 10,
+      "target": 8,
+      "status": "PASS",
+      "issues": [
+        "[INFO] requirementsBom line sum \u00a331,219 differs from costStack materials \u00a352,534 (gold-band / rescale path) \u2014 Overview table follows the line roll-up"
+      ],
+      "fix": "",
+      "basis": "dashboard integrity (every quoted number vs its engine source) \u2014 section scores match the engine scorecard 14/14; capex category % = 100 \u00d7 \u00a3 / \u03a3 (per-row arithmetic) 8/8; \u03a3 capex categories \u2248 the BoM materials total 1/1; cell completeness+type contract 90/90 \u00b7 score = min over checks of 10 \u00d7 passed/checked",
+      "content_score": 10.0,
+      "content_basis": "dashboard integrity (every quoted number vs its engine source) \u2014 section scores match the engine scorecard 14/14; capex category % = 100 \u00d7 \u00a3 / \u03a3 (per-row arithmetic) 8/8; \u03a3 capex categories \u2248 the BoM materials total 1/1; cell completeness+type contract 90/90 \u00b7 score = min over checks of 10 \u00d7 passed/checked",
+      "checked": 113,
+      "passed": 113,
+      "components": [
+        {
+          "check": "section scores match the engine scorecard",
+          "passed": 14,
+          "checked": 14
+        },
+        {
+          "check": "capex category % = 100 \u00d7 \u00a3 / \u03a3 (per-row arithmetic)",
+          "passed": 8,
+          "checked": 8
+        },
+        {
+          "check": "\u03a3 capex categories \u2248 the BoM materials total",
+          "passed": 1,
+          "checked": 1
+        },
+        {
+          "check": "cell completeness+type contract",
+          "passed": 90,
+          "checked": 90
+        }
+      ]
+    },
+    "Brief": {
+      "score": 10,
+      "target": 8,
+      "status": "PASS",
+      "issues": [],
+      "fix": "",
+      "basis": "brief\u2194design constraint fidelity (verification spine, per-constraint target vs achieved) \u2014 brief constraints honoured by the design (target vs achieved, verification spine) 10/10 \u00b7 score = min over checks of 10 \u00d7 passed/checked",
+      "content_score": 10.0,
+      "content_basis": "brief\u2194design constraint fidelity (verification spine, per-constraint target vs achieved) \u2014 brief constraints honoured by the design (target vs achieved, verification spine) 10/10 \u00b7 score = min over checks of 10 \u00d7 passed/checked",
+      "checked": 10,
+      "passed": 10,
+      "components": [
+        {
+          "check": "brief constraints honoured by the design (target vs achieved, verification spine)",
+          "passed": 10,
+          "checked": 10
+        }
+      ]
+    },
+    "Calculations": {
+      "score": 6,
+      "target": 8,
+      "status": "FAIL",
+      "issues": [
+        "[MED] 10 of 108 quantities have no recorded origin (only 91% trace to the brief via a tool/formula) \u2014 numbers appear from nowhere",
+        "[MED] 15 of 87 numbers (17%) have NO calculation shown in Excel \u2014 only a value (calc-coverage 83%). A number you cannot see computed is not verifiable."
+      ],
+      "fix": "provenance.py \u2014 record each number's lineage at source (contract / sizing / tools)",
+      "basis": "worked-calc coverage (every definition resolves to a LIVE Excel formula or an honestly-disclosed non-arithmetic pick; inputs populated) + tool-flow consumption + duty coverage vs the contract's calculator quantities \u2014 worked-calc definitions resolve to a LIVE computed result 38/38; calc input rows carry their value 107/107; tool outputs consumed downstream 64/64; worked-calc coverage of the contract's calculator duties (\u22655 calcs for 23 calculator quantities) 5/5; cell completeness+type contract 572/572 \u00b7 score = min over checks of 10 \u00d7 passed/checked",
+      "content_score": 10.0,
+      "content_basis": "worked-calc coverage (every definition resolves to a LIVE Excel formula or an honestly-disclosed non-arithmetic pick; inputs populated) + tool-flow consumption + duty coverage vs the contract's calculator quantities \u2014 worked-calc definitions resolve to a LIVE computed result 38/38; calc input rows carry their value 107/107; tool outputs consumed downstream 64/64; worked-calc coverage of the contract's calculator duties (\u22655 calcs for 23 calculator quantities) 5/5; cell completeness+type contract 572/572 \u00b7 score = min over checks of 10 \u00d7 passed/checked",
+      "checked": 786,
+      "passed": 786,
+      "components": [
+        {
+          "check": "worked-calc definitions resolve to a LIVE computed result",
+          "passed": 38,
+          "checked": 38
+        },
+        {
+          "check": "calc input rows carry their value",
+          "passed": 107,
+          "checked": 107
+        },
+        {
+          "check": "tool outputs consumed downstream",
+          "passed": 64,
+          "checked": 64
+        },
+        {
+          "check": "worked-calc coverage of the contract's calculator duties (\u22655 calcs for 23 calculator quantities)",
+          "passed": 5,
+          "checked": 5
+        },
+        {
+          "check": "cell completeness+type contract",
+          "passed": 572,
+          "checked": 572
+        }
+      ]
+    },
+    "Bill of Materials (Ledger)": {
+      "score": 9.9,
+      "target": 8,
+      "status": "PASS",
+      "issues": [
+        "cell contract: 5 of 502 required cells empty/invalid across 3 row(s) \u2014 e.g. row 48: 'Tag' placeholder '\u2014'"
+      ],
+      "fix": "price the \u00a30 lines at source (requirements_bom.py emitter), state the material on fabricated parts in the sizing pass, and close ENGINEERED MPN TBDs by growing the parts DB (Stage 17.6 ingest) so partVerifications resolves them (commodity / generic-spec valve lines resolve at procurement \u2014 no hold; OEM-proprietary lines never resolve by design)",
+      "basis": "column-contract arithmetic: 10 \u00d7 54/54 rows passing; content checks: BoM ledger column contract (per-row Row check) \u2014 cell completeness+type contract 497/502 \u00b7 score = min over checks of 10 \u00d7 passed/checked",
+      "content_score": 9.9,
+      "content_basis": "BoM ledger column contract (per-row Row check) \u2014 cell completeness+type contract 497/502 \u00b7 score = min over checks of 10 \u00d7 passed/checked",
+      "checked": 502,
+      "passed": 497,
+      "components": [
+        {
+          "check": "cell completeness+type contract",
+          "passed": 497,
+          "checked": 502
+        }
+      ]
+    },
+    "Cost waterfall": {
+      "score": 10,
+      "target": 8,
+      "status": "PASS",
+      "issues": [],
+      "fix": "fix the mismatching step at the cost-stack source it names",
+      "basis": "cost-waterfall arithmetic ties (each step vs its named costStack anchor; sums close) \u2014 waterfall rows tie live to their stated costStack anchor 10/10; assembly/install rows computed live from their factors 5/5; \u03a3 class subtotals \u2248 the BoM materials total 1/1; cell completeness+type contract 65/65 \u00b7 score = min over checks of 10 \u00d7 passed/checked",
+      "content_score": 10.0,
+      "content_basis": "cost-waterfall arithmetic ties (each step vs its named costStack anchor; sums close) \u2014 waterfall rows tie live to their stated costStack anchor 10/10; assembly/install rows computed live from their factors 5/5; \u03a3 class subtotals \u2248 the BoM materials total 1/1; cell completeness+type contract 65/65 \u00b7 score = min over checks of 10 \u00d7 passed/checked",
+      "checked": 81,
+      "passed": 81,
+      "components": [
+        {
+          "check": "waterfall rows tie live to their stated costStack anchor",
+          "passed": 10,
+          "checked": 10
+        },
+        {
+          "check": "assembly/install rows computed live from their factors",
+          "passed": 5,
+          "checked": 5
+        },
+        {
+          "check": "\u03a3 class subtotals \u2248 the BoM materials total",
+          "passed": 1,
+          "checked": 1
+        },
+        {
+          "check": "cell completeness+type contract",
+          "passed": 65,
+          "checked": 65
+        }
+      ]
+    },
+    "Financial model": {
+      "score": 9.9,
+      "target": 8,
+      "status": "PASS",
+      "issues": [
+        "1 orphan numeric literal(s) in the financial model (e.g. row 14 col 2) \u2014 a model number must be driven, not typed",
+        "capped below 10: tab discloses an identified failure/gap (grade-inflation ban \u2014 a perfect 10 requires a clean sheet)"
+      ],
+      "fix": "drive the orphan literals from the Inputs & Assumptions drivers",
+      "basis": "formula integrity (cells reference drivers; no orphan literals) + scenario arithmetic (live) \u2014 model value cells are live formulas or declared (yellow) inputs 215/216; cell completeness+type contract 385/385 \u00b7 score = min over checks of 10 \u00d7 passed/checked",
+      "content_score": 10.0,
+      "content_basis": "formula integrity (cells reference drivers; no orphan literals) + scenario arithmetic (live) \u2014 model value cells are live formulas or declared (yellow) inputs 215/216; cell completeness+type contract 385/385 \u00b7 score = min over checks of 10 \u00d7 passed/checked",
+      "checked": 601,
+      "passed": 600,
+      "components": [
+        {
+          "check": "model value cells are live formulas or declared (yellow) inputs",
+          "passed": 215,
+          "checked": 216
+        },
+        {
+          "check": "cell completeness+type contract",
+          "passed": 385,
+          "checked": 385
+        }
+      ]
+    },
+    "Connection trace": {
+      "score": 10,
+      "target": 8,
+      "status": "PASS",
+      "issues": [],
+      "fix": "fix the topology edge / parts_ledger connectivity classifier (orphan_instrument must not fire on consumables; device MCU counts as control); prune ghost ledger connections after gold-spine bake",
+      "basis": "resolved-endpoint fraction (every \u2190 / \u2192 tag must exist) + per-row status + ledger connectivity concerns/stale ties (proportionate vs equipment count) + ledger-vs-rendered connection coverage \u2014 endpoint tags resolve to a real BoM/part tag 3/3; connection rows carry a computed OK status (0 unresolved endpoints, no missing-tie evidence) 20/20; ledger connectivity clean (no unconnected electrical parts, no stale topology ties) 1/1; cell completeness+type contract 114/114 \u00b7 score = min over checks of 10 \u00d7 passed/checked",
+      "content_score": 10.0,
+      "content_basis": "resolved-endpoint fraction (every \u2190 / \u2192 tag must exist) + per-row status + ledger connectivity concerns/stale ties (proportionate vs equipment count) + ledger-vs-rendered connection coverage \u2014 endpoint tags resolve to a real BoM/part tag 3/3; connection rows carry a computed OK status (0 unresolved endpoints, no missing-tie evidence) 20/20; ledger connectivity clean (no unconnected electrical parts, no stale topology ties) 1/1; cell completeness+type contract 114/114 \u00b7 score = min over checks of 10 \u00d7 passed/checked",
+      "checked": 138,
+      "passed": 138,
+      "components": [
+        {
+          "check": "endpoint tags resolve to a real BoM/part tag",
+          "passed": 3,
+          "checked": 3
+        },
+        {
+          "check": "connection rows carry a computed OK status (0 unresolved endpoints, no missing-tie evidence)",
+          "passed": 20,
+          "checked": 20
+        },
+        {
+          "check": "ledger connectivity clean (no unconnected electrical parts, no stale topology ties)",
+          "passed": 1,
+          "checked": 1
+        },
+        {
+          "check": "cell completeness+type contract",
+          "passed": 114,
+          "checked": 114
+        }
+      ]
+    },
+    "Part names": {
+      "score": 9.9,
+      "target": 8,
+      "status": "PASS",
+      "issues": [
+        "cell contract: 2 of 265 required cells empty/invalid across 2 row(s) \u2014 e.g. row 54: 'Tag' placeholder '\u2014'"
+      ],
+      "fix": "fix the master merge / tag registry at tab_parts_master source",
+      "basis": "dedupe + completeness (every BoM tag present exactly once) + cross-link + MPN/status coverage (parts-ledger.json) \u2014 part tags unique (each physical thing named once) 48/48; every principal carries an MPN or an honest TBD status 48/48; master tags cross-linked to >=1 drawing/manifest reference 22/22; parts-ledger equipment free of orphan/not-found status 52/52; cell completeness+type contract 263/265 \u00b7 score = min over checks of 10 \u00d7 passed/checked",
+      "content_score": 9.9,
+      "content_basis": "dedupe + completeness (every BoM tag present exactly once) + cross-link + MPN/status coverage (parts-ledger.json) \u2014 part tags unique (each physical thing named once) 48/48; every principal carries an MPN or an honest TBD status 48/48; master tags cross-linked to >=1 drawing/manifest reference 22/22; parts-ledger equipment free of orphan/not-found status 52/52; cell completeness+type contract 263/265 \u00b7 score = min over checks of 10 \u00d7 passed/checked",
+      "checked": 435,
+      "passed": 433,
+      "components": [
+        {
+          "check": "part tags unique (each physical thing named once)",
+          "passed": 48,
+          "checked": 48
+        },
+        {
+          "check": "every principal carries an MPN or an honest TBD status",
+          "passed": 48,
+          "checked": 48
+        },
+        {
+          "check": "master tags cross-linked to >=1 drawing/manifest reference",
+          "passed": 22,
+          "checked": 22
+        },
+        {
+          "check": "parts-ledger equipment free of orphan/not-found status",
+          "passed": 52,
+          "checked": 52
+        },
+        {
+          "check": "cell completeness+type contract",
+          "passed": 263,
+          "checked": 265
+        }
+      ]
+    },
+    "Risk & Regulatory": {
+      "score": 9.9,
+      "target": 8,
+      "status": "PASS",
+      "issues": [
+        "2 Medium hazard(s) remain in the register"
+      ],
+      "fix": "fix each OPEN-DEFECT row at its ROUTED source stage (each row names it: the physics-critic finding's producing rule / the flagged gate's source line / the cost model) \u2014 the mirrored finding then clears and the row disappears; external risks keep their mitigations",
+      "basis": "column-contract arithmetic: 10 \u00d7 2/2 rows passing; content checks: risk-register column contract (per-row triage) \u2014 cell completeness+type contract 72/72 \u00b7 score = min over checks of 10 \u00d7 passed/checked",
+      "content_score": 10.0,
+      "content_basis": "risk-register column contract (per-row triage) \u2014 cell completeness+type contract 72/72 \u00b7 score = min over checks of 10 \u00d7 passed/checked",
+      "checked": 72,
+      "passed": 72,
+      "components": [
+        {
+          "check": "cell completeness+type contract",
+          "passed": 72,
+          "checked": 72
+        }
+      ]
+    },
+    "Assembly sequence": {
+      "score": 10,
+      "target": 8,
+      "status": "PASS",
+      "issues": [
+        "6/6 steps carry design-derived content (footprint / region groups / schedule quantities / BoM lift mass)"
+      ],
+      "fix": "derive the unit norms from the design (crew model / lift study); give every step a design-derived quantity to raise the fraction",
+      "basis": "arithmetic: 10 \u00d7 min(steps 6/6, heavy-lift callouts 1/1, programme reconciliation 1/1); content checks: design-derived step arithmetic \u2014 steps with design-derived duration + predecessor 6/6; heavy (>1 t) items called out with a crane class 1/1; critical-path total reconciled against any other dossier schedule 1/1; cell completeness+type contract 30/30 \u00b7 score = min over checks of 10 \u00d7 passed/checked",
+      "components": [
+        {
+          "check": "steps with design-derived duration + predecessor",
+          "passed": 6,
+          "checked": 6
+        },
+        {
+          "check": "heavy (>1 t) items called out with a crane class",
+          "passed": 1,
+          "checked": 1
+        },
+        {
+          "check": "critical-path total reconciled against any other dossier schedule",
+          "passed": 1,
+          "checked": 1
+        },
+        {
+          "check": "cell completeness+type contract",
+          "passed": 30,
+          "checked": 30
+        }
+      ],
+      "content_score": 10.0,
+      "content_basis": "design-derived step arithmetic \u2014 steps with design-derived duration + predecessor 6/6; heavy (>1 t) items called out with a crane class 1/1; critical-path total reconciled against any other dossier schedule 1/1; cell completeness+type contract 30/30 \u00b7 score = min over checks of 10 \u00d7 passed/checked",
+      "checked": 38,
+      "passed": 38
+    },
+    "Process schedules": {
+      "score": 10,
+      "target": 8,
+      "status": "PASS",
+      "scored": false,
+      "issues": [
+        "out of scope for this archetype \u2014 VERIFIED, not scored: plant valve + field-instrument schedules \u2014 a rear drive unit has no process-train valves; coolant circuit is on the Connection trace / Decision Register. (this is a sealed traction MGU+MCU pack \u2014 plant process/distribution deliverables are inapplicable, not a vacuous pass)."
+      ],
+      "fix": "none \u2014 inapplicable to a sealed traction drive pack",
+      "basis": "verified out-of-scope: traction drive pack (MGU+MCU) \u2014 not a process plant"
+    },
+    "Line & velocity": {
+      "score": 10,
+      "target": 8,
+      "status": "PASS",
+      "scored": false,
+      "issues": [
+        "out of scope for this archetype \u2014 VERIFIED, not scored: a plant pipe/cable line list with velocity / volt-drop \u2014 a sealed traction MGU+MCU pack has short HV/phase leads and coolant hoses scored on the Connection trace + SLD, not a distribution line list. (this is a sealed traction MGU+MCU pack \u2014 plant process/distribution deliverables are inapplicable, not a vacuous pass)."
+      ],
+      "fix": "none \u2014 inapplicable to a sealed traction drive pack",
+      "basis": "verified out-of-scope: traction drive pack (MGU+MCU) \u2014 not a process plant"
+    },
+    "Glossary": {
+      "score": 10,
+      "target": 8,
+      "status": "PASS",
+      "issues": [],
+      "fix": "drop orphan terms / define the missing ones in _GLOSSARY",
+      "basis": "glossary contract (every term defined + no orphan terms) \u2014 every rendered term carries a definition 34/34; terms actually used somewhere in the workbook 34/34 \u00b7 score = min over checks of 10 \u00d7 passed/checked",
+      "content_score": 10.0,
+      "content_basis": "glossary contract (every term defined + no orphan terms) \u2014 every rendered term carries a definition 34/34; terms actually used somewhere in the workbook 34/34 \u00b7 score = min over checks of 10 \u00d7 passed/checked",
+      "checked": 68,
+      "passed": 68,
+      "components": [
+        {
+          "check": "every rendered term carries a definition",
+          "passed": 34,
+          "checked": 34
+        },
+        {
+          "check": "terms actually used somewhere in the workbook",
+          "passed": 34,
+          "checked": 34
+        }
+      ]
+    },
+    "Engineering Analysis": {
+      "score": 9.8,
+      "target": 8,
+      "status": "PASS",
+      "issues": [
+        "cell contract: 3 of 159 required cells empty/invalid across 3 row(s) \u2014 e.g. row 84: 'Tag' placeholder '\u2014'"
+      ],
+      "fix": "add the missing material to the universal reference table (_EA_MATERIALS) or the missing P=/\u03c3= figures to the row's own materials-take-off basis string (requirements_bom.py::_materials_takeoff) \u2014 never hand-type a value into this tab",
+      "basis": "column-contract arithmetic: 10 \u00d7 21/21 rows passing; content checks: safety-factor/allowable column contract (per-part material + allowable + actual stress + utilisation triage) + material stress-strain characterisation \u2014 cell completeness+type contract 156/159 \u00b7 score = min over checks of 10 \u00d7 passed/checked",
+      "content_score": 9.8,
+      "content_basis": "safety-factor/allowable column contract (per-part material + allowable + actual stress + utilisation triage) + material stress-strain characterisation \u2014 cell completeness+type contract 156/159 \u00b7 score = min over checks of 10 \u00d7 passed/checked",
+      "checked": 159,
+      "passed": 156,
+      "components": [
+        {
+          "check": "cell completeness+type contract",
+          "passed": 156,
+          "checked": 159
+        }
+      ]
+    },
+    "HVAC": {
+      "score": 10,
+      "target": 8,
+      "status": "PASS",
+      "scored": false,
+      "issues": [
+        "out of scope for this archetype \u2014 VERIFIED, not scored: a ventilation / climate-control schematic \u2014 the pack is liquid-cooled via the vehicle loop; there is no HVAC plant. (this is a sealed traction MGU+MCU pack \u2014 plant process/distribution deliverables are inapplicable, not a vacuous pass)."
+      ],
+      "fix": "none \u2014 inapplicable to a sealed traction drive pack",
+      "basis": "verified out-of-scope: traction drive pack (MGU+MCU) \u2014 not a process plant"
+    },
+    "Quantities": {
+      "score": 10,
+      "target": 8,
+      "status": "PASS",
+      "scored": false,
+      "issues": [
+        "out of scope for this archetype \u2014 VERIFIED, not scored: folded into Calculations + Design basis (2026-07-14 tab consolidation) \u2014 contract quantities are not a separate sheet. (this is a sealed traction MGU+MCU pack \u2014 plant process/distribution deliverables are inapplicable, not a vacuous pass)."
+      ],
+      "fix": "none \u2014 inapplicable to a sealed traction drive pack",
+      "basis": "verified out-of-scope: traction drive pack (MGU+MCU) \u2014 not a process plant"
+    },
+    "Inputs Master (M0)": {
+      "score": 10,
+      "target": 8,
+      "status": "PASS",
+      "scored": false,
+      "issues": [
+        "out of scope for this archetype \u2014 VERIFIED, not scored: folded into Inputs & Assumptions (2026-07-14) \u2014 M0 primitives append as a section on that sheet. (this is a sealed traction MGU+MCU pack \u2014 plant process/distribution deliverables are inapplicable, not a vacuous pass)."
+      ],
+      "fix": "none \u2014 inapplicable to a sealed traction drive pack",
+      "basis": "verified out-of-scope: traction drive pack (MGU+MCU) \u2014 not a process plant"
+    },
+    "Electrical": {
+      "score": 10,
+      "target": 8,
+      "status": "PASS",
+      "issues": [
+        "Single-line part coverage 6/6 (100%)"
+      ],
+      "fix": "",
+      "basis": "single-line drawing coverage; traction-pack HV energy tree (battery DC \u2192 fuse \u2192 inverter \u2192 motor) \u2014 plant panel schedule NA; content checks: panel-schedule column contract + single-line drawing coverage",
+      "content_score": null,
+      "content_basis": "panel-schedule column contract + single-line drawing coverage",
+      "checked": 0,
+      "passed": 0,
+      "components": []
+    },
+    "Quality & Audit": {
+      "score": 4.0,
+      "target": 8,
+      "status": "FAIL",
+      "issues": [
+        "the dossier does NOT ship \u2014 dossier floor 4/10 (min of every deterministic section & non-mirror tab, the SAME number the verdict quotes); Verification/race evidence still must close before homologation"
+      ],
+      "fix": "resolve the failing tabs/sections (the per-tab table on this tab lists every scored surface)",
+      "basis": "THE dossier floor \u2014 min of every deterministic section & non-mirror tab (identical to the verdict computation); own content check: floor mirror + audit-surface integrity (rows tie to the live scorecard) \u2014 per-tab table rows name real scored tabs 35/35; findings carry their producing check 4/4; cell completeness+type contract 236/237 \u00b7 score = min over checks of 10 \u00d7 passed/checked",
+      "checked": 276,
+      "passed": 275,
+      "content_score": 10.0,
+      "content_basis": "floor mirror + audit-surface integrity (rows tie to the live scorecard) \u2014 per-tab table rows name real scored tabs 35/35; findings carry their producing check 4/4; cell completeness+type contract 236/237 \u00b7 score = min over checks of 10 \u00d7 passed/checked",
+      "components": [
+        {
+          "check": "per-tab table rows name real scored tabs",
+          "passed": 35,
+          "checked": 35
+        },
+        {
+          "check": "findings carry their producing check",
+          "passed": 4,
+          "checked": 4
+        },
+        {
+          "check": "cell completeness+type contract",
+          "passed": 236,
+          "checked": 237
+        }
+      ]
+    },
+    "Design basis": {
+      "score": 10,
+      "target": 8,
+      "status": "PASS",
+      "issues": [
+        "18/18 basis lines carry a value + a named source; 18/18 carry a unit or are a stated dimensionless ratio; 2/2 live cross-references resolve"
+      ],
+      "fix": "any line without a derivable value/source/unit must gain one at its owning module (never hand-type a basis line)",
+      "basis": "arithmetic: 10 \u00d7 min(sourced 18/18, unit-or-ratio 18/18, cross-ref resolves 2/2); content checks: design-basis completeness arithmetic \u2014 basis rows carrying a value + a named source 18/18; numeric values carrying a unit (or a stated dimensionless ratio) 18/18; live cross-references that resolve to a populated target cell 2/2; cell completeness+type contract 90/90 \u00b7 score = min over checks of 10 \u00d7 passed/checked",
+      "components": [
+        {
+          "check": "basis rows carrying a value + a named source",
+          "passed": 18,
+          "checked": 18
+        },
+        {
+          "check": "numeric values carrying a unit (or a stated dimensionless ratio)",
+          "passed": 18,
+          "checked": 18
+        },
+        {
+          "check": "live cross-references that resolve to a populated target cell",
+          "passed": 2,
+          "checked": 2
+        },
+        {
+          "check": "cell completeness+type contract",
+          "passed": 90,
+          "checked": 90
+        }
+      ],
+      "content_score": 10.0,
+      "content_basis": "design-basis completeness arithmetic \u2014 basis rows carrying a value + a named source 18/18; numeric values carrying a unit (or a stated dimensionless ratio) 18/18; live cross-references that resolve to a populated target cell 2/2; cell completeness+type contract 90/90 \u00b7 score = min over checks of 10 \u00d7 passed/checked",
+      "checked": 128,
+      "passed": 128
+    },
+    "Holds & exclusions": {
+      "score": 9.9,
+      "target": 8,
+      "status": "PASS",
+      "issues": [
+        "4 open hold(s) + 0 exclusion(s) \u2014 every hold derived live from a failing check/contract, fully quantified (Impact) and routed (Owner); every exclusion explicitly reconciled against the client offer \u2014 nothing left as a bare, unlinked disclosure",
+        "4 open hold(s) remain \u2014 never a perfect 10 until every hold clears at source (does not score: already priced by the never-perfect-10 rule)"
+      ],
+      "fix": "clear each hold at its source (the named check re-passes) \u2014 the row then disappears on rebuild; add the missing Impact/Owner/citation at the point noted above",
+      "basis": "arithmetic: 10 \u00d7 min(complete 4/4, impact 4/4, owner 4/4, exclusions cited 0/1); content checks: live-derivation check (each hold re-derived from the current contract results) \u2014 holds carrying item/scope/source/clears 4/4; holds carrying a numeric Impact 4/4; holds carrying a non-empty Owner 4/4; exclusions explicitly reconciled against the client offer (none) 1/1; rendered holds match the LIVE re-derivation (stale hold = fail) 4/4; cell completeness+type contract 28/28 \u00b7 score = min over checks of 10 \u00d7 passed/checked",
+      "components": [
+        {
+          "check": "holds carrying item/scope/source/clears",
+          "passed": 4,
+          "checked": 4
+        },
+        {
+          "check": "holds carrying a numeric Impact",
+          "passed": 4,
+          "checked": 4
+        },
+        {
+          "check": "holds carrying a non-empty Owner",
+          "passed": 4,
+          "checked": 4
+        },
+        {
+          "check": "exclusions explicitly reconciled against the client offer (none)",
+          "passed": 1,
+          "checked": 1
+        },
+        {
+          "check": "rendered holds match the LIVE re-derivation (stale hold = fail)",
+          "passed": 4,
+          "checked": 4
+        },
+        {
+          "check": "cell completeness+type contract",
+          "passed": 28,
+          "checked": 28
+        }
+      ],
+      "content_score": 10.0,
+      "content_basis": "live-derivation check (each hold re-derived from the current contract results) \u2014 holds carrying item/scope/source/clears 4/4; holds carrying a numeric Impact 4/4; holds carrying a non-empty Owner 4/4; exclusions explicitly reconciled against the client offer (none) 1/1; rendered holds match the LIVE re-derivation (stale hold = fail) 4/4; cell completeness+type contract 28/28 \u00b7 score = min over checks of 10 \u00d7 passed/checked",
+      "checked": 45,
+      "passed": 45
+    },
+    "Questions for the customer": {
+      "score": 10.0,
+      "target": 8,
+      "status": "PASS",
+      "issues": [
+        "18 open question(s) for the customer \u2014 every row derived live from a named engine artefact (brief augmentation / plausibility critic / decisions register / client-offer reconciliation); an answered question disappears on rebuild"
+      ],
+      "fix": "answer each question in the brief (or record a scope decision in briefs-loop/<brief>.decisions.json) and re-run",
+      "basis": "live-derivation check (each question re-derived from the run's own artefacts: brief augmentation, plausibility critic, decisions register, client-offer reconciliation) \u2014 rendered questions match the LIVE re-derivation (stale/dropped question = fail) 18/18; cell completeness+type contract 90/90 \u00b7 score = min over checks of 10 \u00d7 passed/checked",
+      "content_score": 10.0,
+      "content_basis": "live-derivation check (each question re-derived from the run's own artefacts: brief augmentation, plausibility critic, decisions register, client-offer reconciliation) \u2014 rendered questions match the LIVE re-derivation (stale/dropped question = fail) 18/18; cell completeness+type contract 90/90 \u00b7 score = min over checks of 10 \u00d7 passed/checked",
+      "checked": 108,
+      "passed": 108,
+      "components": [
+        {
+          "check": "rendered questions match the LIVE re-derivation (stale/dropped question = fail)",
+          "passed": 18,
+          "checked": 18
+        },
+        {
+          "check": "cell completeness+type contract",
+          "passed": 90,
+          "checked": 90
+        }
+      ]
+    },
+    "\u26a0 Checks": {
+      "score": 10,
+      "target": 8,
+      "status": "PASS",
+      "issues": [
+        "148/148 invariants pass"
+      ],
+      "fix": "fix each failing invariant at source",
+      "basis": "fail-count formula: 10 if 0 FAIL else max(0, 8 \u2212 2 \u00d7 fails) \u2014 deterministic invariants pass 94/94; cell completeness+type contract 311/311 \u00b7 score = min over checks of 10 \u00d7 passed/checked",
+      "content_score": 10.0,
+      "content_basis": "fail-count formula: 10 if 0 FAIL else max(0, 8 \u2212 2 \u00d7 fails) \u2014 deterministic invariants pass 94/94; cell completeness+type contract 311/311 \u00b7 score = min over checks of 10 \u00d7 passed/checked",
+      "checked": 405,
+      "passed": 405,
+      "components": [
+        {
+          "check": "deterministic invariants pass",
+          "passed": 94,
+          "checked": 94
+        },
+        {
+          "check": "cell completeness+type contract",
+          "passed": 311,
+          "checked": 311
+        }
+      ]
+    },
+    "Renders": {
+      "score": 9,
+      "target": 8,
+      "status": "PASS",
+      "issues": [
+        "Render part coverage 23/23 (100%)"
+      ],
+      "fix": "raise the drawing's part coverage at its generator (parts-ledger names the misses)",
+      "basis": "render mechanism: parts-ledger coverage \u00d7 default-size litter \u00d7 typed-shape \u00d7 vision-critic verdict (render-vision-critique.json) \u2014 drawing part coverage (blender) 23/23 \u00b7 score = min over checks of 10 \u00d7 passed/checked",
+      "content_score": 10.0,
+      "content_basis": "render mechanism: parts-ledger coverage \u00d7 default-size litter \u00d7 typed-shape \u00d7 vision-critic verdict (render-vision-critique.json) \u2014 drawing part coverage (blender) 23/23 \u00b7 score = min over checks of 10 \u00d7 passed/checked",
+      "checked": 23,
+      "passed": 23,
+      "components": [
+        {
+          "check": "drawing part coverage (blender)",
+          "passed": 23,
+          "checked": 23
+        }
+      ]
+    },
+    "GA \u2014 General Arrangement": {
+      "score": 9,
+      "target": 8,
+      "status": "PASS",
+      "issues": [
+        "GA part coverage 23/23 (100%)"
+      ],
+      "fix": "raise the drawing's part coverage at its generator (parts-ledger names the misses)",
+      "basis": "GA mechanism: parts-ledger coverage \u00d7 default-size litter \u00d7 layout-divergence \u00d7 typed-shape checks \u2014 drawing part coverage (general-arrangement) 23/23 \u00b7 score = min over checks of 10 \u00d7 passed/checked",
+      "content_score": 10.0,
+      "content_basis": "GA mechanism: parts-ledger coverage \u00d7 default-size litter \u00d7 layout-divergence \u00d7 typed-shape checks \u2014 drawing part coverage (general-arrangement) 23/23 \u00b7 score = min over checks of 10 \u00d7 passed/checked",
+      "checked": 23,
+      "passed": 23,
+      "components": [
+        {
+          "check": "drawing part coverage (general-arrangement)",
+          "passed": 23,
+          "checked": 23
+        }
+      ]
+    },
+    "Drawings": {
+      "score": 9,
+      "target": 8,
+      "status": "PASS",
+      "issues": [
+        "2 drawing(s) registered with 2 print-ready A1 sheet PDF(s), all present on disk, lettering \u22652.5 mm",
+        "register intact + plant/product-scale content earned (drawing_gates all_pass \u00b7 GA coverage 100%) \u2014 capped 9 (drawing_gates + GA coverage; register alone never mints 10)"
+      ],
+      "fix": "raise drawing_gates / GA coverage further for a 10 \u2014 register alone never mints 10",
+      "basis": "drawing-register integrity: every registered A1 print PDF exists on disk + ISO 3098 2.5 mm lettering bar \u2014 registered drawings with their print set present 2/2; registered render views with a file 11/11; registered drawings passing their own G1-G9 gate verdict 2/2; registered drawings share ONE revision 1/1; registered drawings share ONE issue date 1/1; cell completeness+type contract 47/47 \u00b7 score = min over checks of 10 \u00d7 passed/checked",
+      "content_score": 10.0,
+      "content_basis": "drawing-register integrity: every registered A1 print PDF exists on disk + ISO 3098 2.5 mm lettering bar \u2014 registered drawings with their print set present 2/2; registered render views with a file 11/11; registered drawings passing their own G1-G9 gate verdict 2/2; registered drawings share ONE revision 1/1; registered drawings share ONE issue date 1/1; cell completeness+type contract 47/47 \u00b7 score = min over checks of 10 \u00d7 passed/checked",
+      "checked": 64,
+      "passed": 64,
+      "components": [
+        {
+          "check": "registered drawings with their print set present",
+          "passed": 2,
+          "checked": 2
+        },
+        {
+          "check": "registered render views with a file",
+          "passed": 11,
+          "checked": 11
+        },
+        {
+          "check": "registered drawings passing their own G1-G9 gate verdict",
+          "passed": 2,
+          "checked": 2
+        },
+        {
+          "check": "registered drawings share ONE revision",
+          "passed": 1,
+          "checked": 1
+        },
+        {
+          "check": "registered drawings share ONE issue date",
+          "passed": 1,
+          "checked": 1
+        },
+        {
+          "check": "cell completeness+type contract",
+          "passed": 47,
+          "checked": 47
+        }
+      ]
+    },
+    "Inputs & Assumptions": {
+      "target": 8,
+      "issues": [],
+      "fix": "wire the orphan driver into the model or remove it",
+      "score": 10.0,
+      "status": "PASS",
+      "basis": "driver integrity (every input driver consumed by a live formula) \u2014 drivers referenced by a live formula somewhere 16/16; cell completeness+type contract 228/228 \u00b7 score = min over checks of 10 \u00d7 passed/checked",
+      "content_score": 10.0,
+      "content_basis": "driver integrity (every input driver consumed by a live formula) \u2014 drivers referenced by a live formula somewhere 16/16; cell completeness+type contract 228/228 \u00b7 score = min over checks of 10 \u00d7 passed/checked",
+      "checked": 244,
+      "passed": 244,
+      "components": [
+        {
+          "check": "drivers referenced by a live formula somewhere",
+          "passed": 16,
+          "checked": 16
+        },
+        {
+          "check": "cell completeness+type contract",
+          "passed": 228,
+          "checked": 228
+        }
+      ]
+    },
+    "Equipment & Dimensions Register": {
+      "target": 8,
+      "issues": [
+        "cell contract: 50 of 513 required cells empty/invalid across 25 row(s) \u2014 e.g. row 12: 'Material' placeholder '\u2014'; 'Drawing appearances' placeholder '\u2014'"
+      ],
+      "fix": "",
+      "score": 9.0,
+      "status": "PASS",
+      "basis": "cell completeness+type contract 463/513 \u00b7 score = min over checks of 10 \u00d7 passed/checked",
+      "content_score": 9.0,
+      "content_basis": "cell completeness+type contract 463/513 \u00b7 score = min over checks of 10 \u00d7 passed/checked",
+      "checked": 513,
+      "passed": 463,
+      "components": [
+        {
+          "check": "cell completeness+type contract",
+          "passed": 463,
+          "checked": 513
+        }
+      ]
+    },
+    "Suppliers": {
+      "target": 8,
+      "issues": [
+        "45 part(s) remain unsourced at concept stage \u2014 never a perfect 10 until each is quoted (does not score: already priced by the never-perfect-10 rule)"
+      ],
+      "fix": "",
+      "score": 10.0,
+      "status": "PASS",
+      "basis": "live re-derivation from the run's own part-verification records (supplier, MPN, distributor price and catalogue link) \u2014 every pinned supplier row carries a real manufacturer part number 10/10; pinned part is backed by a catalogue source (link or listing title) 10/10; supplier rows agree with the open-by-design ledger (a sourced part must not still be declared open) 10/10; every open part states WHY it is open (declared, not silently TBD) 45/45; every unresolved part is DECLARED open with a reason (undeclared = a gap, not a decision) 45/45; cell completeness+type contract 141/141 \u00b7 score = min over checks of 10 \u00d7 passed/checked",
+      "content_score": 10.0,
+      "content_basis": "live re-derivation from the run's own part-verification records (supplier, MPN, distributor price and catalogue link) \u2014 every pinned supplier row carries a real manufacturer part number 10/10; pinned part is backed by a catalogue source (link or listing title) 10/10; supplier rows agree with the open-by-design ledger (a sourced part must not still be declared open) 10/10; every open part states WHY it is open (declared, not silently TBD) 45/45; every unresolved part is DECLARED open with a reason (undeclared = a gap, not a decision) 45/45; cell completeness+type contract 141/141 \u00b7 score = min over checks of 10 \u00d7 passed/checked",
+      "checked": 261,
+      "passed": 261,
+      "components": [
+        {
+          "check": "every pinned supplier row carries a real manufacturer part number",
+          "passed": 10,
+          "checked": 10
+        },
+        {
+          "check": "pinned part is backed by a catalogue source (link or listing title)",
+          "passed": 10,
+          "checked": 10
+        },
+        {
+          "check": "supplier rows agree with the open-by-design ledger (a sourced part must not still be declared open)",
+          "passed": 10,
+          "checked": 10
+        },
+        {
+          "check": "every open part states WHY it is open (declared, not silently TBD)",
+          "passed": 45,
+          "checked": 45
+        },
+        {
+          "check": "every unresolved part is DECLARED open with a reason (undeclared = a gap, not a decision)",
+          "passed": 45,
+          "checked": 45
+        },
+        {
+          "check": "cell completeness+type contract",
+          "passed": 141,
+          "checked": 141
+        }
+      ]
+    },
+    "Verification": {
+      "target": 8,
+      "issues": [
+        "cell contract: 22 of 390 required cells empty/invalid across 22 row(s) \u2014 e.g. row 38: 'Next action' placeholder '\u2014'"
+      ],
+      "fix": "close every HARD open claim on the Verification tab (FAIL / not-yet-proven / OPEN)",
+      "score": 9.4,
+      "status": "PASS",
+      "basis": "proof spine (brief + physics + realisation + holds; HARD-only; any HARD open caps at most 4) \u2014 HARD claims PASS 22/22; cell completeness+type contract 368/390 \u00b7 score = min over checks of 10 \u00d7 passed/checked",
+      "content_score": 9.4,
+      "content_basis": "proof spine (brief + physics + realisation + holds; HARD-only; any HARD open caps at most 4) \u2014 HARD claims PASS 22/22; cell completeness+type contract 368/390 \u00b7 score = min over checks of 10 \u00d7 passed/checked",
+      "checked": 412,
+      "passed": 390,
+      "components": [
+        {
+          "check": "HARD claims PASS",
+          "passed": 22,
+          "checked": 22
+        },
+        {
+          "check": "cell completeness+type contract",
+          "passed": 368,
+          "checked": 390
+        }
+      ]
+    },
+    "Decision Register": {
+      "target": 8,
+      "issues": [],
+      "fix": "render every state.decisionRegister entry exactly once, then rebuild",
+      "score": 10.0,
+      "status": "PASS",
+      "basis": "state-to-render row-count fidelity for the durable Decision Register \u2014 rendered decision-row count matches state.decisionRegister 9/9; cell completeness+type contract 72/72 \u00b7 score = min over checks of 10 \u00d7 passed/checked",
+      "content_score": 10.0,
+      "content_basis": "state-to-render row-count fidelity for the durable Decision Register \u2014 rendered decision-row count matches state.decisionRegister 9/9; cell completeness+type contract 72/72 \u00b7 score = min over checks of 10 \u00d7 passed/checked",
+      "checked": 81,
+      "passed": 81,
+      "components": [
+        {
+          "check": "rendered decision-row count matches state.decisionRegister",
+          "passed": 9,
+          "checked": 9
+        },
+        {
+          "check": "cell completeness+type contract",
+          "passed": 72,
+          "checked": 72
+        }
+      ]
+    },
+    "PCB": {
+      "target": 8,
+      "issues": [
+        "[MED] readiness: ENGINEERING DRAFT \u2014 the electronics pipeline's own release record marks this NOT_FABRICATION_READY \u2014 hygiene (DRC / routed / Gerbers) is clean, but clean hygiene describes an internally consistent board, not a releasable one; no fabrication package has been signed off; NOT_FABRICATION_READY=TRUE / supplier release remains OPEN",
+        "[MED] PCB tab is scored as an honest ENGINEERING DRAFT: required/implemented channels, fitness failure, placement residuals and NOT_FABRICATION_READY are disclosed; ship/fab-ready remains blocked",
+        "cell contract: 8 of 1036 required cells empty/invalid across 8 row(s) \u2014 e.g. row 120: 'Value' placeholder '\u2014'"
+      ],
+      "fix": "route DRC violations / unrouted nets / weak-tier or unresolved parts back to the atopile generator or the pipeline stage that produced them, then re-run the PCB pipeline",
+      "score": 9.0,
+      "status": "PASS",
+      "basis": "PCB two-axis honest scoring: HYGIENE (DRC/routed/Gerbers/pipeline.ok + the DRC/layer/PnP tables populated + a relative fab-pack path) x DESIGN-FITNESS (resolution-tier-weighted BoM + real KiCad designators + honest unresolved triage) \u2014 overall = min(hygiene, fitness), hard-capped to a FAIL band whenever the readiness verdict itself is FAIL \u2014 DRC clean (0 violations) 1/1; board fully routed (0 unrouted nets) 1/1; Gerber set present 1/1; pipeline's own ok verdict (built + routed + DRC-clean + gerbers) 1/1; draft stamp: NOT_FABRICATION_READY / forgeDraftOnly 1/1; supplier/HIL release evidence withheld 1/1; required channel counts disclosed 1/1; implemented channel counts disclosed 1/1; fitness verdict / failure reason disclosed 1/1; PCB-local ship flag is false 1/1; engineering draft evidence-quality ceiling (not fabrication-ready) 9.0/10; cell completeness+type contract 1028/1036 \u00b7 score = min over checks of 10 \u00d7 passed/checked",
+      "content_score": 9.0,
+      "content_basis": "PCB two-axis honest scoring: HYGIENE (DRC/routed/Gerbers/pipeline.ok + the DRC/layer/PnP tables populated + a relative fab-pack path) x DESIGN-FITNESS (resolution-tier-weighted BoM + real KiCad designators + honest unresolved triage) \u2014 overall = min(hygiene, fitness), hard-capped to a FAIL band whenever the readiness verdict itself is FAIL \u2014 DRC clean (0 violations) 1/1; board fully routed (0 unrouted nets) 1/1; Gerber set present 1/1; pipeline's own ok verdict (built + routed + DRC-clean + gerbers) 1/1; draft stamp: NOT_FABRICATION_READY / forgeDraftOnly 1/1; supplier/HIL release evidence withheld 1/1; required channel counts disclosed 1/1; implemented channel counts disclosed 1/1; fitness verdict / failure reason disclosed 1/1; PCB-local ship flag is false 1/1; engineering draft evidence-quality ceiling (not fabrication-ready) 9.0/10; cell completeness+type contract 1028/1036 \u00b7 score = min over checks of 10 \u00d7 passed/checked",
+      "checked": 1056,
+      "passed": 1047.0,
+      "components": [
+        {
+          "check": "DRC clean (0 violations)",
+          "passed": 1,
+          "checked": 1
+        },
+        {
+          "check": "board fully routed (0 unrouted nets)",
+          "passed": 1,
+          "checked": 1
+        },
+        {
+          "check": "Gerber set present",
+          "passed": 1,
+          "checked": 1
+        },
+        {
+          "check": "pipeline's own ok verdict (built + routed + DRC-clean + gerbers)",
+          "passed": 1,
+          "checked": 1
+        },
+        {
+          "check": "draft stamp: NOT_FABRICATION_READY / forgeDraftOnly",
+          "passed": 1,
+          "checked": 1
+        },
+        {
+          "check": "supplier/HIL release evidence withheld",
+          "passed": 1,
+          "checked": 1
+        },
+        {
+          "check": "required channel counts disclosed",
+          "passed": 1,
+          "checked": 1
+        },
+        {
+          "check": "implemented channel counts disclosed",
+          "passed": 1,
+          "checked": 1
+        },
+        {
+          "check": "fitness verdict / failure reason disclosed",
+          "passed": 1,
+          "checked": 1
+        },
+        {
+          "check": "PCB-local ship flag is false",
+          "passed": 1,
+          "checked": 1
+        },
+        {
+          "check": "engineering draft evidence-quality ceiling (not fabrication-ready)",
+          "passed": 9.0,
+          "checked": 10
+        },
+        {
+          "check": "cell completeness+type contract",
+          "passed": 1028,
+          "checked": 1036
+        }
+      ]
+    },
+    "Audit data": {
+      "target": 8,
+      "issues": [],
+      "fix": "",
+      "score": 10.0,
+      "status": "PASS",
+      "basis": "audit-operand register contract (every embedded operand carries its label + provenance; per-row Cell check formulas) \u2014 cell completeness+type contract 272/272 \u00b7 score = min over checks of 10 \u00d7 passed/checked",
+      "content_score": 10.0,
+      "content_basis": "audit-operand register contract (every embedded operand carries its label + provenance; per-row Cell check formulas) \u2014 cell completeness+type contract 272/272 \u00b7 score = min over checks of 10 \u00d7 passed/checked",
+      "checked": 272,
+      "passed": 272,
+      "components": [
+        {
+          "check": "cell completeness+type contract",
+          "passed": 272,
+          "checked": 272
+        }
+      ]
+    },
+    "Contents": {
+      "target": 8,
+      "issues": [],
+      "fix": "",
+      "score": 10.0,
+      "status": "PASS",
+      "basis": "index integrity (both directions) \u2014 index rows point at an existing tab 29/29; every sheet listed in the index 29/29; cell completeness+type contract 87/87 \u00b7 score = min over checks of 10 \u00d7 passed/checked",
+      "content_score": 10.0,
+      "content_basis": "index integrity (both directions) \u2014 index rows point at an existing tab 29/29; every sheet listed in the index 29/29; cell completeness+type contract 87/87 \u00b7 score = min over checks of 10 \u00d7 passed/checked",
+      "checked": 145,
+      "passed": 145,
+      "components": [
+        {
+          "check": "index rows point at an existing tab",
+          "passed": 29,
+          "checked": 29
+        },
+        {
+          "check": "every sheet listed in the index",
+          "passed": 29,
+          "checked": 29
+        },
+        {
+          "check": "cell completeness+type contract",
+          "passed": 87,
+          "checked": 87
+        }
+      ]
+    }
+  },
+  "summary": {
+    "min_tab": "Executive Summary",
+    "min_score": 4.0,
+    "scored_count": 30,
+    "fail_tabs": [
+      "Executive Summary",
+      "Calculations",
+      "Quality & Audit"
+    ],
+    "unscored_tabs": [],
+    "verified_out_of_scope_tabs": [
+      "Process schedules",
+      "Line & velocity",
+      "HVAC",
+      "Quantities",
+      "Inputs Master (M0)"
+    ],
+    "all_pass": false
+  }
+}

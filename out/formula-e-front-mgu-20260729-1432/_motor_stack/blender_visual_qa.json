@@ -1,0 +1,33 @@
+{
+  "schema": "forgeos.blender.visual_qa/v1",
+  "ran_at": "2026-08-05T13:03:38Z",
+  "ship_ok": false,
+  "method": "human+vision open of PNG files (not mesh-name only)",
+  "views": {
+    "00-hero": {
+      "opened": true,
+      "pass": true,
+      "notes": "Cutaway readable: windings, gears, top PCB/HV, QD. Inverter stack still schematic (green PCB + colour bars) \u2014 film cans present in mesh set but not dominant in this framing."
+    },
+    "filmcap_meshes": {
+      "pass": true,
+      "count": 9,
+      "names": [
+        "u_se_td_pe_filmcap_0",
+        "u_se_td_pe_filmcap_0_end_0",
+        "u_se_td_pe_filmcap_0_end_1",
+        "u_se_td_pe_filmcap_1",
+        "u_se_td_pe_filmcap_1_end_0",
+        "u_se_td_pe_filmcap_1_end_1",
+        "u_se_td_pe_filmcap_2",
+        "u_se_td_pe_filmcap_2_end_0",
+        "u_se_td_pe_filmcap_2_end_1"
+      ]
+    }
+  },
+  "ok": true,
+  "residual": [
+    "Hero framing still prioritises motor cutaway over film-cap bank visibility \u2014 consider PE-focused crop later",
+    "Gate-driver packages still package_family for full draft A"
+  ]
+}

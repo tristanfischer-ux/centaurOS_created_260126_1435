@@ -1,0 +1,112 @@
+{
+  "floor": 4,
+  "mean": 9.1,
+  "sections": [
+    {
+      "name": "headline",
+      "score": 9,
+      "defects": [],
+      "advisory": true
+    },
+    {
+      "name": "brief_compliance",
+      "score": 10,
+      "defects": [
+        "advisory: self-audit (LLM) scored this section 8/10 — 2 constraints left unverified (mass gross; role/regen pairing notes)"
+      ],
+      "advisory": false
+    },
+    {
+      "name": "bill_of_materials",
+      "score": 8,
+      "defects": [
+        "Pre-render chain total (~£47k) is on the low side for a race-spec 350 kW unitised FPK, though macros cover big-ticket lines and no wrong-class parts"
+      ],
+      "advisory": true
+    },
+    {
+      "name": "performance_card",
+      "score": 8,
+      "defects": [
+        "Unit cost ceiling blank (brief cost null) — honest but incomplete"
+      ],
+      "advisory": true
+    },
+    {
+      "name": "design_narrative",
+      "score": 9,
+      "defects": [],
+      "advisory": true
+    },
+    {
+      "name": "physics_fidelity",
+      "score": 10,
+      "defects": [
+        "advisory: the LLM critic's own physics opinion is 6/10 — an annotation only, it never scores (B3)",
+        "advisory: 8 uncorroborated critic note(s) render as advisory notes — visible, never scored",
+        "advisory: self-audit (LLM) scored this section 4/10 — PHYSICS_HIGH_ISSUES_2: physically implausible motor losses/efficiency claim"
+      ],
+      "advisory": false
+    },
+    {
+      "name": "drawing_gates",
+      "score": 10,
+      "defects": []
+    },
+    {
+      "name": "cost_sanity",
+      "score": 10,
+      "defects": []
+    },
+    {
+      "name": "physics_gates",
+      "score": 10,
+      "advisory": true,
+      "defects": []
+    },
+    {
+      "name": "tool_archetype",
+      "score": 10,
+      "defects": []
+    },
+    {
+      "name": "connectivity",
+      "score": 10,
+      "defects": [
+        "INV-4 Inverter Housing: missing_input — Electrical component with no upstream power supply.",
+        "INV-4 Inverter Housing: missing_output — Electrical component with no downstream load.",
+        "INV-5 Inverter Cover: missing_input — Electrical component with no upstream power supply.",
+        "INV-5 Inverter Cover: missing_output — Electrical component with no downstream load."
+      ]
+    },
+    {
+      "name": "unresolved_critic_highs",
+      "score": 10,
+      "defects": []
+    },
+    {
+      "name": "closure_honesty",
+      "score": 10,
+      "defects": [
+        "OPEN race holds disclosed: homologation=NOT_HOMOLOGATED; ship_ok=false; holds=hv_dc_fuse_word, connector_interlock_pin_word, ac_phase_busbar_pierce_word, shield_drain_bond_word, sic_traction_inverter_word, inverter_housing_word, inverter_cover_word, sic_power_module_stack_word, gate_driver_board_word, hv_dc_connector_word, lv_signal_connector_word, coolant_port_in_word, coolant_port_out_word, oem_inverter_control_board_word, can_fd_vehicle_interface_word, hv_interlock_interface_word, control_harness_set_word, voltage_sensor_word, traction_ipmsm_motor_generator_word, motor_outer_casing_word, motor_cover_word, motor_cooling_jacket_word, stator_laminations_word, stator_windings_word, reduction_gear_stage_tool_grounded_word, permanent_magnet_set_word, hollow_rotor_barrel_word, motor_shaft_word, front_bearing_word, rear_bearing_word, front_end_bell_word, traction_drive_housing_word, cassette_cover_word, hv_shield_cover_word, mounting_ear_set_word, nameplate_word, traction_motor_synth_word, traction_inverter_synth_word, hv_interlock_loop_word, phase_overcurrent_trip_word, inverter_desat_protection_word, coolant_flow_interlock_word, isolation_monitor_interface_word, coolant_hose_set_word, coolant_expansion_bottle_word"
+      ],
+      "advisory": false
+    },
+    {
+      "name": "release_readiness",
+      "score": 4,
+      "defects": [
+        "NOT_HOMOLOGATED: 45 open release hold(s) (hv_dc_fuse_word, connector_interlock_pin_word, ac_phase_busbar_pierce_word, shield_drain_bond_word, sic_traction_inverter_word, inverter_housing_word, inverter_cover_word, sic_power_module_stack_word, gate_driver_board_word, hv_dc_connector_word, lv_signal_connector_word, coolant_port_in_word, coolant_port_out_word, oem_inverter_control_board_word, can_fd_vehicle_interface_word, hv_interlock_interface_word, control_harness_set_word, voltage_sensor_word, traction_ipmsm_motor_generator_word, motor_outer_casing_word, motor_cover_word, motor_cooling_jacket_word, stator_laminations_word, stator_windings_word, reduction_gear_stage_tool_grounded_word, permanent_magnet_set_word, hollow_rotor_barrel_word, motor_shaft_word, front_bearing_word, rear_bearing_word, front_end_bell_word, traction_drive_housing_word, cassette_cover_word, hv_shield_cover_word, mounting_ear_set_word, nameplate_word, traction_motor_synth_word, traction_inverter_synth_word, hv_interlock_loop_word, phase_overcurrent_trip_word, inverter_desat_protection_word, coolant_flow_interlock_word, isolation_monitor_interface_word, coolant_hose_set_word, coolant_expansion_bottle_word)",
+        "NOT_FABRICATION_READY: bespoke PCB lacks supplier-Gerber and/or populated-board HIL release evidence",
+        "Render evidence is concept-only; it does not prove release CAD or homologated geometry"
+      ],
+      "advisory": false,
+      "qualityLoopActionable": false
+    }
+  ],
+  "allPass": false,
+  "deterministicFloor": 4,
+  "deterministicMean": 9.3,
+  "deterministicAllPass": false,
+  "iteration": 0
+}
