@@ -1,0 +1,170 @@
+{
+  "schema": "fe_front_council_v11/v1",
+  "ran_at": "2026-08-05T18:07:00.551683+00:00",
+  "input_verdict": "REJECT",
+  "council_verdict": "REJECT_UNTIL_UNIVERSAL_FIXES",
+  "mandate": [
+    "Port detailed GA into universal drawing path (not fe-front-* only)",
+    "Check in forge-truth seed for curated SiC gate-drive MPNs",
+    "Add requirementsBom identity sanitiser at source (anti CoolIT/MKP/spam)",
+    "Confirm PE densify is traction-sealed-only",
+    "Then re-prove scores + ship_ok false"
+  ],
+  "p0": [
+    {
+      "id": "V11-001",
+      "title": "Detailed GA generator is FE-front-only script",
+      "fix": "Port morphology-aware views into draw_ga.py (sealed traction path) or general detailed-ga module"
+    },
+    {
+      "id": "V11-003",
+      "title": "Gate-drive MPN DB seed is local forge-truth only",
+      "fix": "Add migration/seed script in-repo OR curated-pinout path that does not require ad-hoc DB rows"
+    }
+  ],
+  "p1": [],
+  "p2": [
+    {
+      "id": "V11-002",
+      "title": "PE filmcap densify is traction-path morphology"
+    },
+    {
+      "id": "V11-004",
+      "title": "BoM identity repair was twin state stamp"
+    },
+    {
+      "id": "V11-006",
+      "title": "Executive Summary floors at 4 (release_readiness)"
+    },
+    {
+      "id": "V11-007",
+      "title": "Quality & Audit floors at 4 (release_readiness)"
+    }
+  ],
+  "votes": [
+    {
+      "id": "V11-001",
+      "severity": "FATAL",
+      "tag": "FIX",
+      "area": "UNIVERSAL",
+      "title": "Detailed GA generator is FE-front-only script",
+      "where": "scripts/fe-front-draw-detailed-ga.py",
+      "why": "Universal rule: GA must come from draw_ga.py / form-meshes for all product classes, not a one-off FE script",
+      "evidence": "file exists as fe-front-* only",
+      "fix": "Port morphology-aware views into draw_ga.py (sealed traction path) or general detailed-ga module",
+      "universal_issue": true,
+      "seat_votes": {
+        "engineering_redteam": "AGREE_FIX",
+        "universality_auditor": "MUST_FIX",
+        "excel_auditor": "N/A",
+        "pcb_fab_skeptic": "N/A",
+        "visual_ga_skeptic": "MUST_FIX"
+      },
+      "council_priority": "P0"
+    },
+    {
+      "id": "V11-002",
+      "severity": "MED",
+      "tag": "REVIEW",
+      "area": "UNIVERSAL",
+      "title": "PE filmcap densify is traction-path morphology",
+      "where": "build_universal_scene.py PE film bank",
+      "why": "Acceptable if only under sealed traction pack path; verify not breaking other sealed instruments",
+      "evidence": "u_se_td_pe_filmcap densify under FPK PE drawer",
+      "fix": "Confirm call site is traction-only (u_se_td_*)",
+      "universal_issue": false,
+      "seat_votes": {
+        "engineering_redteam": "NOTE",
+        "universality_auditor": "SHOULD_FIX",
+        "excel_auditor": "N/A",
+        "pcb_fab_skeptic": "N/A",
+        "visual_ga_skeptic": "N/A"
+      },
+      "council_priority": "P2"
+    },
+    {
+      "id": "V11-003",
+      "severity": "HIGH",
+      "tag": "GAP",
+      "area": "UNIVERSAL",
+      "title": "Gate-drive MPN DB seed is local forge-truth only",
+      "where": "~/.forge-truth/forge-truth.db inserts",
+      "why": "Other machines / CI cannot resolve ACPL-336J without seed; repair is not portable",
+      "evidence": "v10 inserted rows via local sqlite",
+      "fix": "Add migration/seed script in-repo OR curated-pinout path that does not require ad-hoc DB rows",
+      "universal_issue": true,
+      "seat_votes": {
+        "engineering_redteam": "AGREE_FIX",
+        "universality_auditor": "MUST_FIX",
+        "excel_auditor": "N/A",
+        "pcb_fab_skeptic": "MUST_FIX",
+        "visual_ga_skeptic": "N/A"
+      },
+      "council_priority": "P0"
+    },
+    {
+      "id": "V11-004",
+      "severity": "MED",
+      "tag": "REVIEW",
+      "area": "UNIVERSAL",
+      "title": "BoM identity repair was twin state stamp",
+      "where": "state.json requirementsBom",
+      "why": "Source fix should live in requirements_bom densify/reconcile so next chain does not recreate CoolIT/MKP lies",
+      "evidence": "v9 repaired twin only",
+      "fix": "Add post-requirementsBoM sanitiser in chain or densify script",
+      "universal_issue": true,
+      "seat_votes": {
+        "engineering_redteam": "NOTE",
+        "universality_auditor": "SHOULD_FIX",
+        "excel_auditor": "N/A",
+        "pcb_fab_skeptic": "N/A",
+        "visual_ga_skeptic": "N/A"
+      },
+      "council_priority": "P2"
+    },
+    {
+      "id": "V11-006",
+      "severity": "GAP",
+      "tag": "GAP",
+      "area": "EXCEL",
+      "title": "Executive Summary floors at 4 (release_readiness)",
+      "where": "Executive Summary",
+      "why": "Honest floor while not homologated \u2014 not a greenwash fix target",
+      "evidence": [
+        "capped at the dossier FLOOR (4/10): the cover cannot claim a higher score than its weakest sheet \u2014 fix that sheet to raise this one"
+      ],
+      "fix": null,
+      "universal_issue": false,
+      "seat_votes": {
+        "engineering_redteam": "AGREE_GAP",
+        "universality_auditor": "OK",
+        "excel_auditor": "NOTE",
+        "pcb_fab_skeptic": "N/A",
+        "visual_ga_skeptic": "N/A"
+      },
+      "council_priority": "P2"
+    },
+    {
+      "id": "V11-007",
+      "severity": "GAP",
+      "tag": "GAP",
+      "area": "EXCEL",
+      "title": "Quality & Audit floors at 4 (release_readiness)",
+      "where": "Quality & Audit",
+      "why": "Honest floor while not homologated \u2014 not a greenwash fix target",
+      "evidence": [
+        "the dossier does NOT ship \u2014 dossier floor 4/10 (min of every deterministic section & non-mirror tab, the SAME number the verdict quotes); Verification/race evidence still must close before homologation"
+      ],
+      "fix": null,
+      "universal_issue": false,
+      "seat_votes": {
+        "engineering_redteam": "AGREE_GAP",
+        "universality_auditor": "OK",
+        "excel_auditor": "NOTE",
+        "pcb_fab_skeptic": "N/A",
+        "visual_ga_skeptic": "N/A"
+      },
+      "council_priority": "P2"
+    }
+  ]
+}

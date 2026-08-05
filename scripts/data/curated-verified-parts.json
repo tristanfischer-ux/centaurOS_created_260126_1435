@@ -1,0 +1,78 @@
+{
+  "schema": "forgeos.curated_verified_parts/v1",
+  "intent": "Portable seed for forge-truth.db so verified PCB identities resolve on any machine/CI without ad-hoc SQL. Role-keyed candidates in pcb-verified-candidates.ts still require a matching DB row.",
+  "parts": [
+    {
+      "part_number": "ACPL-336J-500E",
+      "manufacturer": "Broadcom",
+      "part_name": "Broadcom ACPL-336J gate-drive optocoupler",
+      "component_class": "electronic_ic",
+      "raw_excerpt": "2.5A isolated gate-drive optocoupler with DESAT; datasheet AV02-4391EN",
+      "roles": ["isolated_gate_driver", "sic_gate_driver"]
+    },
+    {
+      "part_number": "ACPL-336J",
+      "manufacturer": "Broadcom",
+      "part_name": "Broadcom ACPL-336J family",
+      "component_class": "electronic_ic",
+      "raw_excerpt": "SiC isolated gate driver family",
+      "roles": ["isolated_gate_driver"]
+    },
+    {
+      "part_number": "LM393DT",
+      "manufacturer": "STMicroelectronics",
+      "part_name": "ST LM393 dual comparator",
+      "component_class": "electronic_ic",
+      "raw_excerpt": "DESAT threshold comparator companion",
+      "roles": ["desat_protection"]
+    },
+    {
+      "part_number": "LM393DR",
+      "manufacturer": "Texas Instruments",
+      "part_name": "TI LM393 dual comparator",
+      "component_class": "electronic_ic",
+      "raw_excerpt": "DESAT threshold comparator companion",
+      "roles": ["desat_protection"]
+    },
+    {
+      "part_number": "SN65HVD255D",
+      "manufacturer": "Texas Instruments",
+      "part_name": "TI SN65HVD255 CAN transceiver",
+      "component_class": "electronic_ic",
+      "raw_excerpt": "CAN transceiver SOIC-8",
+      "roles": ["can_transceiver"]
+    },
+    {
+      "part_number": "OPA333AIDBVT",
+      "manufacturer": "Texas Instruments",
+      "part_name": "TI OPA333 zero-drift op-amp",
+      "component_class": "electronic_ic",
+      "raw_excerpt": "Phase current AFE",
+      "roles": ["current_sense_afe"]
+    },
+    {
+      "part_number": "TPS62160DSGR",
+      "manufacturer": "Texas Instruments",
+      "part_name": "TI TPS62160 buck converter",
+      "component_class": "electronic_ic",
+      "raw_excerpt": "LV buck 1A WSON-8",
+      "roles": ["lv_buck"]
+    },
+    {
+      "part_number": "TPS62160",
+      "manufacturer": "Texas Instruments",
+      "part_name": "TI TPS62160 family",
+      "component_class": "electronic_ic",
+      "raw_excerpt": "LV buck family",
+      "roles": ["lv_buck"]
+    },
+    {
+      "part_number": "B2B-XH-A",
+      "manufacturer": "JST",
+      "part_name": "JST XH 2P vertical header",
+      "component_class": "connector",
+      "raw_excerpt": "Gate-drive output connector",
+      "roles": ["gate_drive_output_connector"]
+    }
+  ]
+}

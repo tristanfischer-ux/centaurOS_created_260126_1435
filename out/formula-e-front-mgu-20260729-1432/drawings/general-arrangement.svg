@@ -16,7 +16,7 @@
   .axis { stroke: #888; stroke-dasharray: 4 3; stroke-width: 0.8; }
   .leader { stroke: #0a3d91; stroke-width: 0.9; }
 </style>
-<text x="40" y="36" class="t h">GENERAL ARRANGEMENT — Formula E front MGU (detailed)</text>
+<text x="40" y="36" class="t h">GENERAL ARRANGEMENT — sealed drive pack (detailed)</text>
 <text x="40" y="58" class="t s">Twin envelope 343×259×267 mm (W×D×H) · stator L_stk=130 mm · package motor Ø178×187 mm · as-placed from parts-manifest (57 parts)</text>
 <text x="40" y="76" class="t warn">NOT FOR CONSTRUCTION — morphology from Blender train; verify connectors against 00-hero / 08-ghost / 13-exploded</text>
 <ellipse cx="150" cy="529.06" rx="18" ry="249.06" class="cyl"/>
@@ -86,19 +86,14 @@
 <text x="1200" y="997" class="t xs"><tspan font-weight="700">X-154/162/224</tspan>  Housing / end bells — concentric cylinder family</text>
 <text x="1200" y="1015" class="t xs"><tspan font-weight="700">X-201/203/207</tspan>  Rotor / ring / sun — planetary nest</text>
 <rect x="40" y="1880" width="2320" height="90" fill="none" stroke="#111" stroke-width="1.5"/>
-<text x="55" y="1905" class="t s">FRACTIONAL FORGE · ForgeOS · FE Front detailed GA v10</text>
-<text x="55" y="1925" class="t xs">Drawing FF-GA-DET-001 · REV P1 · scale ~1:0.4 schematic · dimensions mm</text>
+<text x="55" y="1905" class="t s">FRACTIONAL FORGE · ForgeOS · detailed GA (universal sealed pack)</text>
+<text x="55" y="1925" class="t xs">Drawing GA-DET-001 · REV P1 · scale ~1:0.4 schematic · dimensions mm</text>
 <text x="55" y="1945" class="t xs">Source: parts-manifest placement_fp + twin design_envelope · ship_ok=false</text>
 <text x="55" y="1965" class="t warn">Dual torque bars unchanged: Path B 122.1 clears arch 104.1 · fails bind 125.2</text>
 
-<!-- standard title block fields for set consistency -->
-<text x="40" y="1980" font-family="Helvetica" font-size="9" font-weight="bold">DRAWING No.</text>
-<text x="130" y="1980" font-family="Helvetica" font-size="9.5">FF-GA-DET-001</text>
-<text x="40" y="1995" font-family="Helvetica" font-size="9" font-weight="bold">REV</text>
-<text x="130" y="1995" font-family="Helvetica" font-size="9.5">P1</text>
-<text x="200" y="1995" font-family="Helvetica" font-size="9" font-weight="bold">DATE</text>
-<text x="250" y="1995" font-family="Helvetica" font-size="9.5">2026-08-05</text>
-<text x="400" y="1995" font-family="Helvetica" font-size="9" font-weight="bold">SCALE</text>
-<text x="460" y="1995" font-family="Helvetica" font-size="9.5">1:5 (@ A1)</text>
+<text x="40" y="1990" font-family="Helvetica" font-size="9" font-weight="bold">REV</text>
+<text x="80" y="1990" font-family="Helvetica" font-size="9.5">P1</text>
+<text x="140" y="1990" font-family="Helvetica" font-size="9" font-weight="bold">DATE</text>
+<text x="190" y="1990" font-family="Helvetica" font-size="9.5">2026-08-05</text>
 
 </svg>

@@ -373,21 +373,21 @@
       "status": "PASS",
       "issues": [],
       "fix": "drop orphan terms / define the missing ones in _GLOSSARY",
-      "basis": "glossary contract (every term defined + no orphan terms) \u2014 every rendered term carries a definition 36/36; terms actually used somewhere in the workbook 36/36 \u00b7 score = min over checks of 10 \u00d7 passed/checked",
+      "basis": "glossary contract (every term defined + no orphan terms) \u2014 every rendered term carries a definition 35/35; terms actually used somewhere in the workbook 35/35 \u00b7 score = min over checks of 10 \u00d7 passed/checked",
       "content_score": 10.0,
-      "content_basis": "glossary contract (every term defined + no orphan terms) \u2014 every rendered term carries a definition 36/36; terms actually used somewhere in the workbook 36/36 \u00b7 score = min over checks of 10 \u00d7 passed/checked",
-      "checked": 72,
-      "passed": 72,
+      "content_basis": "glossary contract (every term defined + no orphan terms) \u2014 every rendered term carries a definition 35/35; terms actually used somewhere in the workbook 35/35 \u00b7 score = min over checks of 10 \u00d7 passed/checked",
+      "checked": 70,
+      "passed": 70,
       "components": [
         {
           "check": "every rendered term carries a definition",
-          "passed": 36,
-          "checked": 36
+          "passed": 35,
+          "checked": 35
         },
         {
           "check": "terms actually used somewhere in the workbook",
-          "passed": 36,
-          "checked": 36
+          "passed": 35,
+          "checked": 35
         }
       ]
     },

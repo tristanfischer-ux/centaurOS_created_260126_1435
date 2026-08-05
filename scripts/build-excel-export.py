@@ -31247,6 +31247,28 @@ def build(run_dir: str, out_path: str) -> dict:
     state = load_json(os.path.join(run_dir, "state.json"))
     if state is None:
         raise SystemExit(f"No state.json in {run_dir}")
+    # UNIVERSAL identity hygiene (v11 council): strip false catalogue MPNs,
+    # rack-CDU brands, DN8/2×6 spam, and motor package double-count before any
+    # BoM/cost/Excel surface reads requirementsBom.
+    try:
+        _san_path = os.path.join(os.path.dirname(__file__), "lib", "requirements_bom_identity_sanitiser.py")
+        if os.path.isfile(_san_path):
+            import importlib.util as _ilu
+            _spec = _ilu.spec_from_file_location("requirements_bom_identity_sanitiser", _san_path)
+            _mod = _ilu.module_from_spec(_spec)
+            assert _spec.loader is not None
+            _spec.loader.exec_module(_mod)
+            _st = _mod.sanitise_requirements_bom(state)
+            if int(_st.get("changed") or 0) > 0:
+                print(f"  · requirementsBom identity sanitiser: { _st }")
+                try:
+                    with open(os.path.join(run_dir, "state.json"), "w", encoding="utf-8") as _fh:
+                        json.dump(state, _fh, indent=2, default=str)
+                        _fh.write("\n")
+                except OSError:
+                    pass
+    except Exception as _san_exc:  # noqa: BLE001 — never block export on sanitiser
+        print(f"  · requirementsBom identity sanitiser skipped: {_san_exc}")
     # INTENT (P6 / cold-v17): restore state.pcb from sidecar when a nested chain
     # race wiped it — before Verification / PCB tab / Gate-38 mirrors read state.
     if _ensure_pcb_from_sidecar(state, run_dir):

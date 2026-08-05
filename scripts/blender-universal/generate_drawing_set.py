@@ -799,6 +799,29 @@ def generate_drawing_set(state_path: str | Path,
     system = _group(SYSTEM_DRAWINGS)
     schedules = _group(SCHEDULE_DRAWINGS)
 
+    # UNIVERSAL (v11 council): morphology-aware detailed GA for sealed drive packs.
+    # Runs after draw_ga when parts-manifest shows concentric motor + PE; no-ops
+    # otherwise. Replaces thin GA with multi-sheet detailed set (same PNG path for
+    # general-arrangement so the register stays single-keyed).
+    try:
+        _det = _THIS / "draw_ga_detailed.py"
+        if _det.is_file() and (out_dir / "parts-manifest.json").is_file():
+            _dp = subprocess.run(
+                [_venv_python(), str(_det), str(out_dir)],
+                capture_output=True, text=True, timeout=120,
+            )
+            if _dp.returncode == 0 and "wrote" in (_dp.stdout or ""):
+                log.append("  draw_ga_detailed.py: sealed-drive detailed GA applied")
+            elif _dp.returncode == 0:
+                log.append("  draw_ga_detailed.py: morphology gate skip")
+            else:
+                log.append(
+                    f"  draw_ga_detailed.py: rc={_dp.returncode} "
+                    f"{(_dp.stderr or _dp.stdout or '')[-120:]}"
+                )
+    except Exception as _det_exc:  # noqa: BLE001
+        log.append(f"  draw_ga_detailed.py: skipped ({type(_det_exc).__name__})")
+
     # T-20 / T-25 — conditional detail sheets. Gate on contract signals via each
     # script's should_emit(state); skip silently when not applicable. These need
     # ONLY state.json (no CAD artifacts) — same philosophy as the BFD.

@@ -1,0 +1,523 @@
+{
+  "schema": "fe_front_adversarial_serial_v11/v1",
+  "verdict": "REJECT",
+  "counts": {
+    "FATAL": 1,
+    "MED": 2,
+    "HIGH": 1,
+    "PASS": 19,
+    "GAP": 2
+  },
+  "n_findings": 25,
+  "findings": [
+    {
+      "id": "V11-001",
+      "severity": "FATAL",
+      "tag": "FIX",
+      "area": "UNIVERSAL",
+      "title": "Detailed GA generator is FE-front-only script",
+      "where": "scripts/fe-front-draw-detailed-ga.py",
+      "why": "Universal rule: GA must come from draw_ga.py / form-meshes for all product classes, not a one-off FE script",
+      "evidence": "file exists as fe-front-* only",
+      "fix": "Port morphology-aware views into draw_ga.py (sealed traction path) or general detailed-ga module",
+      "universal_issue": true
+    },
+    {
+      "id": "V11-002",
+      "severity": "MED",
+      "tag": "REVIEW",
+      "area": "UNIVERSAL",
+      "title": "PE filmcap densify is traction-path morphology",
+      "where": "build_universal_scene.py PE film bank",
+      "why": "Acceptable if only under sealed traction pack path; verify not breaking other sealed instruments",
+      "evidence": "u_se_td_pe_filmcap densify under FPK PE drawer",
+      "fix": "Confirm call site is traction-only (u_se_td_*)",
+      "universal_issue": false
+    },
+    {
+      "id": "V11-003",
+      "severity": "HIGH",
+      "tag": "GAP",
+      "area": "UNIVERSAL",
+      "title": "Gate-drive MPN DB seed is local forge-truth only",
+      "where": "~/.forge-truth/forge-truth.db inserts",
+      "why": "Other machines / CI cannot resolve ACPL-336J without seed; repair is not portable",
+      "evidence": "v10 inserted rows via local sqlite",
+      "fix": "Add migration/seed script in-repo OR curated-pinout path that does not require ad-hoc DB rows",
+      "universal_issue": true
+    },
+    {
+      "id": "V11-004",
+      "severity": "MED",
+      "tag": "REVIEW",
+      "area": "UNIVERSAL",
+      "title": "BoM identity repair was twin state stamp",
+      "where": "state.json requirementsBom",
+      "why": "Source fix should live in requirements_bom densify/reconcile so next chain does not recreate CoolIT/MKP lies",
+      "evidence": "v9 repaired twin only",
+      "fix": "Add post-requirementsBoM sanitiser in chain or densify script",
+      "universal_issue": true
+    },
+    {
+      "id": "V11-005",
+      "severity": "PASS",
+      "tag": "OK",
+      "area": "EXCEL",
+      "title": "No #VALUE/#REF/#DIV formula errors in scan",
+      "where": "dossier.xlsx",
+      "why": "",
+      "evidence": "0 errors in 30 sheets",
+      "fix": null,
+      "universal_issue": false
+    },
+    {
+      "id": "V11-006",
+      "severity": "GAP",
+      "tag": "GAP",
+      "area": "EXCEL",
+      "title": "Executive Summary floors at 4 (release_readiness)",
+      "where": "Executive Summary",
+      "why": "Honest floor while not homologated \u2014 not a greenwash fix target",
+      "evidence": [
+        "capped at the dossier FLOOR (4/10): the cover cannot claim a higher score than its weakest sheet \u2014 fix that sheet to raise this one"
+      ],
+      "fix": null,
+      "universal_issue": false
+    },
+    {
+      "id": "V11-007",
+      "severity": "GAP",
+      "tag": "GAP",
+      "area": "EXCEL",
+      "title": "Quality & Audit floors at 4 (release_readiness)",
+      "where": "Quality & Audit",
+      "why": "Honest floor while not homologated \u2014 not a greenwash fix target",
+      "evidence": [
+        "the dossier does NOT ship \u2014 dossier floor 4/10 (min of every deterministic section & non-mirror tab, the SAME number the verdict quotes); Verification/race evidence still must close before homologation"
+      ],
+      "fix": null,
+      "universal_issue": false
+    },
+    {
+      "id": "V11-008",
+      "severity": "PASS",
+      "tag": "OK",
+      "area": "EXCEL",
+      "title": "Dual torque bars present",
+      "where": "Calculations!T_arch/T_bind",
+      "why": "",
+      "evidence": "present",
+      "fix": null,
+      "universal_issue": false
+    },
+    {
+      "id": "V11-009",
+      "severity": "PASS",
+      "tag": "OK",
+      "area": "BOM",
+      "title": "SUB-COMPONENT zero-cost lines present (11)",
+      "where": "requirementsBom",
+      "why": "",
+      "evidence": "n=11",
+      "fix": null,
+      "universal_issue": false
+    },
+    {
+      "id": "V11-010",
+      "severity": "PASS",
+      "tag": "OK",
+      "area": "PCB",
+      "title": "Draft A fitness 9.1 package_family=0",
+      "where": "pcb_grade_card",
+      "why": "",
+      "evidence": {
+        "mpn_package": 26,
+        "mpn_symbol_footprint": 29,
+        "mpn_package_only": 5
+      },
+      "fix": null,
+      "universal_issue": false
+    },
+    {
+      "id": "V11-011",
+      "severity": "PASS",
+      "tag": "OK",
+      "area": "IMAGE",
+      "title": "00-hero.png present (14399 KB)",
+      "where": "out/formula-e-front-mgu-20260729-1432/00-hero.png",
+      "why": "",
+      "evidence": "size=14399040",
+      "fix": null,
+      "universal_issue": false
+    },
+    {
+      "id": "V11-012",
+      "severity": "PASS",
+      "tag": "OK",
+      "area": "IMAGE",
+      "title": "08-ghost present (14875 KB)",
+      "where": "out/formula-e-front-mgu-20260729-1432/08-product-ghost-shell.png",
+      "why": "",
+      "evidence": "size=14875206",
+      "fix": null,
+      "universal_issue": false
+    },
+    {
+      "id": "V11-013",
+      "severity": "PASS",
+      "tag": "OK",
+      "area": "IMAGE",
+      "title": "13-exploded present (14267 KB)",
+      "where": "out/formula-e-front-mgu-20260729-1432/13-product-exploded.png",
+      "why": "",
+      "evidence": "size=14267968",
+      "fix": null,
+      "universal_issue": false
+    },
+    {
+      "id": "V11-014",
+      "severity": "PASS",
+      "tag": "OK",
+      "area": "IMAGE",
+      "title": "04-exterior present (14371 KB)",
+      "where": "out/formula-e-front-mgu-20260729-1432/04-product-exterior.png",
+      "why": "",
+      "evidence": "size=14371877",
+      "fix": null,
+      "universal_issue": false
+    },
+    {
+      "id": "V11-015",
+      "severity": "PASS",
+      "tag": "OK",
+      "area": "IMAGE",
+      "title": "ga present (280 KB)",
+      "where": "out/formula-e-front-mgu-20260729-1432/drawings/general-arrangement.png",
+      "why": "",
+      "evidence": "size=280800",
+      "fix": null,
+      "universal_issue": false
+    },
+    {
+      "id": "V11-016",
+      "severity": "PASS",
+      "tag": "OK",
+      "area": "IMAGE",
+      "title": "ga-if present (145 KB)",
+      "where": "out/formula-e-front-mgu-20260729-1432/drawings/ga-detail-interfaces.png",
+      "why": "",
+      "evidence": "size=145432",
+      "fix": null,
+      "universal_issue": false
+    },
+    {
+      "id": "V11-017",
+      "severity": "PASS",
+      "tag": "OK",
+      "area": "IMAGE",
+      "title": "ga-sec present (224 KB)",
+      "where": "out/formula-e-front-mgu-20260729-1432/drawings/ga-detail-section.png",
+      "why": "",
+      "evidence": "size=224404",
+      "fix": null,
+      "universal_issue": false
+    },
+    {
+      "id": "V11-018",
+      "severity": "PASS",
+      "tag": "OK",
+      "area": "BLENDER",
+      "title": "PE filmcap meshes present (n=54)",
+      "where": "form-meshes.json",
+      "why": "",
+      "evidence": "n=54",
+      "fix": null,
+      "universal_issue": false
+    },
+    {
+      "id": "V11-019",
+      "severity": "PASS",
+      "tag": "OK",
+      "area": "GA",
+      "title": "Detailed GA content markers present",
+      "where": "general-arrangement.svg",
+      "why": "",
+      "evidence": "L_stk/film-cap/DET markers",
+      "fix": null,
+      "universal_issue": false
+    },
+    {
+      "id": "V11-020",
+      "severity": "PASS",
+      "tag": "OK",
+      "area": "DETERMINISTIC",
+      "title": "0 deterministic FAILs",
+      "where": "twin",
+      "why": "",
+      "evidence": "",
+      "fix": null,
+      "universal_issue": false
+    },
+    {
+      "id": "V11-021",
+      "severity": "PASS",
+      "tag": "OK",
+      "area": "PROVENANCE",
+      "title": "sourceless=0",
+      "where": "audit_provenance",
+      "why": "",
+      "evidence": {
+        "total": 108,
+        "roots": 41,
+        "traced": 67,
+        "structured": 58,
+        "sourceless": 0,
+        "traceable_fraction": 1.0,
+        "high": 0,
+        "med": 0,
+        "verdict": "PASS",
+        "ship_ok": true
+      },
+      "fix": null,
+      "universal_issue": false
+    },
+    {
+      "id": "V11-022",
+      "severity": "PASS",
+      "tag": "OK",
+      "area": "CALC_COVERAGE",
+      "title": "100%",
+      "where": "",
+      "why": "",
+      "evidence": "",
+      "fix": null,
+      "universal_issue": false
+    },
+    {
+      "id": "V11-023",
+      "severity": "PASS",
+      "tag": "OK",
+      "area": "MULTIPHYSICS",
+      "title": "summary present",
+      "where": "out/formula-e-front-mgu-20260729-1432/20260805-0907-V1.296-formula-e-front-mgu-design-pack/em-honesty/multiphysics_run_summary.json",
+      "why": "",
+      "evidence": [
+        "ran_at",
+        "ship_ok",
+        "headline",
+        "r1",
+        "r2_femm",
+        "r2_fd",
+        "r3",
+        "r4_dense",
+        "r4_pack",
+        "r5",
+        "r6",
+        "ross"
+      ],
+      "fix": null,
+      "universal_issue": false
+    },
+    {
+      "id": "V11-024",
+      "severity": "PASS",
+      "tag": "OK",
+      "area": "SHIP",
+      "title": "ship_ok false",
+      "where": "state",
+      "why": "",
+      "evidence": "",
+      "fix": null,
+      "universal_issue": false
+    },
+    {
+      "id": "V11-025",
+      "severity": "PASS",
+      "tag": "OK",
+      "area": "EM",
+      "title": "Dual bars arch=104.098914 bind=125.214912 PathB=122.1",
+      "where": "quantities",
+      "why": "",
+      "evidence": "",
+      "fix": null,
+      "universal_issue": false
+    }
+  ],
+  "sheet_stats_summary": {
+    "Executive Summary": {
+      "formulas": 20,
+      "errors": 0,
+      "filled": 164
+    },
+    "Contents": {
+      "formulas": 31,
+      "errors": 0,
+      "filled": 127
+    },
+    "Inputs & Assumptions": {
+      "formulas": 47,
+      "errors": 0,
+      "filled": 339
+    },
+    "Equipment & Dimensions Register": {
+      "formulas": 286,
+      "errors": 0,
+      "filled": 875
+    },
+    "Overview": {
+      "formulas": 47,
+      "errors": 0,
+      "filled": 193
+    },
+    "Renders": {
+      "formulas": 1,
+      "errors": 0,
+      "filled": 26
+    },
+    "Cost waterfall": {
+      "formulas": 42,
+      "errors": 0,
+      "filled": 118
+    },
+    "Financial model": {
+      "formulas": 557,
+      "errors": 0,
+      "filled": 823
+    },
+    "Bill of Materials (Ledger)": {
+      "formulas": 265,
+      "errors": 0,
+      "filled": 853
+    },
+    "Brief": {
+      "formulas": 11,
+      "errors": 0,
+      "filled": 148
+    },
+    "Verification": {
+      "formulas": 97,
+      "errors": 0,
+      "filled": 480
+    },
+    "Design basis": {
+      "formulas": 39,
+      "errors": 0,
+      "filled": 141
+    },
+    "Engineering Analysis": {
+      "formulas": 146,
+      "errors": 0,
+      "filled": 529
+    },
+    "Drawings": {
+      "formulas": 18,
+      "errors": 0,
+      "filled": 122
+    },
+    "GA \u2014 General Arrangement": {
+      "formulas": 1,
+      "errors": 0,
+      "filled": 5
+    },
+    "Electrical": {
+      "formulas": 1,
+      "errors": 0,
+      "filled": 7
+    },
+    "PCB": {
+      "formulas": 269,
+      "errors": 0,
+      "filled": 1715
+    },
+    "Line & velocity": {
+      "formulas": 122,
+      "errors": 0,
+      "filled": 412
+    },
+    "Assembly sequence": {
+      "formulas": 7,
+      "errors": 0,
+      "filled": 85
+    },
+    "Suppliers": {
+      "formulas": 63,
+      "errors": 0,
+      "filled": 369
+    },
+    "Audit data": {
+      "formulas": 75,
+      "errors": 0,
+      "filled": 418
+    },
+    "Risk & Regulatory": {
+      "formulas": 20,
+      "errors": 0,
+      "filled": 145
+    },
+    "Holds & exclusions": {
+      "formulas": 3,
+      "errors": 0,
+      "filled": 29
+    },
+    "Decision Register": {
+      "formulas": 10,
+      "errors": 0,
+      "filled": 98
+    },
+    "Questions for the customer": {
+      "formulas": 16,
+      "errors": 0,
+      "filled": 101
+    },
+    "Quality & Audit": {
+      "formulas": 186,
+      "errors": 0,
+      "filled": 758
+    },
+    "\u26a0 Checks": {
+      "formulas": 543,
+      "errors": 0,
+      "filled": 1865
+    },
+    "Connection trace": {
+      "formulas": 125,
+      "errors": 0,
+      "filled": 342
+    },
+    "Calculations": {
+      "formulas": 519,
+      "errors": 0,
+      "filled": 2229
+    },
+    "Part names": {
+      "formulas": 107,
+      "errors": 0,
+      "filled": 328
+    }
+  },
+  "excel_errors": [],
+  "tab_summary": {
+    "min_tab": "Executive Summary",
+    "min_score": 4.0,
+    "scored_count": 30,
+    "fail_tabs": [
+      "Executive Summary",
+      "Quality & Audit"
+    ],
+    "unscored_tabs": [],
+    "verified_out_of_scope_tabs": [
+      "Process schedules",
+      "Line & velocity",
+      "HVAC",
+      "Quantities",
+      "Inputs Master (M0)"
+    ],
+    "all_pass": false
+  },
+  "pcb_tiers": {
+    "mpn_package": 26,
+    "mpn_symbol_footprint": 29,
+    "mpn_package_only": 5
+  },
+  "pcb_draft": "A"
+}

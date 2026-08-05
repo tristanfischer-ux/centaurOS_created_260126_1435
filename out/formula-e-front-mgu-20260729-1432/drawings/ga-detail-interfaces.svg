@@ -44,15 +44,4 @@
 <text x="900" y="264" class="t xs">IF-LV · 12/24 V LV · Buck rails · 3× LV buck</text>
 <text x="900" y="282" class="t xs">IF-SHAFT · Halfshaft outputs · Gear nest · L/R flanges</text>
 <text x="40" y="1360" class="t warn">ICD XYZ not invented — partner ask remains open (Bar B)</text>
-
-<!-- standard title block fields for set consistency -->
-<text x="40" y="1980" font-family="Helvetica" font-size="9" font-weight="bold">DRAWING No.</text>
-<text x="130" y="1980" font-family="Helvetica" font-size="9.5">FF-GA-DET-001</text>
-<text x="40" y="1995" font-family="Helvetica" font-size="9" font-weight="bold">REV</text>
-<text x="130" y="1995" font-family="Helvetica" font-size="9.5">P1</text>
-<text x="200" y="1995" font-family="Helvetica" font-size="9" font-weight="bold">DATE</text>
-<text x="250" y="1995" font-family="Helvetica" font-size="9.5">2026-08-05</text>
-<text x="400" y="1995" font-family="Helvetica" font-size="9" font-weight="bold">SCALE</text>
-<text x="460" y="1995" font-family="Helvetica" font-size="9.5">1:5 (@ A1)</text>
-
 </svg>
