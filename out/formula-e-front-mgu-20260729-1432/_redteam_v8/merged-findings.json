@@ -1,0 +1,165 @@
+{
+  "schema": "fe_front_redteam_v8_delta/v1",
+  "ran_at": "2026-08-05T14:42:32.156778+00:00",
+  "scope": "deltas only since adversarial v7 (provenance stamp, excel rebuild, pack V1.298, covering note, PCB A- confirmation)",
+  "out_of_scope": [
+    "Re-litigate Path B dual torque bars as single number",
+    "Mint ship_ok",
+    "Clear architecture planetary/EM blockers without geometry decision"
+  ],
+  "verdict": "ACCEPT_DELTAS_WITH_GAPS",
+  "counts": {
+    "FATAL": 0,
+    "HIGH": 0,
+    "PASS": 7,
+    "GAP": 2,
+    "MED": 1
+  },
+  "findings": [
+    {
+      "id": "D1",
+      "severity": "PASS",
+      "tag": "OK",
+      "area": "PROVENANCE",
+      "claim": "sourceless=0 / calc-coverage 100%",
+      "evidence": {
+        "provenance": {
+          "total": 108,
+          "roots": 41,
+          "traced": 67,
+          "structured": 58,
+          "sourceless": 0,
+          "traceable_fraction": 1.0,
+          "high": 0,
+          "med": 0,
+          "verdict": "PASS",
+          "ship_ok": true
+        },
+        "calc_coverage_findings": 0
+      }
+    },
+    {
+      "id": "D2",
+      "severity": "PASS",
+      "tag": "OK",
+      "area": "EXCEL",
+      "claim": "Calculations 9.8 PASS",
+      "evidence": {
+        "score": 9.8,
+        "issues": [
+          "1 worked calc(s) never resolve to a live/disclosed result \u2014 e.g. lamination_grade  [static \u2014 no auto-check]"
+        ]
+      }
+    },
+    {
+      "id": "D3",
+      "severity": "PASS",
+      "tag": "OK",
+      "area": "SHIP_DISCIPLINE",
+      "claim": "ship_ok false / floor held by release_readiness",
+      "evidence": {
+        "floor": 4,
+        "release": [
+          {
+            "name": "release_readiness",
+            "score": 4,
+            "defects": [
+              "NOT_HOMOLOGATED: 45 open release hold(s) (hv_dc_fuse_word, connector_interlock_pin_word, ac_phase_busbar_pierce_word, shield_drain_bond_word, sic_traction_inverter_word, inverter_housing_word, inverter_cover_word, sic_power_module_stack_word, gate_driver_board_word, hv_dc_connector_word, lv_signal_connector_word, coolant_port_in_word, coolant_port_out_word, oem_inverter_control_board_word, can_fd_vehicle_interface_word, hv_interlock_interface_word, control_harness_set_word, voltage_sensor_word, traction_ipmsm_motor_generator_word, motor_outer_casing_word, motor_cover_word, motor_cooling_jacket_word, stator_laminations_word, stator_windings_word, reduction_gear_stage_tool_grounded_word, permanent_magnet_set_word, hollow_rotor_barrel_word, motor_shaft_word, front_bearing_word, rear_bearing_word, front_end_bell_word, traction_drive_housing_word, cassette_cover_word, hv_shield_cover_word, mounting_ear_set_word, nameplate_word, traction_motor_synth_word, traction_inverter_synth_word, hv_interlock_loop_word, phase_overcurrent_trip_word, inverter_desat_protection_word, coolant_flow_interlock_word, isolation_monitor_interface_word, coolant_hose_set_word, coolant_expansion_bottle_word)",
+              "NOT_FABRICATION_READY: bespoke PCB lacks supplier-Gerber and/or populated-board HIL release evidence",
+              "Render evidence is concept-only; it does not prove release CAD or homologated geometry"
+            ],
+            "advisory": false,
+            "qualityLoopActionable": false
+          }
+        ]
+      }
+    },
+    {
+      "id": "D4",
+      "severity": "PASS",
+      "tag": "OK",
+      "area": "PCB",
+      "claim": "draft A- fitness 8.01 fab PROTOTYPE_PACKAGE",
+      "evidence": {
+        "draft": "A-",
+        "fab": "PROTOTYPE_PACKAGE",
+        "still_open": [
+          "gate-driver/desat channels still package_family (isolated SiC drivers need dedicated identities for draft A)",
+          "firmware HIL absent"
+        ]
+      }
+    },
+    {
+      "id": "D5",
+      "severity": "PASS",
+      "tag": "OK",
+      "area": "COVERING_NOTE",
+      "claim": "V1.298 covering note carries dual bars + ship_ok false"
+    },
+    {
+      "id": "D6",
+      "severity": "PASS",
+      "tag": "OK",
+      "area": "PACK",
+      "claim": "pack 20260805-1441-V1.298-formula-e-front-mgu-design-pack.zip present",
+      "evidence": {
+        "bytes": 92052089
+      }
+    },
+    {
+      "id": "D7",
+      "severity": "GAP",
+      "tag": "GAP",
+      "area": "ARCHITECTURE",
+      "claim": "Architecture blockers OPEN (planetary vs bore / dual torque bars) \u2014 not closed this round",
+      "evidence": "ship_ok false by design; Path B 122.1 clears 104.1 fails 125.2",
+      "fix": null
+    },
+    {
+      "id": "D8",
+      "severity": "GAP",
+      "tag": "GAP",
+      "area": "BAR_B",
+      "claim": "Bar B partner artefacts still required (dyno, Gerbers, ICD)",
+      "evidence": "release_readiness score 4"
+    },
+    {
+      "id": "D9",
+      "severity": "MED",
+      "tag": "REVIEW",
+      "area": "EXCEL_LAMINATION",
+      "claim": "Calculations notes 1 worked calc never resolves (lamination_grade static)",
+      "evidence": [
+        "1 worked calc(s) never resolve to a live/disclosed result \u2014 e.g. lamination_grade  [static \u2014 no auto-check]"
+      ],
+      "fix": "Optional next round \u2014 static disclosure is acceptable for grade label"
+    },
+    {
+      "id": "D10",
+      "severity": "PASS",
+      "tag": "OK",
+      "area": "HONESTY",
+      "claim": "Covering states not homologated"
+    }
+  ],
+  "evidence_snapshot": {
+    "provenance": {
+      "total": 108,
+      "roots": 41,
+      "traced": 67,
+      "structured": 58,
+      "sourceless": 0,
+      "traceable_fraction": 1.0,
+      "high": 0,
+      "med": 0,
+      "verdict": "PASS",
+      "ship_ok": true
+    },
+    "calculations_score": 9.8,
+    "quality_floor": 4,
+    "pcb_fitness": 8.01,
+    "pcb_draft": "A-",
+    "pcb_fab": "PROTOTYPE_PACKAGE",
+    "pack": "20260805-1441-V1.298-formula-e-front-mgu-design-pack"
+  }
+}

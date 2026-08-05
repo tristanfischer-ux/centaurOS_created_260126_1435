@@ -1,0 +1,64 @@
+{
+  "schema": "fe_front_polish_round_status/v1",
+  "ran_at": "2026-08-05T14:43:37.937690+00:00",
+  "ship_ok": false,
+  "open_items_closed": {
+    "calc_prov": true,
+    "pack_298": true,
+    "adv2": true
+  },
+  "provenance": {
+    "total": 108,
+    "roots": 41,
+    "traced": 67,
+    "structured": 58,
+    "sourceless": 0,
+    "traceable_fraction": 1.0,
+    "high": 0,
+    "med": 0,
+    "verdict": "PASS",
+    "ship_ok": true
+  },
+  "calc_coverage_hidden": [],
+  "tab_scores": {
+    "Calculations": 9.8,
+    "Executive Summary": 4.0,
+    "Quality & Audit": 4.0,
+    "Verification": 9.4,
+    "Overview": 10,
+    "fail_tabs": [
+      "Executive Summary",
+      "Quality & Audit"
+    ],
+    "min_score": 4.0
+  },
+  "quality_floor": 4,
+  "quality_mean": 9.1,
+  "pcb": {
+    "fitness_score": 8.01,
+    "draft": "A-",
+    "fab": "PROTOTYPE_PACKAGE",
+    "composite_label": "PCB draft-review A- \u00b7 PROTOTYPE fab package \u00b7 NOT supplier-released"
+  },
+  "pack_v1298": {
+    "folder": "20260805-1441-V1.298-formula-e-front-mgu-design-pack",
+    "zip": "20260805-1441-V1.298-formula-e-front-mgu-design-pack.zip",
+    "zip_bytes": 63091,
+    "zip_note": "slim git zip (JSON/MD); full-res renders on twin pack folder"
+  },
+  "adversarial_v8": {
+    "verdict": "ACCEPT_DELTAS_WITH_GAPS",
+    "counts": {
+      "FATAL": 0,
+      "HIGH": 0,
+      "PASS": 7,
+      "GAP": 2,
+      "MED": 1
+    }
+  },
+  "honesty": {
+    "dual_torque_bars": "Path B ~122.1 clears ~104.1 fails ~125.2",
+    "ship_ok": false,
+    "floor_reason": "release_readiness NOT_HOMOLOGATED (honest)"
+  }
+}

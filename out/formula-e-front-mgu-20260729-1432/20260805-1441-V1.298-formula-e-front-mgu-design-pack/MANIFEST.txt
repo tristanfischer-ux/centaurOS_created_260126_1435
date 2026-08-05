@@ -1,0 +1,7 @@
+V1.298 open-items pack (git zip is slim — full-res PNGs on twin folder)
+- Provenance sourceless 0 · calc-coverage 100% · Calculations tab 9.8/10
+- Dual torque bars · ship_ok=false · release_readiness floor 4 (honest)
+- PCB draft A- fitness 8.01 · PROTOTYPE_PACKAGE
+- Multiphysics R1–R6 + dense CCX + ROSS (screens, JSON in zip)
+- Full-res cycle-3 polish renders: twin root + pack folder renders/
+- Adversarial v8: ACCEPT_DELTAS_WITH_GAPS (0 FATAL)

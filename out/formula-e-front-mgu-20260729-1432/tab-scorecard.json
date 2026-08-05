@@ -82,24 +82,23 @@
       ]
     },
     "Calculations": {
-      "score": 6,
+      "score": 9.8,
       "target": 8,
-      "status": "FAIL",
+      "status": "PASS",
       "issues": [
-        "[MED] 10 of 108 quantities have no recorded origin (only 91% trace to the brief via a tool/formula) \u2014 numbers appear from nowhere",
-        "[MED] 15 of 87 numbers (17%) have NO calculation shown in Excel \u2014 only a value (calc-coverage 83%). A number you cannot see computed is not verifiable."
+        "1 worked calc(s) never resolve to a live/disclosed result \u2014 e.g. lamination_grade  [static \u2014 no auto-check]"
       ],
-      "fix": "provenance.py \u2014 record each number's lineage at source (contract / sizing / tools)",
-      "basis": "worked-calc coverage (every definition resolves to a LIVE Excel formula or an honestly-disclosed non-arithmetic pick; inputs populated) + tool-flow consumption + duty coverage vs the contract's calculator quantities \u2014 worked-calc definitions resolve to a LIVE computed result 38/38; calc input rows carry their value 107/107; tool outputs consumed downstream 64/64; worked-calc coverage of the contract's calculator duties (\u22655 calcs for 23 calculator quantities) 5/5; cell completeness+type contract 572/572 \u00b7 score = min over checks of 10 \u00d7 passed/checked",
-      "content_score": 10.0,
-      "content_basis": "worked-calc coverage (every definition resolves to a LIVE Excel formula or an honestly-disclosed non-arithmetic pick; inputs populated) + tool-flow consumption + duty coverage vs the contract's calculator quantities \u2014 worked-calc definitions resolve to a LIVE computed result 38/38; calc input rows carry their value 107/107; tool outputs consumed downstream 64/64; worked-calc coverage of the contract's calculator duties (\u22655 calcs for 23 calculator quantities) 5/5; cell completeness+type contract 572/572 \u00b7 score = min over checks of 10 \u00d7 passed/checked",
-      "checked": 786,
-      "passed": 786,
+      "fix": "bind the RHS's symbols to this block's own input cells at the calc renderer source (formula_to_excel), or honestly disclose the pick",
+      "basis": "worked-calc coverage (every definition resolves to a LIVE Excel formula or an honestly-disclosed non-arithmetic pick; inputs populated) + tool-flow consumption + duty coverage vs the contract's calculator quantities \u2014 worked-calc definitions resolve to a LIVE computed result 51/52; calc input rows carry their value 107/107; tool outputs consumed downstream 64/64; worked-calc coverage of the contract's calculator duties (\u22655 calcs for 23 calculator quantities) 5/5; cell completeness+type contract 615/615 \u00b7 score = min over checks of 10 \u00d7 passed/checked",
+      "content_score": 9.8,
+      "content_basis": "worked-calc coverage (every definition resolves to a LIVE Excel formula or an honestly-disclosed non-arithmetic pick; inputs populated) + tool-flow consumption + duty coverage vs the contract's calculator quantities \u2014 worked-calc definitions resolve to a LIVE computed result 51/52; calc input rows carry their value 107/107; tool outputs consumed downstream 64/64; worked-calc coverage of the contract's calculator duties (\u22655 calcs for 23 calculator quantities) 5/5; cell completeness+type contract 615/615 \u00b7 score = min over checks of 10 \u00d7 passed/checked",
+      "checked": 843,
+      "passed": 842,
       "components": [
         {
           "check": "worked-calc definitions resolve to a LIVE computed result",
-          "passed": 38,
-          "checked": 38
+          "passed": 51,
+          "checked": 52
         },
         {
           "check": "calc input rows carry their value",
@@ -118,8 +117,8 @@
         },
         {
           "check": "cell completeness+type contract",
-          "passed": 572,
-          "checked": 572
+          "passed": 615,
+          "checked": 615
         }
       ]
     },
@@ -460,11 +459,11 @@
         "the dossier does NOT ship \u2014 dossier floor 4/10 (min of every deterministic section & non-mirror tab, the SAME number the verdict quotes); Verification/race evidence still must close before homologation"
       ],
       "fix": "resolve the failing tabs/sections (the per-tab table on this tab lists every scored surface)",
-      "basis": "THE dossier floor \u2014 min of every deterministic section & non-mirror tab (identical to the verdict computation); own content check: floor mirror + audit-surface integrity (rows tie to the live scorecard) \u2014 per-tab table rows name real scored tabs 35/35; findings carry their producing check 4/4; cell completeness+type contract 236/237 \u00b7 score = min over checks of 10 \u00d7 passed/checked",
-      "checked": 276,
-      "passed": 275,
+      "basis": "THE dossier floor \u2014 min of every deterministic section & non-mirror tab (identical to the verdict computation); own content check: floor mirror + audit-surface integrity (rows tie to the live scorecard) \u2014 per-tab table rows name real scored tabs 35/35; findings carry their producing check 2/2; cell completeness+type contract 230/231 \u00b7 score = min over checks of 10 \u00d7 passed/checked",
+      "checked": 268,
+      "passed": 267,
       "content_score": 10.0,
-      "content_basis": "floor mirror + audit-surface integrity (rows tie to the live scorecard) \u2014 per-tab table rows name real scored tabs 35/35; findings carry their producing check 4/4; cell completeness+type contract 236/237 \u00b7 score = min over checks of 10 \u00d7 passed/checked",
+      "content_basis": "floor mirror + audit-surface integrity (rows tie to the live scorecard) \u2014 per-tab table rows name real scored tabs 35/35; findings carry their producing check 2/2; cell completeness+type contract 230/231 \u00b7 score = min over checks of 10 \u00d7 passed/checked",
       "components": [
         {
           "check": "per-tab table rows name real scored tabs",
@@ -473,13 +472,13 @@
         },
         {
           "check": "findings carry their producing check",
-          "passed": 4,
-          "checked": 4
+          "passed": 2,
+          "checked": 2
         },
         {
           "check": "cell completeness+type contract",
-          "passed": 236,
-          "checked": 237
+          "passed": 230,
+          "checked": 231
         }
       ]
     },
@@ -524,26 +523,26 @@
       "target": 8,
       "status": "PASS",
       "issues": [
-        "4 open hold(s) + 0 exclusion(s) \u2014 every hold derived live from a failing check/contract, fully quantified (Impact) and routed (Owner); every exclusion explicitly reconciled against the client offer \u2014 nothing left as a bare, unlinked disclosure",
-        "4 open hold(s) remain \u2014 never a perfect 10 until every hold clears at source (does not score: already priced by the never-perfect-10 rule)"
+        "2 open hold(s) + 0 exclusion(s) \u2014 every hold derived live from a failing check/contract, fully quantified (Impact) and routed (Owner); every exclusion explicitly reconciled against the client offer \u2014 nothing left as a bare, unlinked disclosure",
+        "2 open hold(s) remain \u2014 never a perfect 10 until every hold clears at source (does not score: already priced by the never-perfect-10 rule)"
       ],
       "fix": "clear each hold at its source (the named check re-passes) \u2014 the row then disappears on rebuild; add the missing Impact/Owner/citation at the point noted above",
-      "basis": "arithmetic: 10 \u00d7 min(complete 4/4, impact 4/4, owner 4/4, exclusions cited 0/1); content checks: live-derivation check (each hold re-derived from the current contract results) \u2014 holds carrying item/scope/source/clears 4/4; holds carrying a numeric Impact 4/4; holds carrying a non-empty Owner 4/4; exclusions explicitly reconciled against the client offer (none) 1/1; rendered holds match the LIVE re-derivation (stale hold = fail) 4/4; cell completeness+type contract 28/28 \u00b7 score = min over checks of 10 \u00d7 passed/checked",
+      "basis": "arithmetic: 10 \u00d7 min(complete 2/2, impact 2/2, owner 2/2, exclusions cited 0/1); content checks: live-derivation check (each hold re-derived from the current contract results) \u2014 holds carrying item/scope/source/clears 2/2; holds carrying a numeric Impact 2/2; holds carrying a non-empty Owner 2/2; exclusions explicitly reconciled against the client offer (none) 1/1; rendered holds match the LIVE re-derivation (stale hold = fail) 2/2; cell completeness+type contract 14/14 \u00b7 score = min over checks of 10 \u00d7 passed/checked",
       "components": [
         {
           "check": "holds carrying item/scope/source/clears",
-          "passed": 4,
-          "checked": 4
+          "passed": 2,
+          "checked": 2
         },
         {
           "check": "holds carrying a numeric Impact",
-          "passed": 4,
-          "checked": 4
+          "passed": 2,
+          "checked": 2
         },
         {
           "check": "holds carrying a non-empty Owner",
-          "passed": 4,
-          "checked": 4
+          "passed": 2,
+          "checked": 2
         },
         {
           "check": "exclusions explicitly reconciled against the client offer (none)",
@@ -552,19 +551,19 @@
         },
         {
           "check": "rendered holds match the LIVE re-derivation (stale hold = fail)",
-          "passed": 4,
-          "checked": 4
+          "passed": 2,
+          "checked": 2
         },
         {
           "check": "cell completeness+type contract",
-          "passed": 28,
-          "checked": 28
+          "passed": 14,
+          "checked": 14
         }
       ],
       "content_score": 10.0,
-      "content_basis": "live-derivation check (each hold re-derived from the current contract results) \u2014 holds carrying item/scope/source/clears 4/4; holds carrying a numeric Impact 4/4; holds carrying a non-empty Owner 4/4; exclusions explicitly reconciled against the client offer (none) 1/1; rendered holds match the LIVE re-derivation (stale hold = fail) 4/4; cell completeness+type contract 28/28 \u00b7 score = min over checks of 10 \u00d7 passed/checked",
-      "checked": 45,
-      "passed": 45
+      "content_basis": "live-derivation check (each hold re-derived from the current contract results) \u2014 holds carrying item/scope/source/clears 2/2; holds carrying a numeric Impact 2/2; holds carrying a non-empty Owner 2/2; exclusions explicitly reconciled against the client offer (none) 1/1; rendered holds match the LIVE re-derivation (stale hold = fail) 2/2; cell completeness+type contract 14/14 \u00b7 score = min over checks of 10 \u00d7 passed/checked",
+      "checked": 23,
+      "passed": 23
     },
     "Questions for the customer": {
       "score": 10.0,
@@ -801,16 +800,16 @@
     "Verification": {
       "target": 8,
       "issues": [
-        "cell contract: 22 of 390 required cells empty/invalid across 22 row(s) \u2014 e.g. row 38: 'Next action' placeholder '\u2014'"
+        "cell contract: 22 of 360 required cells empty/invalid across 22 row(s) \u2014 e.g. row 36: 'Next action' placeholder '\u2014'"
       ],
       "fix": "close every HARD open claim on the Verification tab (FAIL / not-yet-proven / OPEN)",
       "score": 9.4,
       "status": "PASS",
-      "basis": "proof spine (brief + physics + realisation + holds; HARD-only; any HARD open caps at most 4) \u2014 HARD claims PASS 22/22; cell completeness+type contract 368/390 \u00b7 score = min over checks of 10 \u00d7 passed/checked",
+      "basis": "proof spine (brief + physics + realisation + holds; HARD-only; any HARD open caps at most 4) \u2014 HARD claims PASS 22/22; cell completeness+type contract 338/360 \u00b7 score = min over checks of 10 \u00d7 passed/checked",
       "content_score": 9.4,
-      "content_basis": "proof spine (brief + physics + realisation + holds; HARD-only; any HARD open caps at most 4) \u2014 HARD claims PASS 22/22; cell completeness+type contract 368/390 \u00b7 score = min over checks of 10 \u00d7 passed/checked",
-      "checked": 412,
-      "passed": 390,
+      "content_basis": "proof spine (brief + physics + realisation + holds; HARD-only; any HARD open caps at most 4) \u2014 HARD claims PASS 22/22; cell completeness+type contract 338/360 \u00b7 score = min over checks of 10 \u00d7 passed/checked",
+      "checked": 382,
+      "passed": 360,
       "components": [
         {
           "check": "HARD claims PASS",
@@ -819,8 +818,8 @@
         },
         {
           "check": "cell completeness+type contract",
-          "passed": 368,
-          "checked": 390
+          "passed": 338,
+          "checked": 360
         }
       ]
     },
@@ -981,7 +980,6 @@
     "scored_count": 30,
     "fail_tabs": [
       "Executive Summary",
-      "Calculations",
       "Quality & Audit"
     ],
     "unscored_tabs": [],
