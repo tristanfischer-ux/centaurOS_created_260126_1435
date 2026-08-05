@@ -520,12 +520,21 @@ function nonBoardPlacement(
   if (
     !hasExplicitPartIdentity
     && /can[_ -]?fd[_ -]?vehicle[_ -]?interface/i.test(roleText)
-    && allWords.some((candidate) => /can[_ -]?fd[_ -]?transceiver/i.test(candidate.characterId))
   ) {
+    // Vehicle CAN interface is a cable/connector obligation; copper lives on the
+    // CAN-FD transceiver footprint (draft or verified). Never leave it as an
+    // unresolved FR4 package when no MPN exists (FE front fitness starvation).
+    const transceiverOnBoard = allWords.some((candidate) =>
+      /can[_ -]?fd[_ -]?transceiver/i.test(candidate.characterId),
+    )
     return {
       placement: 'interconnect_only',
       ...(selectedBoard ? { boardId: selectedBoard.boardId } : {}),
-      reasons: ['can_fd_transceiver_owns_vehicle_interface'],
+      reasons: [
+        transceiverOnBoard
+          ? 'can_fd_transceiver_owns_vehicle_interface'
+          : 'vehicle_can_interface_is_interconnect_not_package',
+      ],
     }
   }
   // INTENT: channel power bus is copper pour / backplane, not a fitted package.

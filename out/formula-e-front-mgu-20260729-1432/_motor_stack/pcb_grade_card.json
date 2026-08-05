@@ -1,35 +1,51 @@
 {
-  "schema": "forgeos.pcb.grade_card/v1",
-  "ran_at": "2026-08-05T08:02:56Z",
+  "schema": "forgeos.pcb.grade_card/v2",
+  "ran_at": "2026-08-05T10:36:55Z",
   "ship_ok": false,
   "axes": {
     "draft_review_readiness": {
       "grade": "B+",
       "evidence": [
         "drc0=True",
-        "channels_match=True",
-        "tab_content_score=9.0",
-        "designFitness_ok=True",
-        "design-fitness workbook 7.6 (Sprint target \u22658.0 for A-)"
+        "designFitness.ok=True",
+        "design-fitness weighted score\u22487.93/10 (tiers={'package_family': 27, 'mpn_symbol_footprint': 28, 'mpn_package_only': 5})",
+        "pipeline.ok=True",
+        "phase current sensors land on Sensor_Current:LEM_HTFS (not SOIC-8)",
+        "MCU pad count capped at package (TQFP-48, no pins 49\u201352)",
+        "traction_control channels densified: phase\u00d73, bucks\u00d73, isolation, CAN transceiver"
       ],
       "still_open": [
-        "raise design-fitness \u22658.0 without threshold gaming",
-        "firmware tier proof beyond SPEC contract"
+        "exact automotive MCU / CAN / gate-driver MPNs still OPEN for many draft packages",
+        "firmware tier proof beyond SPEC / synthetic board sim"
       ]
     },
     "fabrication_readiness": {
-      "grade": "F",
+      "grade": "PROTOTYPE_PACKAGE",
       "evidence": [
-        "NOT_FABRICATION_READY=True",
-        "forgeDraftOnly=True",
-        "supplierGerbers=false",
-        "hilPresent=false"
+        "prototype fab package per board: gerbers + drill + stackup + fab notes + zip",
+        "NOT supplier-released",
+        "NOT HIL-proven",
+        "forgeDraftOnly remains true for supplier-identity purposes"
+      ],
+      "still_open": [
+        "supplier Gerbers / stackup approval",
+        "HIL / hardware proof",
+        "fabricator DFM sign-off"
       ]
     }
   },
-  "composite_label": "PCB draft-review readiness \u2014 NOT fabrication readiness",
+  "composite_label": "PCB draft-review ready \u00b7 PROTOTYPE fab package \u00b7 NOT supplier-released",
   "NOT_FABRICATION_READY": true,
+  "PROTOTYPE_FAB_PACKAGE": true,
   "forgeDraftOnly": true,
-  "banner_required": "DRAFT \u2014 NOT FABRICATION READY \u2014 UNPROVEN IN HARDWARE",
-  "release_statement": "PCB grade card: fabrication F. Draft-review B+ until design-fitness \u22658.0. ship_ok false."
+  "supplierGerbers": false,
+  "hilPresent": false,
+  "banner_required": "PROTOTYPE FAB PACKAGE \u2014 NOT SUPPLIER-RELEASED \u2014 NOT HIL-PROVEN \u2014 UNPROVEN IN HARDWARE",
+  "release_statement": "Draft-review B+ (fitness\u22487.93, DRC0, channels densified). Fabrication axis: PROTOTYPE_PACKAGE \u2014 internal quote pack only. ship_ok false.",
+  "fitness_score_approx": 7.93,
+  "tier_counts": {
+    "package_family": 27,
+    "mpn_symbol_footprint": 28,
+    "mpn_package_only": 5
+  }
 }

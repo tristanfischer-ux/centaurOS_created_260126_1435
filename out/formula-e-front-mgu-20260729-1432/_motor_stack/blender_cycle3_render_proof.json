@@ -1,0 +1,23 @@
+{
+  "schema": "forgeos.motor_stack.blender_cycle3_render_proof/v1",
+  "ran_at": "2026-08-05T10:35:00Z",
+  "ship_ok": false,
+  "mesh_count": 275,
+  "morphology_prefix_found": {
+    "u_se_td_housing_machine_band": true,
+    "u_se_td_hv_connector": true,
+    "u_se_td_lv_connector": true,
+    "u_se_td_sic_inverter": true,
+    "u_se_td_coolant_in": true,
+    "u_se_td_coolant_out": true
+  },
+  "heroes_fresh": {
+    "00-hero.png": true,
+    "04-product-exterior.png": true,
+    "05-product-left.png": true,
+    "06-product-right.png": true,
+    "07-product-service.png": true,
+    "08-product-ghost-shell.png": true
+  },
+  "ok": true
+}

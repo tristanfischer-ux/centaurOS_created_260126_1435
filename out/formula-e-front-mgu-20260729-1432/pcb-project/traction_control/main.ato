@@ -1,0 +1,436 @@
+component Part_phase_current_sensor_word__1:
+    designator_prefix = "U"
+    footprint = "Sensor_Current:LEM_HTFS"
+    mpn = "LEM HASS 100-S"
+    value = "HASS 100-S"
+    signal VCC ~ pin 1
+    signal GND ~ pin 2
+    signal OUT ~ pin 3
+    signal REF ~ pin 4
+
+component Part_phase_current_sensor_word__2:
+    designator_prefix = "U"
+    footprint = "Sensor_Current:LEM_HTFS"
+    mpn = "LEM HASS 100-S"
+    value = "HASS 100-S"
+    signal VCC ~ pin 1
+    signal GND ~ pin 2
+    signal OUT ~ pin 3
+    signal REF ~ pin 4
+
+component Part_phase_current_sensor_word__3:
+    designator_prefix = "U"
+    footprint = "Sensor_Current:LEM_HTFS"
+    mpn = "LEM HASS 100-S"
+    value = "HASS 100-S"
+    signal VCC ~ pin 1
+    signal GND ~ pin 2
+    signal OUT ~ pin 3
+    signal REF ~ pin 4
+
+component Part_resolver_signal_interface_word:
+    designator_prefix = "U"
+    footprint = "Package_SO:SOIC-8_3.9x4.9mm_P1.27mm"
+    mpn = "ABB RRIA"
+    value = "RRIA"
+    signal VCC ~ pin 1
+    signal GND ~ pin 2
+    signal IN_POS ~ pin 3
+    signal IN_NEG ~ pin 4
+    signal OUT ~ pin 5
+
+component Part_temperature_probe_word:
+    designator_prefix = "U"
+    footprint = "Package_SO:SOIC-8_3.9x4.9mm_P1.27mm"
+    mpn = "Texas Instruments TMP1075DSGR"
+    value = "TMP1075DSGR"
+    signal VCC ~ pin 1
+    signal GND ~ pin 2
+    signal OUT ~ pin 3
+    signal NC ~ pin 4
+
+component Part_control_mcu_word:
+    designator_prefix = "U"
+    footprint = "Package_QFP:TQFP-48_7x7mm_P0.5mm"
+    mpn = "Microchip Technology ATSAMD21G18A-AU"
+    value = "ATSAMD21G18A-AU"
+    signal PA00__1 ~ pin 1
+    signal PA01__2 ~ pin 2
+    signal PA02__3 ~ pin 3
+    signal PA03__4 ~ pin 4
+    signal GNDANA__5 ~ pin 5
+    signal VDDANA__6 ~ pin 6
+    signal PB08__7 ~ pin 7
+    signal PB09__8 ~ pin 8
+    signal PA04__9 ~ pin 9
+    signal PA05__10 ~ pin 10
+    signal PA06__11 ~ pin 11
+    signal PA07__12 ~ pin 12
+    signal PA08__13 ~ pin 13
+    signal PA09__14 ~ pin 14
+    signal PA10__15 ~ pin 15
+    signal PA11__16 ~ pin 16
+    signal VDDIO__17 ~ pin 17
+    signal GND__18 ~ pin 18
+    signal PB10__19 ~ pin 19
+    signal PB11__20 ~ pin 20
+    signal PA12__21 ~ pin 21
+    signal PA13__22 ~ pin 22
+    signal PA14__23 ~ pin 23
+    signal PA15__24 ~ pin 24
+    signal PA16__25 ~ pin 25
+    signal PA17__26 ~ pin 26
+    signal PA18__27 ~ pin 27
+    signal PA19__28 ~ pin 28
+    signal PA20__29 ~ pin 29
+    signal PA21__30 ~ pin 30
+    signal PA22__31 ~ pin 31
+    signal PA23__32 ~ pin 32
+    signal PA24__33 ~ pin 33
+    signal PA25__34 ~ pin 34
+    signal GND__35 ~ pin 35
+    signal VDDIO__36 ~ pin 36
+    signal PB22__37 ~ pin 37
+    signal PB23__38 ~ pin 38
+    signal PA27__39 ~ pin 39
+    signal __RESET___40 ~ pin 40
+    signal PA28__41 ~ pin 41
+    signal GND__42 ~ pin 42
+    signal VDDCORE__43 ~ pin 43
+    signal VDDIN__44 ~ pin 44
+    signal PA30__45 ~ pin 45
+    signal PA31__46 ~ pin 46
+    signal PB02__47 ~ pin 47
+    signal PB03__48 ~ pin 48
+
+component Part_can_fd_transceiver_word:
+    designator_prefix = "U"
+    footprint = "Package_DFN_QFN:QFN-24-1EP_4x4mm_P0.5mm_EP2.6x2.6mm"
+    mpn = "TBD (detailed design) - connectivity_ic"
+    value = "connectivity_ic"
+    signal VCC ~ pin 1
+    signal GND ~ pin 2
+    signal TX ~ pin 3
+    signal RX ~ pin 4
+
+component Part_current_sense_front_end_word__1:
+    designator_prefix = "U"
+    footprint = "Package_SO:SOIC-8_3.9x4.9mm_P1.27mm"
+    mpn = "TBD (detailed design) - op_amp"
+    value = "op_amp"
+    signal VCC ~ pin 1
+    signal GND ~ pin 2
+    signal IN_POS ~ pin 3
+    signal IN_NEG ~ pin 4
+    signal OUT ~ pin 5
+
+component Part_current_sense_front_end_word__2:
+    designator_prefix = "U"
+    footprint = "Package_SO:SOIC-8_3.9x4.9mm_P1.27mm"
+    mpn = "TBD (detailed design) - op_amp"
+    value = "op_amp"
+    signal VCC ~ pin 1
+    signal GND ~ pin 2
+    signal IN_POS ~ pin 3
+    signal IN_NEG ~ pin 4
+    signal OUT ~ pin 5
+
+component Part_current_sense_front_end_word__3:
+    designator_prefix = "U"
+    footprint = "Package_SO:SOIC-8_3.9x4.9mm_P1.27mm"
+    mpn = "TBD (detailed design) - op_amp"
+    value = "op_amp"
+    signal VCC ~ pin 1
+    signal GND ~ pin 2
+    signal IN_POS ~ pin 3
+    signal IN_NEG ~ pin 4
+    signal OUT ~ pin 5
+
+component Part_lv_buck_rails_word__1:
+    designator_prefix = "U"
+    footprint = "Package_TO_SOT_SMD:SOT-23"
+    mpn = "TBD (detailed design) - regulator"
+    value = "regulator"
+    signal VIN ~ pin 1
+    signal GND ~ pin 2
+    signal VOUT ~ pin 3
+    signal EN ~ pin 4
+    signal NC ~ pin 5
+
+component Part_lv_buck_rails_word__2:
+    designator_prefix = "U"
+    footprint = "Package_TO_SOT_SMD:SOT-23"
+    mpn = "TBD (detailed design) - regulator"
+    value = "regulator"
+    signal VIN ~ pin 1
+    signal GND ~ pin 2
+    signal VOUT ~ pin 3
+    signal EN ~ pin 4
+    signal NC ~ pin 5
+
+component Part_lv_buck_rails_word__3:
+    designator_prefix = "U"
+    footprint = "Package_TO_SOT_SMD:SOT-23"
+    mpn = "TBD (detailed design) - regulator"
+    value = "regulator"
+    signal VIN ~ pin 1
+    signal GND ~ pin 2
+    signal VOUT ~ pin 3
+    signal EN ~ pin 4
+    signal NC ~ pin 5
+
+component Part_hv_lv_isolation_barrier_word:
+    designator_prefix = "U"
+    footprint = "Package_SO:SOIC-8_3.81x9.347mm_P2.54mm"
+    mpn = "TBD (detailed design) - isolator_ic"
+    value = "isolator_ic"
+    signal VDD1 ~ pin 1
+    signal GND1 ~ pin 2
+    signal VIA ~ pin 3
+    signal VOB ~ pin 4
+    signal VDD2 ~ pin 5
+    signal GND2 ~ pin 6
+    signal VOA ~ pin 7
+    signal VIB ~ pin 8
+
+component Part_decouple_phase_current_sensor_word__1:
+    designator_prefix = "C"
+    footprint = "Capacitor_SMD:C_0603_1608Metric"
+    mpn = "YAGEO CC0603KRX7R9BB104"
+    value = "CC0603KRX7R9BB104"
+    signal ___1 ~ pin 1
+    signal ___2 ~ pin 2
+
+component Part_decouple_phase_current_sensor_word__2:
+    designator_prefix = "C"
+    footprint = "Capacitor_SMD:C_0603_1608Metric"
+    mpn = "YAGEO CC0603KRX7R9BB104"
+    value = "CC0603KRX7R9BB104"
+    signal ___1 ~ pin 1
+    signal ___2 ~ pin 2
+
+component Part_decouple_phase_current_sensor_word__3:
+    designator_prefix = "C"
+    footprint = "Capacitor_SMD:C_0603_1608Metric"
+    mpn = "YAGEO CC0603KRX7R9BB104"
+    value = "CC0603KRX7R9BB104"
+    signal ___1 ~ pin 1
+    signal ___2 ~ pin 2
+
+component Part_decouple_resolver_signal_interface_word:
+    designator_prefix = "C"
+    footprint = "Capacitor_SMD:C_0603_1608Metric"
+    mpn = "YAGEO CC0603KRX7R9BB104"
+    value = "CC0603KRX7R9BB104"
+    signal ___1 ~ pin 1
+    signal ___2 ~ pin 2
+
+component Part_decouple_temperature_probe_word:
+    designator_prefix = "C"
+    footprint = "Capacitor_SMD:C_0603_1608Metric"
+    mpn = "YAGEO CC0603KRX7R9BB104"
+    value = "CC0603KRX7R9BB104"
+    signal ___1 ~ pin 1
+    signal ___2 ~ pin 2
+
+component Part_decouple_control_mcu_word:
+    designator_prefix = "C"
+    footprint = "Capacitor_SMD:C_0603_1608Metric"
+    mpn = "YAGEO CC0603KRX7R9BB104"
+    value = "CC0603KRX7R9BB104"
+    signal ___1 ~ pin 1
+    signal ___2 ~ pin 2
+
+component Part_decouple_can_fd_transceiver_word:
+    designator_prefix = "C"
+    footprint = "Capacitor_SMD:C_0603_1608Metric"
+    mpn = "YAGEO CC0603KRX7R9BB104"
+    value = "CC0603KRX7R9BB104"
+    signal ___1 ~ pin 1
+    signal ___2 ~ pin 2
+
+component Part_decouple_current_sense_front_end_word__1:
+    designator_prefix = "C"
+    footprint = "Capacitor_SMD:C_0603_1608Metric"
+    mpn = "YAGEO CC0603KRX7R9BB104"
+    value = "CC0603KRX7R9BB104"
+    signal ___1 ~ pin 1
+    signal ___2 ~ pin 2
+
+component Part_decouple_current_sense_front_end_word__2:
+    designator_prefix = "C"
+    footprint = "Capacitor_SMD:C_0603_1608Metric"
+    mpn = "YAGEO CC0603KRX7R9BB104"
+    value = "CC0603KRX7R9BB104"
+    signal ___1 ~ pin 1
+    signal ___2 ~ pin 2
+
+component Part_decouple_current_sense_front_end_word__3:
+    designator_prefix = "C"
+    footprint = "Capacitor_SMD:C_0603_1608Metric"
+    mpn = "YAGEO CC0603KRX7R9BB104"
+    value = "CC0603KRX7R9BB104"
+    signal ___1 ~ pin 1
+    signal ___2 ~ pin 2
+
+component Part_decouple_lv_buck_rails_word__1:
+    designator_prefix = "C"
+    footprint = "Capacitor_SMD:C_0603_1608Metric"
+    mpn = "YAGEO CC0603KRX7R9BB104"
+    value = "CC0603KRX7R9BB104"
+    signal ___1 ~ pin 1
+    signal ___2 ~ pin 2
+
+component Part_decouple_lv_buck_rails_word__2:
+    designator_prefix = "C"
+    footprint = "Capacitor_SMD:C_0603_1608Metric"
+    mpn = "YAGEO CC0603KRX7R9BB104"
+    value = "CC0603KRX7R9BB104"
+    signal ___1 ~ pin 1
+    signal ___2 ~ pin 2
+
+component Part_decouple_lv_buck_rails_word__3:
+    designator_prefix = "C"
+    footprint = "Capacitor_SMD:C_0603_1608Metric"
+    mpn = "YAGEO CC0603KRX7R9BB104"
+    value = "CC0603KRX7R9BB104"
+    signal ___1 ~ pin 1
+    signal ___2 ~ pin 2
+
+component Part_decouple_hv_lv_isolation_barrier_word:
+    designator_prefix = "C"
+    footprint = "Capacitor_SMD:C_0603_1608Metric"
+    mpn = "YAGEO CC0603KRX7R9BB104"
+    value = "CC0603KRX7R9BB104"
+    signal ___1 ~ pin 1
+    signal ___2 ~ pin 2
+
+module App:
+    phase_current_sensor_word__1 = new Part_phase_current_sensor_word__1
+    phase_current_sensor_word__2 = new Part_phase_current_sensor_word__2
+    phase_current_sensor_word__3 = new Part_phase_current_sensor_word__3
+    resolver_signal_interface_word = new Part_resolver_signal_interface_word
+    temperature_probe_word = new Part_temperature_probe_word
+    control_mcu_word = new Part_control_mcu_word
+    can_fd_transceiver_word = new Part_can_fd_transceiver_word
+    current_sense_front_end_word__1 = new Part_current_sense_front_end_word__1
+    current_sense_front_end_word__2 = new Part_current_sense_front_end_word__2
+    current_sense_front_end_word__3 = new Part_current_sense_front_end_word__3
+    lv_buck_rails_word__1 = new Part_lv_buck_rails_word__1
+    lv_buck_rails_word__2 = new Part_lv_buck_rails_word__2
+    lv_buck_rails_word__3 = new Part_lv_buck_rails_word__3
+    hv_lv_isolation_barrier_word = new Part_hv_lv_isolation_barrier_word
+    decouple_phase_current_sensor_word__1 = new Part_decouple_phase_current_sensor_word__1
+    decouple_phase_current_sensor_word__2 = new Part_decouple_phase_current_sensor_word__2
+    decouple_phase_current_sensor_word__3 = new Part_decouple_phase_current_sensor_word__3
+    decouple_resolver_signal_interface_word = new Part_decouple_resolver_signal_interface_word
+    decouple_temperature_probe_word = new Part_decouple_temperature_probe_word
+    decouple_control_mcu_word = new Part_decouple_control_mcu_word
+    decouple_can_fd_transceiver_word = new Part_decouple_can_fd_transceiver_word
+    decouple_current_sense_front_end_word__1 = new Part_decouple_current_sense_front_end_word__1
+    decouple_current_sense_front_end_word__2 = new Part_decouple_current_sense_front_end_word__2
+    decouple_current_sense_front_end_word__3 = new Part_decouple_current_sense_front_end_word__3
+    decouple_lv_buck_rails_word__1 = new Part_decouple_lv_buck_rails_word__1
+    decouple_lv_buck_rails_word__2 = new Part_decouple_lv_buck_rails_word__2
+    decouple_lv_buck_rails_word__3 = new Part_decouple_lv_buck_rails_word__3
+    decouple_hv_lv_isolation_barrier_word = new Part_decouple_hv_lv_isolation_barrier_word
+
+    signal VCC
+    signal GND
+    signal SWDIO
+    signal SWCLK
+    signal PHASE_CURRENT_RAW_0
+    signal PHASE_CURRENT_ADC_0
+    signal PHASE_CURRENT_RAW_1
+    signal PHASE_CURRENT_ADC_1
+    signal PHASE_CURRENT_RAW_2
+    signal PHASE_CURRENT_ADC_2
+    signal LV_BUCK_RAIL_0
+    signal LV_BUCK_RAIL_1
+    signal LV_BUCK_RAIL_2
+
+    phase_current_sensor_word__1.VCC ~ VCC
+    phase_current_sensor_word__2.VCC ~ VCC
+    phase_current_sensor_word__3.VCC ~ VCC
+    resolver_signal_interface_word.VCC ~ VCC
+    temperature_probe_word.VCC ~ VCC
+    control_mcu_word.VDDANA__6 ~ VCC
+    control_mcu_word.VDDIO__17 ~ VCC
+    control_mcu_word.VDDIO__36 ~ VCC
+    control_mcu_word.VDDCORE__43 ~ VCC
+    control_mcu_word.VDDIN__44 ~ VCC
+    can_fd_transceiver_word.VCC ~ VCC
+    current_sense_front_end_word__1.VCC ~ VCC
+    current_sense_front_end_word__2.VCC ~ VCC
+    current_sense_front_end_word__3.VCC ~ VCC
+    lv_buck_rails_word__1.VIN ~ VCC
+    lv_buck_rails_word__1.VOUT ~ VCC
+    lv_buck_rails_word__2.VIN ~ VCC
+    lv_buck_rails_word__2.VOUT ~ VCC
+    lv_buck_rails_word__3.VIN ~ VCC
+    lv_buck_rails_word__3.VOUT ~ VCC
+    hv_lv_isolation_barrier_word.VDD1 ~ VCC
+    hv_lv_isolation_barrier_word.VDD2 ~ VCC
+    decouple_phase_current_sensor_word__1.___1 ~ VCC
+    decouple_phase_current_sensor_word__2.___1 ~ VCC
+    decouple_phase_current_sensor_word__3.___1 ~ VCC
+    decouple_resolver_signal_interface_word.___1 ~ VCC
+    decouple_temperature_probe_word.___1 ~ VCC
+    decouple_control_mcu_word.___1 ~ VCC
+    decouple_can_fd_transceiver_word.___1 ~ VCC
+    decouple_current_sense_front_end_word__1.___1 ~ VCC
+    decouple_current_sense_front_end_word__2.___1 ~ VCC
+    decouple_current_sense_front_end_word__3.___1 ~ VCC
+    decouple_lv_buck_rails_word__1.___1 ~ VCC
+    decouple_lv_buck_rails_word__2.___1 ~ VCC
+    decouple_lv_buck_rails_word__3.___1 ~ VCC
+    decouple_hv_lv_isolation_barrier_word.___1 ~ VCC
+    phase_current_sensor_word__1.GND ~ GND
+    phase_current_sensor_word__2.GND ~ GND
+    phase_current_sensor_word__3.GND ~ GND
+    resolver_signal_interface_word.GND ~ GND
+    temperature_probe_word.GND ~ GND
+    control_mcu_word.GNDANA__5 ~ GND
+    control_mcu_word.GND__18 ~ GND
+    control_mcu_word.GND__35 ~ GND
+    control_mcu_word.GND__42 ~ GND
+    can_fd_transceiver_word.GND ~ GND
+    current_sense_front_end_word__1.GND ~ GND
+    current_sense_front_end_word__2.GND ~ GND
+    current_sense_front_end_word__3.GND ~ GND
+    lv_buck_rails_word__1.GND ~ GND
+    lv_buck_rails_word__2.GND ~ GND
+    lv_buck_rails_word__3.GND ~ GND
+    hv_lv_isolation_barrier_word.GND1 ~ GND
+    hv_lv_isolation_barrier_word.GND2 ~ GND
+    decouple_phase_current_sensor_word__1.___2 ~ GND
+    decouple_phase_current_sensor_word__2.___2 ~ GND
+    decouple_phase_current_sensor_word__3.___2 ~ GND
+    decouple_resolver_signal_interface_word.___2 ~ GND
+    decouple_temperature_probe_word.___2 ~ GND
+    decouple_control_mcu_word.___2 ~ GND
+    decouple_can_fd_transceiver_word.___2 ~ GND
+    decouple_current_sense_front_end_word__1.___2 ~ GND
+    decouple_current_sense_front_end_word__2.___2 ~ GND
+    decouple_current_sense_front_end_word__3.___2 ~ GND
+    decouple_lv_buck_rails_word__1.___2 ~ GND
+    decouple_lv_buck_rails_word__2.___2 ~ GND
+    decouple_lv_buck_rails_word__3.___2 ~ GND
+    decouple_hv_lv_isolation_barrier_word.___2 ~ GND
+    control_mcu_word.PA31__46 ~ SWDIO
+    control_mcu_word.PA30__45 ~ SWCLK
+    phase_current_sensor_word__1.OUT ~ PHASE_CURRENT_RAW_0
+    current_sense_front_end_word__1.IN_POS ~ PHASE_CURRENT_RAW_0
+    current_sense_front_end_word__1.OUT ~ PHASE_CURRENT_ADC_0
+    control_mcu_word.PA02__3 ~ PHASE_CURRENT_ADC_0
+    phase_current_sensor_word__2.OUT ~ PHASE_CURRENT_RAW_1
+    current_sense_front_end_word__2.IN_POS ~ PHASE_CURRENT_RAW_1
+    current_sense_front_end_word__2.OUT ~ PHASE_CURRENT_ADC_1
+    control_mcu_word.PA03__4 ~ PHASE_CURRENT_ADC_1
+    phase_current_sensor_word__3.OUT ~ PHASE_CURRENT_RAW_2
+    current_sense_front_end_word__3.IN_POS ~ PHASE_CURRENT_RAW_2
+    current_sense_front_end_word__3.OUT ~ PHASE_CURRENT_ADC_2
+    control_mcu_word.PA04__9 ~ PHASE_CURRENT_ADC_2
+    lv_buck_rails_word__1.VOUT ~ LV_BUCK_RAIL_0
+    lv_buck_rails_word__2.VOUT ~ LV_BUCK_RAIL_1
+    lv_buck_rails_word__3.VOUT ~ LV_BUCK_RAIL_2

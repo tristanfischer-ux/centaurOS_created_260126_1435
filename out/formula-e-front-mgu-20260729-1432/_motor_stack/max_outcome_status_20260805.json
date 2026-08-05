@@ -1,0 +1,10 @@
+{
+  "ran_at": "2026-08-05T10:36:55Z",
+  "ship_ok": false,
+  "multiphysics_ok": true,
+  "blender_cycle3_ok": true,
+  "pcb_grade": "B+",
+  "pcb_fab_axis": "PROTOTYPE_PACKAGE",
+  "pcb_fitness_ok": true,
+  "pcb_fitness_score_approx": 7.93
+}

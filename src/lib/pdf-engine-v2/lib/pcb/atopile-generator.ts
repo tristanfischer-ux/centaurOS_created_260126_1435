@@ -1402,6 +1402,7 @@ function ensureHostHatActuationDriveWords(
 function ensureDraftChannelTopologyWords(
   words: ElectronicWordRef[],
   requiredFunctionCounts: Record<string, number> | undefined,
+  boardRole?: string,
 ): ElectronicWordRef[] {
   if (!requiredFunctionCounts) return words
   const target = (role: string): number => {
@@ -1413,7 +1414,7 @@ function ensureDraftChannelTopologyWords(
   const identity = (word: ElectronicWordRef): string =>
     `${word.wordId} ${word.characterId} ${word.nameHuman}`
   const out = words.map((word) => ({ ...word }))
-  const initialBlob = out.map(identity).join(' ')
+  let initialBlob = out.map(identity).join(' ')
   const anchor = out[0]
   const moduleId = anchor?.moduleId ?? 'power_control'
   const subModuleId = anchor?.subModuleId ?? 'channel_topology'
@@ -1461,6 +1462,80 @@ function ensureDraftChannelTopologyWords(
       categories: [category],
       quantity,
     })
+  }
+
+  // INTENT (2026-08-05 FE max-outcome): OEM parent control assembly is off-board
+  // (supplier module), but the reviewable traction_control FR4 still needs MCU,
+  // CAN transceiver, phase AFEs, bucks and HV/LV isolation anchors so channel
+  // densification and fitness are not starved empty.
+  const isTractionControl =
+    boardRole === 'traction_control_board'
+    || boardRole === 'traction_control'
+    || /traction[_ -]?control/i.test(boardRole ?? '')
+  if (isTractionControl) {
+    if (!/(?:control|main)[_ -]?(?:mcu|microcontroller)|microcontroller/i.test(initialBlob)) {
+      pushDraftRole(
+        'control_mcu_word',
+        'Real-time MCU',
+        'control_mcu',
+        1,
+        'controller',
+        'TQFP-48 draft MCU footprint; exact automotive MCU MPN OPEN',
+      )
+    }
+    // vehicle_can channel may exist while the interface noun is interconnect-only
+    // (no package) — still seed a transceiver when architecture requires CAN.
+    if (
+      !/can[_ -]?fd[_ -]?transceiver/i.test(initialBlob)
+      && (target('vehicle_can') > 0 || /can[_ -]?fd[_ -]?vehicle[_ -]?interface/i.test(initialBlob))
+    ) {
+      pushDraftRole(
+        'can_fd_transceiver_word',
+        'CAN-FD transceiver',
+        'can_fd_transceiver',
+        1,
+        'connectivity',
+        'QFN draft CAN-FD transceiver; exact MPN OPEN',
+      )
+    }
+    if (
+      /phase[_ -]?current[_ -]?sensor/i.test(initialBlob)
+      && !/current[_ -]?sense[_ -]?front[_ -]?end/i.test(initialBlob)
+    ) {
+      pushDraftRole(
+        'current_sense_front_end_word',
+        'Phase current sense front-end',
+        'current_sense_front_end',
+        Math.max(1, target('phase_current_sense') || 1),
+        'sensor',
+        'SOIC draft AFE; exact op-amp / sigma-delta MPN OPEN',
+      )
+    }
+    if (!/lv[_ -]?buck[_ -]?rails?|buck[_ -]?(?:regulator|rail)/i.test(initialBlob)) {
+      pushDraftRole(
+        'lv_buck_rails_word',
+        'LV buck power rails',
+        'lv_buck_rails',
+        Math.max(1, target('lv_buck_rail') || 1),
+        'power',
+        'SOT-23 draft buck; exact MPN OPEN',
+      )
+    }
+    if (
+      !/hv[_ -]?lv[_ -]?(?:isolation|isolator|barrier)/i.test(initialBlob)
+      && target('hv_lv_isolation_barrier') > 0
+    ) {
+      pushDraftRole(
+        'hv_lv_isolation_barrier_word',
+        'Draft HV/LV signal isolation barrier',
+        'hv_lv_isolation_barrier',
+        Math.max(1, target('hv_lv_isolation_barrier')),
+        'isolation',
+        'SOIC-8 dual-domain draft isolator footprint; isolation rating and exact MPN OPEN',
+      )
+    }
+    // Refresh blob after seeds so gate/phase densify sees anchors.
+    initialBlob = out.map(identity).join(' ')
   }
 
   const gateCount = target('gate_drive_channel')
@@ -1872,6 +1947,37 @@ function resolveComponent(
   // P7: interface-critical roles may not stay on a bare package_family / function_class
   // default — Fix 1 already floors FAB-READY on non-catalogue tiers; this forces an
   // honest electronic gap instead of a silent generic footprint for USB/ESD/MCU/flash/fuse.
+  // Phase-current LEM HASS / open-loop modules are NOT SOIC-8 (red-team).
+  // Prefer KiCad Sensor_Current LEM_HTFS (4-pad TH) as package-family stand-in.
+  const isPhaseCurrentSensor =
+    /phase[_ -]?current[_ -]?sensor/i.test(word.characterId)
+    || /phase[_ -]?current[_ -]?sensor/i.test(word.wordId)
+    || /HASS/i.test(partNumber ?? '')
+    || /HASS/i.test(resolvedPartNumber ?? '')
+  if (isPhaseCurrentSensor) {
+    const lemRef = {
+      library: 'Sensor_Current',
+      footprint: 'LEM_HTFS',
+    }
+    // Keep verified MPN string when present (HASS 100-S) but correct land pattern.
+    // SOIC-8 for an open-loop module is a red-team reject — always replace footprint.
+    footprint = lemRef
+    if (tier === 'function_class' || tier === 'mpn_package' || tier === 'mpn_symbol_footprint') {
+      // Package land is family-correct LEM module; MPN string may still be HASS.
+      tier = resolvedPartNumber || partNumber ? 'mpn_package' : 'package_family'
+    }
+    // 4-pad secondary: VCC, GND, OUT, REF — primary bus is off-board aperture.
+    // Drop any SOIC-8 identity pinout that claimed this part.
+    identityVerified = false
+    pinSpecs = []
+    pinPadMap = {
+      VCC: '1',
+      GND: '2',
+      OUT: '3',
+      REF: '4',
+    }
+  }
+
   // DECISION: role set matches CURSOR-PCB-HONESTY Fix 7 (noun/role keyed, not per-product).
   if (
     !mpnVerified
@@ -1890,7 +1996,13 @@ function resolveComponent(
   }
 
   const fallbackPins = fallback ? fallback.pins.map((pin) => sanitizePinName(pin)!) : ['P1', 'P2']
-  const resolvedPins = identityVerified ? pinSpecs.map(pinIdentifier) : fallbackPins
+  // LEM_HTFS secondary side (or other pinPadMap-only drafts)
+  const padMapPins = Object.keys(pinPadMap)
+  const resolvedPins = identityVerified
+    ? pinSpecs.map(pinIdentifier)
+    : padMapPins.length > 0
+      ? padMapPins
+      : fallbackPins
   // GOTCHA: OPA334 lists V- (power_in) before V+ — picking the first power_in
   // shorted the negative rail onto VCC (organoid OD final20). Prefer positive
   // supply names; never treat V-/VEE as the primary powerPin.
@@ -2031,8 +2143,87 @@ function findPinMatching(
 /**
  * @description Ensure a named pin exists on the component (concept-stage synth).
  */
+function isSupplyLikePinName(pin: string): boolean {
+  return /^(?:VDD|VCC|VSS|GND|AVDD|DVDD|VDDIO|VDDANA|VDDIN|VDDCORE|GNDANA|VBAT|VIN|VOUT|VEE|V___P|V___N)(?:_|$)/i.test(
+    pin,
+  )
+}
+
+/**
+ * Claim a free package pin for a logical net name instead of inventing pads
+ * beyond the verified footprint (TQFP-48 must not grow pins 49–52).
+ * Returns the real package pin identifier to use on the netlist.
+ */
+function claimFreePackagePin(component: AtopileComponentRecord, logicalName: string): string | null {
+  const packagePadCount =
+    component.pinSpecs.length > 0
+      ? component.pinSpecs.length
+      : Object.keys(component.pinPadMap).length
+  if (packagePadCount <= 0) return null
+
+  // Prefer SAMD21-class ADC-capable pads for sense / ADC logical names.
+  const wantAdc = /ADC|SENSE|AIN|ANALOG/i.test(logicalName)
+  const preferredRes: RegExp[] = wantAdc
+    ? [/^PA0[2-7]/i, /^PB0[89]/i, /^PA1[01]/i, /^PB0[0-3]/i, /^PA[0-9]/i]
+    : [/^PA/i, /^PB/i, /^P[0-9]/i]
+
+  const usedAsAliasTargets = new Set<string>()
+  // Pins already referenced only as themselves — we re-use unused GPIO for logic
+  // by preferring pins that still appear only as their package name (not re-aliased).
+  // Track via a side bag on the component object (not serialised).
+  const bag = component as AtopileComponentRecord & {
+    _claimedLogicalPins?: Record<string, string>
+  }
+  bag._claimedLogicalPins = bag._claimedLogicalPins ?? {}
+  if (bag._claimedLogicalPins[logicalName]) return bag._claimedLogicalPins[logicalName]
+  for (const v of Object.values(bag._claimedLogicalPins)) usedAsAliasTargets.add(v)
+
+  const candidates: string[] = []
+  if (component.pinSpecs.length > 0) {
+    for (const ps of component.pinSpecs) {
+      const id = pinIdentifier(ps)
+      if (isSupplyLikePinName(id) || isSupplyLikePinName(ps.name)) continue
+      if (usedAsAliasTargets.has(id)) continue
+      // Skip reset / crystal-ish names
+      if (/RESET|XIN|XOUT|SWCLK|SWDIO|USB/i.test(id) || /RESET|XIN|XOUT|SWCLK|SWDIO|USB/i.test(ps.name)) {
+        continue
+      }
+      candidates.push(id)
+    }
+  } else {
+    for (const id of component.pins) {
+      if (isSupplyLikePinName(id)) continue
+      if (usedAsAliasTargets.has(id)) continue
+      candidates.push(id)
+    }
+  }
+
+  for (const re of preferredRes) {
+    const hit = candidates.find((id) => re.test(id))
+    if (hit) {
+      bag._claimedLogicalPins[logicalName] = hit
+      return hit
+    }
+  }
+  if (candidates[0]) {
+    bag._claimedLogicalPins[logicalName] = candidates[0]
+    return candidates[0]
+  }
+  return null
+}
+
 function ensureComponentPin(component: AtopileComponentRecord, pin: string): string {
-  if (!component.pins.includes(pin)) component.pins.push(pin)
+  if (component.pins.includes(pin)) return pin
+  const packagePadCount =
+    component.pinSpecs.length > 0
+      ? component.pinSpecs.length
+      : Object.keys(component.pinPadMap).length
+  // Never invent pads beyond a verified package pinout (red-team: pins 49–52 on TQFP-48).
+  if (packagePadCount > 0 && component.pins.length >= packagePadCount) {
+    const claimed = claimFreePackagePin(component, pin)
+    if (claimed) return claimed
+  }
+  component.pins.push(pin)
   return pin
 }
 
@@ -3616,6 +3807,7 @@ export function generateAtopileProject(
   const channelTopologyWords = ensureDraftChannelTopologyWords(
     scopedElectronicWords,
     opts.requiredFunctionCounts,
+    opts.boardRole,
   )
   // INTENT: densify channel-count footprints plus published gold companions —
   // heater FFC+hall, OD photodiode+TIA+passives, HAT 2×20 socket, inter-board

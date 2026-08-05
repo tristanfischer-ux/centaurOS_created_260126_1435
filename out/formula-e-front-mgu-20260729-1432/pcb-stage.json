@@ -1,0 +1,1217 @@
+{
+  "isPcbBearing": true,
+  "electronicPartCount": 11,
+  "distinctElectronicCategories": [
+    "analog_frontend",
+    "connectivity",
+    "power_electronics",
+    "processor",
+    "sensor_ic"
+  ],
+  "reasons": [
+    "electronic_function_diversity_5_categories",
+    "front_fpk_bespoke_forced_for_hot"
+  ],
+  "signals": {
+    "compactProductEnvelope": false,
+    "customFormFactor": false,
+    "multiFunctionIntegration": true,
+    "safetySpecificIntegration": false,
+    "rfOrHighSpeedLayout": false,
+    "repeatedApplicationSpecificBoard": false,
+    "explicitCustomIntent": false,
+    "explicitCotsIntent": false,
+    "parentIsPurchasedAssembly": false,
+    "productionVolumeUnits": null
+  },
+  "capability": {
+    "kicadCli": {
+      "available": true,
+      "path": "/opt/homebrew/bin/kicad-cli",
+      "version": "10.0.4"
+    },
+    "atopile": {
+      "available": true,
+      "path": "/Users/tristanfischer/.local/bin/ato",
+      "version": "ato, version 0.2.69"
+    },
+    "freerouting": {
+      "available": true,
+      "path": "/Applications/freerouting.app/Contents/MacOS/freerouting"
+    },
+    "java": {
+      "available": true,
+      "path": "/opt/homebrew/opt/openjdk/bin/java",
+      "version": "openjdk version \"26.0.1\" 2026-04-21\nOpenJDK Runtime Environment Homebrew (build 26.0.1)\nOpenJDK 64-Bit Server VM Homebrew (build 26.0.1, mixed mode, sharing)"
+    },
+    "kicadSymbols": {
+      "available": true,
+      "path": "/Applications/KiCad/KiCad.app/Contents/SharedSupport/symbols",
+      "itemCount": 222
+    },
+    "kicadFootprints": {
+      "available": true,
+      "path": "/Applications/KiCad/KiCad.app/Contents/SharedSupport/footprints",
+      "itemCount": 15435
+    },
+    "freeroutingJar": {
+      "available": true,
+      "path": "/Applications/freerouting.app/Contents/app/freerouting-executable.jar"
+    },
+    "kicadPythonBridge": {
+      "available": true,
+      "pythonBin": "/Applications/KiCad/KiCad.app/Contents/Frameworks/Python.framework/Versions/3.9/bin/python3",
+      "sitePackages": "/Applications/KiCad/KiCad.app/Contents/Frameworks/Python.framework/Versions/3.9/lib/python3.9/site-packages"
+    },
+    "canAuthor": true,
+    "canRoute": true,
+    "canVerifyAndExport": true,
+    "missingRequired": []
+  },
+  "disposition": "bespoke",
+  "dispositionDetail": {
+    "disposition": "bespoke",
+    "rationale": [
+      "jlr_hot_requires_reviewable_boards",
+      "gate_driver_and_control_tbd_mpn",
+      "bespoke_kiCad_deliverable_required"
+    ],
+    "requiresKiCadDeliverable": true,
+    "confidence": "high",
+    "underlying": {
+      "disposition": "bespoke_required",
+      "reasons": [
+        "jlr_hot_requires_reviewable_boards",
+        "gate_driver_and_control_tbd_mpn"
+      ],
+      "requiresKiCadDeliverable": true,
+      "confidence": "high"
+    }
+  },
+  "canAuthor": true,
+  "canRoute": true,
+  "canVerifyAndExport": true,
+  "architecture": {
+    "schema": "pcb-architecture/v1",
+    "systemDisposition": "multi_board",
+    "requiresAnyKiCadDeliverable": true,
+    "assignments": [
+      {
+        "wordId": "hv_dc_fuse_word",
+        "placement": "off_board_module",
+        "reasons": [
+          "purchased_traction_power_stage_or_hv_passive"
+        ]
+      },
+      {
+        "wordId": "sic_traction_inverter_word",
+        "placement": "off_board_module",
+        "reasons": [
+          "purchased_traction_power_stage_or_hv_passive"
+        ]
+      },
+      {
+        "wordId": "sic_power_module_stack_word",
+        "placement": "off_board_module",
+        "reasons": [
+          "purchased_traction_power_stage_or_hv_passive"
+        ]
+      },
+      {
+        "wordId": "dc_link_capacitor_bank_word",
+        "placement": "off_board_module",
+        "reasons": [
+          "purchased_traction_power_stage_or_hv_passive"
+        ]
+      },
+      {
+        "wordId": "gate_driver_board_word",
+        "placement": "on_board",
+        "boardId": "traction_gate_drive",
+        "reasons": [
+          "function_role_board_assignment"
+        ]
+      },
+      {
+        "wordId": "phase_current_sensor_word",
+        "placement": "on_board",
+        "boardId": "traction_control",
+        "reasons": [
+          "function_role_board_assignment"
+        ]
+      },
+      {
+        "wordId": "oem_inverter_control_board_word",
+        "placement": "off_board_module",
+        "reasons": [
+          "purchased_traction_control_parent_or_motor_sensor"
+        ]
+      },
+      {
+        "wordId": "can_fd_vehicle_interface_word",
+        "placement": "interconnect_only",
+        "boardId": "traction_control",
+        "reasons": [
+          "vehicle_can_interface_is_interconnect_not_package"
+        ]
+      },
+      {
+        "wordId": "resolver_signal_interface_word",
+        "placement": "on_board",
+        "boardId": "traction_control",
+        "reasons": [
+          "function_role_board_assignment"
+        ]
+      },
+      {
+        "wordId": "temperature_probe_word",
+        "placement": "on_board",
+        "boardId": "traction_control",
+        "reasons": [
+          "function_role_board_assignment"
+        ]
+      },
+      {
+        "wordId": "traction_inverter_synth_word",
+        "placement": "off_board_module",
+        "reasons": [
+          "purchased_traction_power_stage_or_hv_passive"
+        ]
+      }
+    ],
+    "boards": [
+      {
+        "boardId": "traction_gate_drive",
+        "role": "traction_gate_drive_board",
+        "requiredWordIds": [
+          "gate_driver_board_word"
+        ],
+        "domains": [
+          "power",
+          "high_voltage"
+        ],
+        "channelRequirements": [
+          {
+            "role": "gate_drive_channel",
+            "count": 6
+          },
+          {
+            "role": "desat_channel",
+            "count": 6
+          }
+        ],
+        "workPerformed": [
+          "isolate_gate_drive",
+          "desat_protect",
+          "drive_sic_half_bridges"
+        ],
+        "shape": {
+          "shapeFamily": "traction_gate_drive",
+          "outlineBasis": "phase_current_and_creepage_to_hv",
+          "datums": [
+            {
+              "id": "outline_width_mm",
+              "valueMm": 120,
+              "basis": "gate-drive creepage envelope for ~535 A phase class"
+            },
+            {
+              "id": "outline_height_mm",
+              "valueMm": 90,
+              "basis": "three half-bridge driver channels + isolation"
+            }
+          ],
+          "mountingHoles": 6,
+          "rationale": "form_follows_traction_gate_drive_board"
+        },
+        "requiresKiCadDeliverable": true
+      },
+      {
+        "boardId": "traction_control",
+        "role": "traction_control_board",
+        "requiredWordIds": [
+          "phase_current_sensor_word",
+          "resolver_signal_interface_word",
+          "temperature_probe_word"
+        ],
+        "domains": [
+          "logic",
+          "analog"
+        ],
+        "channelRequirements": [
+          {
+            "role": "phase_current_sense",
+            "count": 3
+          },
+          {
+            "role": "resolver_channel",
+            "count": 1
+          },
+          {
+            "role": "vehicle_can",
+            "count": 1
+          },
+          {
+            "role": "lv_buck_rail",
+            "count": 3
+          },
+          {
+            "role": "hv_lv_isolation_barrier",
+            "count": 1
+          }
+        ],
+        "workPerformed": [
+          "sense_phase_current",
+          "demodulate_resolver",
+          "vehicle_can",
+          "regulate_lv_rails",
+          "isolate_hv_lv_domains",
+          "torque_current_limits"
+        ],
+        "shape": {
+          "shapeFamily": "traction_control",
+          "outlineBasis": "mcu_sensing_and_vehicle_interface",
+          "datums": [
+            {
+              "id": "outline_width_mm",
+              "valueMm": 100,
+              "basis": "MCU + sensing + CAN interface"
+            },
+            {
+              "id": "outline_height_mm",
+              "valueMm": 80,
+              "basis": "resolver + current AFE stack"
+            }
+          ],
+          "mountingHoles": 4,
+          "rationale": "form_follows_traction_control_board"
+        },
+        "requiresKiCadDeliverable": true
+      }
+    ],
+    "unassignedWordIds": [],
+    "rationale": [
+      "traction_inverter_requires_gate_drive_and_control_boards"
+    ],
+    "confidence": "medium",
+    "onBoardElectronicPartCount": 4
+  },
+  "designFitness": {
+    "ok": true,
+    "findings": []
+  },
+  "pipeline": {
+    "ok": true,
+    "stageReached": "complete",
+    "routed": true,
+    "drc": {
+      "ran": true,
+      "violations": 0
+    },
+    "errors": [],
+    "components": 60,
+    "gerbers": {
+      "dir": "/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/formula-e-front-mgu-20260729-1432/pcb-boards/traction_gate_drive/pcb/gerbers",
+      "files": [
+        "/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/formula-e-front-mgu-20260729-1432/pcb-boards/traction_gate_drive/pcb/gerbers/board-routed-B_Adhesive.gba",
+        "/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/formula-e-front-mgu-20260729-1432/pcb-boards/traction_gate_drive/pcb/gerbers/board-routed-B_Courtyard.gbr",
+        "/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/formula-e-front-mgu-20260729-1432/pcb-boards/traction_gate_drive/pcb/gerbers/board-routed-B_Cu.gbl",
+        "/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/formula-e-front-mgu-20260729-1432/pcb-boards/traction_gate_drive/pcb/gerbers/board-routed-B_Fab.gbr",
+        "/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/formula-e-front-mgu-20260729-1432/pcb-boards/traction_gate_drive/pcb/gerbers/board-routed-B_Mask.gbs",
+        "/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/formula-e-front-mgu-20260729-1432/pcb-boards/traction_gate_drive/pcb/gerbers/board-routed-B_Paste.gbp",
+        "/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/formula-e-front-mgu-20260729-1432/pcb-boards/traction_gate_drive/pcb/gerbers/board-routed-B_Silkscreen.gbo",
+        "/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/formula-e-front-mgu-20260729-1432/pcb-boards/traction_gate_drive/pcb/gerbers/board-routed-Edge_Cuts.gm1",
+        "/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/formula-e-front-mgu-20260729-1432/pcb-boards/traction_gate_drive/pcb/gerbers/board-routed-F_Adhesive.gta",
+        "/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/formula-e-front-mgu-20260729-1432/pcb-boards/traction_gate_drive/pcb/gerbers/board-routed-F_Courtyard.gbr",
+        "/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/formula-e-front-mgu-20260729-1432/pcb-boards/traction_gate_drive/pcb/gerbers/board-routed-F_Cu.gtl",
+        "/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/formula-e-front-mgu-20260729-1432/pcb-boards/traction_gate_drive/pcb/gerbers/board-routed-F_Fab.gbr",
+        "/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/formula-e-front-mgu-20260729-1432/pcb-boards/traction_gate_drive/pcb/gerbers/board-routed-F_Mask.gts",
+        "/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/formula-e-front-mgu-20260729-1432/pcb-boards/traction_gate_drive/pcb/gerbers/board-routed-F_Paste.gtp",
+        "/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/formula-e-front-mgu-20260729-1432/pcb-boards/traction_gate_drive/pcb/gerbers/board-routed-F_Silkscreen.gto",
+        "/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/formula-e-front-mgu-20260729-1432/pcb-boards/traction_gate_drive/pcb/gerbers/board-routed-In1_Cu.g1",
+        "/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/formula-e-front-mgu-20260729-1432/pcb-boards/traction_gate_drive/pcb/gerbers/board-routed-In2_Cu.g2",
+        "/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/formula-e-front-mgu-20260729-1432/pcb-boards/traction_gate_drive/pcb/gerbers/board-routed-Margin.gbr",
+        "/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/formula-e-front-mgu-20260729-1432/pcb-boards/traction_gate_drive/pcb/gerbers/board-routed-User_Comments.gbr",
+        "/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/formula-e-front-mgu-20260729-1432/pcb-boards/traction_gate_drive/pcb/gerbers/board-routed-User_Drawings.gbr",
+        "/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/formula-e-front-mgu-20260729-1432/pcb-boards/traction_gate_drive/pcb/gerbers/board-routed-job.gbrjob",
+        "/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/formula-e-front-mgu-20260729-1432/pcb-boards/traction_control/pcb/gerbers/board-routed-B_Adhesive.gba",
+        "/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/formula-e-front-mgu-20260729-1432/pcb-boards/traction_control/pcb/gerbers/board-routed-B_Courtyard.gbr",
+        "/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/formula-e-front-mgu-20260729-1432/pcb-boards/traction_control/pcb/gerbers/board-routed-B_Cu.gbl",
+        "/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/formula-e-front-mgu-20260729-1432/pcb-boards/traction_control/pcb/gerbers/board-routed-B_Fab.gbr",
+        "/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/formula-e-front-mgu-20260729-1432/pcb-boards/traction_control/pcb/gerbers/board-routed-B_Mask.gbs",
+        "/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/formula-e-front-mgu-20260729-1432/pcb-boards/traction_control/pcb/gerbers/board-routed-B_Paste.gbp",
+        "/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/formula-e-front-mgu-20260729-1432/pcb-boards/traction_control/pcb/gerbers/board-routed-B_Silkscreen.gbo",
+        "/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/formula-e-front-mgu-20260729-1432/pcb-boards/traction_control/pcb/gerbers/board-routed-Edge_Cuts.gm1",
+        "/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/formula-e-front-mgu-20260729-1432/pcb-boards/traction_control/pcb/gerbers/board-routed-F_Adhesive.gta",
+        "/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/formula-e-front-mgu-20260729-1432/pcb-boards/traction_control/pcb/gerbers/board-routed-F_Courtyard.gbr",
+        "/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/formula-e-front-mgu-20260729-1432/pcb-boards/traction_control/pcb/gerbers/board-routed-F_Cu.gtl",
+        "/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/formula-e-front-mgu-20260729-1432/pcb-boards/traction_control/pcb/gerbers/board-routed-F_Fab.gbr",
+        "/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/formula-e-front-mgu-20260729-1432/pcb-boards/traction_control/pcb/gerbers/board-routed-F_Mask.gts",
+        "/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/formula-e-front-mgu-20260729-1432/pcb-boards/traction_control/pcb/gerbers/board-routed-F_Paste.gtp",
+        "/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/formula-e-front-mgu-20260729-1432/pcb-boards/traction_control/pcb/gerbers/board-routed-F_Silkscreen.gto",
+        "/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/formula-e-front-mgu-20260729-1432/pcb-boards/traction_control/pcb/gerbers/board-routed-In1_Cu.g1",
+        "/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/formula-e-front-mgu-20260729-1432/pcb-boards/traction_control/pcb/gerbers/board-routed-In2_Cu.g2",
+        "/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/formula-e-front-mgu-20260729-1432/pcb-boards/traction_control/pcb/gerbers/board-routed-Margin.gbr",
+        "/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/formula-e-front-mgu-20260729-1432/pcb-boards/traction_control/pcb/gerbers/board-routed-User_Comments.gbr",
+        "/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/formula-e-front-mgu-20260729-1432/pcb-boards/traction_control/pcb/gerbers/board-routed-User_Drawings.gbr",
+        "/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/formula-e-front-mgu-20260729-1432/pcb-boards/traction_control/pcb/gerbers/board-routed-job.gbrjob"
+      ]
+    },
+    "drill": {
+      "dir": "/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/formula-e-front-mgu-20260729-1432/pcb-boards/traction_gate_drive/pcb/drill",
+      "files": [
+        "/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/formula-e-front-mgu-20260729-1432/pcb-boards/traction_gate_drive/pcb/drill/board-routed.drl",
+        "/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/formula-e-front-mgu-20260729-1432/pcb-boards/traction_control/pcb/drill/board-routed.drl"
+      ]
+    },
+    "pos": {
+      "path": "/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/formula-e-front-mgu-20260729-1432/pcb/positions.csv"
+    },
+    "generator": {
+      "componentCount": 60,
+      "netCount": 27,
+      "offBoardCount": 0,
+      "offBoard": [],
+      "unresolvedCount": 0,
+      "unresolved": [],
+      "components": [
+        {
+          "instanceName": "gate_driver_board_word",
+          "nameHuman": "Gate Driver Board",
+          "characterId": "gate_driver_board",
+          "manufacturer": null,
+          "partNumber": null,
+          "footprint": {
+            "library": "Package_SO",
+            "footprint": "SOIC-8_3.9x4.9mm_P1.27mm"
+          },
+          "resolutionTier": "package_family",
+          "quantityInDesign": 1
+        },
+        {
+          "instanceName": "isolated_gate_driver_channel_word__1",
+          "nameHuman": "Draft isolated gate-driver channel",
+          "characterId": "isolated_gate_driver_channel",
+          "manufacturer": null,
+          "partNumber": null,
+          "footprint": {
+            "library": "Package_SO",
+            "footprint": "SOIC-8_3.81x9.347mm_P2.54mm"
+          },
+          "resolutionTier": "package_family",
+          "quantityInDesign": 1
+        },
+        {
+          "instanceName": "isolated_gate_driver_channel_word__2",
+          "nameHuman": "Draft isolated gate-driver channel",
+          "characterId": "isolated_gate_driver_channel",
+          "manufacturer": null,
+          "partNumber": null,
+          "footprint": {
+            "library": "Package_SO",
+            "footprint": "SOIC-8_3.81x9.347mm_P2.54mm"
+          },
+          "resolutionTier": "package_family",
+          "quantityInDesign": 1
+        },
+        {
+          "instanceName": "isolated_gate_driver_channel_word__3",
+          "nameHuman": "Draft isolated gate-driver channel",
+          "characterId": "isolated_gate_driver_channel",
+          "manufacturer": null,
+          "partNumber": null,
+          "footprint": {
+            "library": "Package_SO",
+            "footprint": "SOIC-8_3.81x9.347mm_P2.54mm"
+          },
+          "resolutionTier": "package_family",
+          "quantityInDesign": 1
+        },
+        {
+          "instanceName": "isolated_gate_driver_channel_word__4",
+          "nameHuman": "Draft isolated gate-driver channel",
+          "characterId": "isolated_gate_driver_channel",
+          "manufacturer": null,
+          "partNumber": null,
+          "footprint": {
+            "library": "Package_SO",
+            "footprint": "SOIC-8_3.81x9.347mm_P2.54mm"
+          },
+          "resolutionTier": "package_family",
+          "quantityInDesign": 1
+        },
+        {
+          "instanceName": "isolated_gate_driver_channel_word__5",
+          "nameHuman": "Draft isolated gate-driver channel",
+          "characterId": "isolated_gate_driver_channel",
+          "manufacturer": null,
+          "partNumber": null,
+          "footprint": {
+            "library": "Package_SO",
+            "footprint": "SOIC-8_3.81x9.347mm_P2.54mm"
+          },
+          "resolutionTier": "package_family",
+          "quantityInDesign": 1
+        },
+        {
+          "instanceName": "isolated_gate_driver_channel_word__6",
+          "nameHuman": "Draft isolated gate-driver channel",
+          "characterId": "isolated_gate_driver_channel",
+          "manufacturer": null,
+          "partNumber": null,
+          "footprint": {
+            "library": "Package_SO",
+            "footprint": "SOIC-8_3.81x9.347mm_P2.54mm"
+          },
+          "resolutionTier": "package_family",
+          "quantityInDesign": 1
+        },
+        {
+          "instanceName": "desat_protection_channel_word__1",
+          "nameHuman": "Draft desaturation-protection channel",
+          "characterId": "desat_protection_channel",
+          "manufacturer": null,
+          "partNumber": null,
+          "footprint": {
+            "library": "Package_SO",
+            "footprint": "SOIC-8_3.81x9.347mm_P2.54mm"
+          },
+          "resolutionTier": "package_family",
+          "quantityInDesign": 1
+        },
+        {
+          "instanceName": "desat_protection_channel_word__2",
+          "nameHuman": "Draft desaturation-protection channel",
+          "characterId": "desat_protection_channel",
+          "manufacturer": null,
+          "partNumber": null,
+          "footprint": {
+            "library": "Package_SO",
+            "footprint": "SOIC-8_3.81x9.347mm_P2.54mm"
+          },
+          "resolutionTier": "package_family",
+          "quantityInDesign": 1
+        },
+        {
+          "instanceName": "desat_protection_channel_word__3",
+          "nameHuman": "Draft desaturation-protection channel",
+          "characterId": "desat_protection_channel",
+          "manufacturer": null,
+          "partNumber": null,
+          "footprint": {
+            "library": "Package_SO",
+            "footprint": "SOIC-8_3.81x9.347mm_P2.54mm"
+          },
+          "resolutionTier": "package_family",
+          "quantityInDesign": 1
+        },
+        {
+          "instanceName": "desat_protection_channel_word__4",
+          "nameHuman": "Draft desaturation-protection channel",
+          "characterId": "desat_protection_channel",
+          "manufacturer": null,
+          "partNumber": null,
+          "footprint": {
+            "library": "Package_SO",
+            "footprint": "SOIC-8_3.81x9.347mm_P2.54mm"
+          },
+          "resolutionTier": "package_family",
+          "quantityInDesign": 1
+        },
+        {
+          "instanceName": "desat_protection_channel_word__5",
+          "nameHuman": "Draft desaturation-protection channel",
+          "characterId": "desat_protection_channel",
+          "manufacturer": null,
+          "partNumber": null,
+          "footprint": {
+            "library": "Package_SO",
+            "footprint": "SOIC-8_3.81x9.347mm_P2.54mm"
+          },
+          "resolutionTier": "package_family",
+          "quantityInDesign": 1
+        },
+        {
+          "instanceName": "desat_protection_channel_word__6",
+          "nameHuman": "Draft desaturation-protection channel",
+          "characterId": "desat_protection_channel",
+          "manufacturer": null,
+          "partNumber": null,
+          "footprint": {
+            "library": "Package_SO",
+            "footprint": "SOIC-8_3.81x9.347mm_P2.54mm"
+          },
+          "resolutionTier": "package_family",
+          "quantityInDesign": 1
+        },
+        {
+          "instanceName": "gate_drive_output_connector_word__1",
+          "nameHuman": "Draft gate-drive output connector",
+          "characterId": "gate_drive_output_connector",
+          "manufacturer": null,
+          "partNumber": null,
+          "footprint": {
+            "library": "Connector_JST",
+            "footprint": "JST_XH_B2B-XH-A_1x02_P2.50mm_Vertical"
+          },
+          "resolutionTier": "package_family",
+          "quantityInDesign": 1
+        },
+        {
+          "instanceName": "gate_drive_output_connector_word__2",
+          "nameHuman": "Draft gate-drive output connector",
+          "characterId": "gate_drive_output_connector",
+          "manufacturer": null,
+          "partNumber": null,
+          "footprint": {
+            "library": "Connector_JST",
+            "footprint": "JST_XH_B2B-XH-A_1x02_P2.50mm_Vertical"
+          },
+          "resolutionTier": "package_family",
+          "quantityInDesign": 1
+        },
+        {
+          "instanceName": "gate_drive_output_connector_word__3",
+          "nameHuman": "Draft gate-drive output connector",
+          "characterId": "gate_drive_output_connector",
+          "manufacturer": null,
+          "partNumber": null,
+          "footprint": {
+            "library": "Connector_JST",
+            "footprint": "JST_XH_B2B-XH-A_1x02_P2.50mm_Vertical"
+          },
+          "resolutionTier": "package_family",
+          "quantityInDesign": 1
+        },
+        {
+          "instanceName": "gate_drive_output_connector_word__4",
+          "nameHuman": "Draft gate-drive output connector",
+          "characterId": "gate_drive_output_connector",
+          "manufacturer": null,
+          "partNumber": null,
+          "footprint": {
+            "library": "Connector_JST",
+            "footprint": "JST_XH_B2B-XH-A_1x02_P2.50mm_Vertical"
+          },
+          "resolutionTier": "package_family",
+          "quantityInDesign": 1
+        },
+        {
+          "instanceName": "gate_drive_output_connector_word__5",
+          "nameHuman": "Draft gate-drive output connector",
+          "characterId": "gate_drive_output_connector",
+          "manufacturer": null,
+          "partNumber": null,
+          "footprint": {
+            "library": "Connector_JST",
+            "footprint": "JST_XH_B2B-XH-A_1x02_P2.50mm_Vertical"
+          },
+          "resolutionTier": "package_family",
+          "quantityInDesign": 1
+        },
+        {
+          "instanceName": "gate_drive_output_connector_word__6",
+          "nameHuman": "Draft gate-drive output connector",
+          "characterId": "gate_drive_output_connector",
+          "manufacturer": null,
+          "partNumber": null,
+          "footprint": {
+            "library": "Connector_JST",
+            "footprint": "JST_XH_B2B-XH-A_1x02_P2.50mm_Vertical"
+          },
+          "resolutionTier": "package_family",
+          "quantityInDesign": 1
+        },
+        {
+          "instanceName": "decouple_gate_driver_board_word",
+          "nameHuman": "Decoupling capacitor (Gate Driver Board)",
+          "characterId": "decoupling_capacitor",
+          "manufacturer": "YAGEO",
+          "partNumber": "CC0603KRX7R9BB104",
+          "footprint": {
+            "library": "Capacitor_SMD",
+            "footprint": "C_0603_1608Metric"
+          },
+          "resolutionTier": "mpn_symbol_footprint",
+          "quantityInDesign": 1
+        },
+        {
+          "instanceName": "decouple_isolated_gate_driver_channel_word__1",
+          "nameHuman": "Decoupling capacitor (Draft isolated gate-driver channel)",
+          "characterId": "decoupling_capacitor",
+          "manufacturer": "YAGEO",
+          "partNumber": "CC0603KRX7R9BB104",
+          "footprint": {
+            "library": "Capacitor_SMD",
+            "footprint": "C_0603_1608Metric"
+          },
+          "resolutionTier": "mpn_symbol_footprint",
+          "quantityInDesign": 1
+        },
+        {
+          "instanceName": "decouple_isolated_gate_driver_channel_word__2",
+          "nameHuman": "Decoupling capacitor (Draft isolated gate-driver channel)",
+          "characterId": "decoupling_capacitor",
+          "manufacturer": "YAGEO",
+          "partNumber": "CC0603KRX7R9BB104",
+          "footprint": {
+            "library": "Capacitor_SMD",
+            "footprint": "C_0603_1608Metric"
+          },
+          "resolutionTier": "mpn_symbol_footprint",
+          "quantityInDesign": 1
+        },
+        {
+          "instanceName": "decouple_isolated_gate_driver_channel_word__3",
+          "nameHuman": "Decoupling capacitor (Draft isolated gate-driver channel)",
+          "characterId": "decoupling_capacitor",
+          "manufacturer": "YAGEO",
+          "partNumber": "CC0603KRX7R9BB104",
+          "footprint": {
+            "library": "Capacitor_SMD",
+            "footprint": "C_0603_1608Metric"
+          },
+          "resolutionTier": "mpn_symbol_footprint",
+          "quantityInDesign": 1
+        },
+        {
+          "instanceName": "decouple_isolated_gate_driver_channel_word__4",
+          "nameHuman": "Decoupling capacitor (Draft isolated gate-driver channel)",
+          "characterId": "decoupling_capacitor",
+          "manufacturer": "YAGEO",
+          "partNumber": "CC0603KRX7R9BB104",
+          "footprint": {
+            "library": "Capacitor_SMD",
+            "footprint": "C_0603_1608Metric"
+          },
+          "resolutionTier": "mpn_symbol_footprint",
+          "quantityInDesign": 1
+        },
+        {
+          "instanceName": "decouple_isolated_gate_driver_channel_word__5",
+          "nameHuman": "Decoupling capacitor (Draft isolated gate-driver channel)",
+          "characterId": "decoupling_capacitor",
+          "manufacturer": "YAGEO",
+          "partNumber": "CC0603KRX7R9BB104",
+          "footprint": {
+            "library": "Capacitor_SMD",
+            "footprint": "C_0603_1608Metric"
+          },
+          "resolutionTier": "mpn_symbol_footprint",
+          "quantityInDesign": 1
+        },
+        {
+          "instanceName": "decouple_isolated_gate_driver_channel_word__6",
+          "nameHuman": "Decoupling capacitor (Draft isolated gate-driver channel)",
+          "characterId": "decoupling_capacitor",
+          "manufacturer": "YAGEO",
+          "partNumber": "CC0603KRX7R9BB104",
+          "footprint": {
+            "library": "Capacitor_SMD",
+            "footprint": "C_0603_1608Metric"
+          },
+          "resolutionTier": "mpn_symbol_footprint",
+          "quantityInDesign": 1
+        },
+        {
+          "instanceName": "decouple_desat_protection_channel_word__1",
+          "nameHuman": "Decoupling capacitor (Draft desaturation-protection channel)",
+          "characterId": "decoupling_capacitor",
+          "manufacturer": "YAGEO",
+          "partNumber": "CC0603KRX7R9BB104",
+          "footprint": {
+            "library": "Capacitor_SMD",
+            "footprint": "C_0603_1608Metric"
+          },
+          "resolutionTier": "mpn_symbol_footprint",
+          "quantityInDesign": 1
+        },
+        {
+          "instanceName": "decouple_desat_protection_channel_word__2",
+          "nameHuman": "Decoupling capacitor (Draft desaturation-protection channel)",
+          "characterId": "decoupling_capacitor",
+          "manufacturer": "YAGEO",
+          "partNumber": "CC0603KRX7R9BB104",
+          "footprint": {
+            "library": "Capacitor_SMD",
+            "footprint": "C_0603_1608Metric"
+          },
+          "resolutionTier": "mpn_symbol_footprint",
+          "quantityInDesign": 1
+        },
+        {
+          "instanceName": "decouple_desat_protection_channel_word__3",
+          "nameHuman": "Decoupling capacitor (Draft desaturation-protection channel)",
+          "characterId": "decoupling_capacitor",
+          "manufacturer": "YAGEO",
+          "partNumber": "CC0603KRX7R9BB104",
+          "footprint": {
+            "library": "Capacitor_SMD",
+            "footprint": "C_0603_1608Metric"
+          },
+          "resolutionTier": "mpn_symbol_footprint",
+          "quantityInDesign": 1
+        },
+        {
+          "instanceName": "decouple_desat_protection_channel_word__4",
+          "nameHuman": "Decoupling capacitor (Draft desaturation-protection channel)",
+          "characterId": "decoupling_capacitor",
+          "manufacturer": "YAGEO",
+          "partNumber": "CC0603KRX7R9BB104",
+          "footprint": {
+            "library": "Capacitor_SMD",
+            "footprint": "C_0603_1608Metric"
+          },
+          "resolutionTier": "mpn_symbol_footprint",
+          "quantityInDesign": 1
+        },
+        {
+          "instanceName": "decouple_desat_protection_channel_word__5",
+          "nameHuman": "Decoupling capacitor (Draft desaturation-protection channel)",
+          "characterId": "decoupling_capacitor",
+          "manufacturer": "YAGEO",
+          "partNumber": "CC0603KRX7R9BB104",
+          "footprint": {
+            "library": "Capacitor_SMD",
+            "footprint": "C_0603_1608Metric"
+          },
+          "resolutionTier": "mpn_symbol_footprint",
+          "quantityInDesign": 1
+        },
+        {
+          "instanceName": "decouple_desat_protection_channel_word__6",
+          "nameHuman": "Decoupling capacitor (Draft desaturation-protection channel)",
+          "characterId": "decoupling_capacitor",
+          "manufacturer": "YAGEO",
+          "partNumber": "CC0603KRX7R9BB104",
+          "footprint": {
+            "library": "Capacitor_SMD",
+            "footprint": "C_0603_1608Metric"
+          },
+          "resolutionTier": "mpn_symbol_footprint",
+          "quantityInDesign": 1
+        },
+        {
+          "instanceName": "phase_current_sensor_word__1",
+          "nameHuman": "Phase Current Sensor",
+          "characterId": "phase_current_sensor",
+          "manufacturer": "LEM",
+          "partNumber": "HASS 100-S",
+          "footprint": {
+            "library": "Sensor_Current",
+            "footprint": "LEM_HTFS"
+          },
+          "resolutionTier": "mpn_package_only",
+          "quantityInDesign": 1
+        },
+        {
+          "instanceName": "phase_current_sensor_word__2",
+          "nameHuman": "Phase Current Sensor",
+          "characterId": "phase_current_sensor",
+          "manufacturer": "LEM",
+          "partNumber": "HASS 100-S",
+          "footprint": {
+            "library": "Sensor_Current",
+            "footprint": "LEM_HTFS"
+          },
+          "resolutionTier": "mpn_package_only",
+          "quantityInDesign": 1
+        },
+        {
+          "instanceName": "phase_current_sensor_word__3",
+          "nameHuman": "Phase Current Sensor",
+          "characterId": "phase_current_sensor",
+          "manufacturer": "LEM",
+          "partNumber": "HASS 100-S",
+          "footprint": {
+            "library": "Sensor_Current",
+            "footprint": "LEM_HTFS"
+          },
+          "resolutionTier": "mpn_package_only",
+          "quantityInDesign": 1
+        },
+        {
+          "instanceName": "resolver_signal_interface_word",
+          "nameHuman": "Resolver Signal Interface",
+          "characterId": "resolver_signal_interface",
+          "manufacturer": "ABB",
+          "partNumber": "RRIA",
+          "footprint": {
+            "library": "Package_SO",
+            "footprint": "SOIC-8_3.9x4.9mm_P1.27mm"
+          },
+          "resolutionTier": "mpn_package_only",
+          "quantityInDesign": 1
+        },
+        {
+          "instanceName": "temperature_probe_word",
+          "nameHuman": "Temperature Probe",
+          "characterId": "temperature_probe",
+          "manufacturer": "Texas Instruments",
+          "partNumber": "TMP1075DSGR",
+          "footprint": {
+            "library": "Package_SO",
+            "footprint": "SOIC-8_3.9x4.9mm_P1.27mm"
+          },
+          "resolutionTier": "mpn_package_only",
+          "quantityInDesign": 1
+        },
+        {
+          "instanceName": "control_mcu_word",
+          "nameHuman": "Real-time MCU",
+          "characterId": "control_mcu",
+          "manufacturer": "Microchip Technology",
+          "partNumber": "ATSAMD21G18A-AU",
+          "footprint": {
+            "library": "Package_QFP",
+            "footprint": "TQFP-48_7x7mm_P0.5mm"
+          },
+          "resolutionTier": "mpn_symbol_footprint",
+          "quantityInDesign": 1
+        },
+        {
+          "instanceName": "can_fd_transceiver_word",
+          "nameHuman": "CAN-FD transceiver",
+          "characterId": "can_fd_transceiver",
+          "manufacturer": null,
+          "partNumber": null,
+          "footprint": {
+            "library": "Package_DFN_QFN",
+            "footprint": "QFN-24-1EP_4x4mm_P0.5mm_EP2.6x2.6mm"
+          },
+          "resolutionTier": "package_family",
+          "quantityInDesign": 1
+        },
+        {
+          "instanceName": "current_sense_front_end_word__1",
+          "nameHuman": "Phase current sense front-end",
+          "characterId": "current_sense_front_end",
+          "manufacturer": null,
+          "partNumber": null,
+          "footprint": {
+            "library": "Package_SO",
+            "footprint": "SOIC-8_3.9x4.9mm_P1.27mm"
+          },
+          "resolutionTier": "package_family",
+          "quantityInDesign": 1
+        },
+        {
+          "instanceName": "current_sense_front_end_word__2",
+          "nameHuman": "Phase current sense front-end",
+          "characterId": "current_sense_front_end",
+          "manufacturer": null,
+          "partNumber": null,
+          "footprint": {
+            "library": "Package_SO",
+            "footprint": "SOIC-8_3.9x4.9mm_P1.27mm"
+          },
+          "resolutionTier": "package_family",
+          "quantityInDesign": 1
+        },
+        {
+          "instanceName": "current_sense_front_end_word__3",
+          "nameHuman": "Phase current sense front-end",
+          "characterId": "current_sense_front_end",
+          "manufacturer": null,
+          "partNumber": null,
+          "footprint": {
+            "library": "Package_SO",
+            "footprint": "SOIC-8_3.9x4.9mm_P1.27mm"
+          },
+          "resolutionTier": "package_family",
+          "quantityInDesign": 1
+        },
+        {
+          "instanceName": "lv_buck_rails_word__1",
+          "nameHuman": "LV buck power rails",
+          "characterId": "lv_buck_rails",
+          "manufacturer": null,
+          "partNumber": null,
+          "footprint": {
+            "library": "Package_TO_SOT_SMD",
+            "footprint": "SOT-23"
+          },
+          "resolutionTier": "package_family",
+          "quantityInDesign": 1
+        },
+        {
+          "instanceName": "lv_buck_rails_word__2",
+          "nameHuman": "LV buck power rails",
+          "characterId": "lv_buck_rails",
+          "manufacturer": null,
+          "partNumber": null,
+          "footprint": {
+            "library": "Package_TO_SOT_SMD",
+            "footprint": "SOT-23"
+          },
+          "resolutionTier": "package_family",
+          "quantityInDesign": 1
+        },
+        {
+          "instanceName": "lv_buck_rails_word__3",
+          "nameHuman": "LV buck power rails",
+          "characterId": "lv_buck_rails",
+          "manufacturer": null,
+          "partNumber": null,
+          "footprint": {
+            "library": "Package_TO_SOT_SMD",
+            "footprint": "SOT-23"
+          },
+          "resolutionTier": "package_family",
+          "quantityInDesign": 1
+        },
+        {
+          "instanceName": "hv_lv_isolation_barrier_word",
+          "nameHuman": "Draft HV/LV signal isolation barrier",
+          "characterId": "hv_lv_isolation_barrier",
+          "manufacturer": null,
+          "partNumber": null,
+          "footprint": {
+            "library": "Package_SO",
+            "footprint": "SOIC-8_3.81x9.347mm_P2.54mm"
+          },
+          "resolutionTier": "package_family",
+          "quantityInDesign": 1
+        },
+        {
+          "instanceName": "decouple_phase_current_sensor_word__1",
+          "nameHuman": "Decoupling capacitor (Phase Current Sensor)",
+          "characterId": "decoupling_capacitor",
+          "manufacturer": "YAGEO",
+          "partNumber": "CC0603KRX7R9BB104",
+          "footprint": {
+            "library": "Capacitor_SMD",
+            "footprint": "C_0603_1608Metric"
+          },
+          "resolutionTier": "mpn_symbol_footprint",
+          "quantityInDesign": 1
+        },
+        {
+          "instanceName": "decouple_phase_current_sensor_word__2",
+          "nameHuman": "Decoupling capacitor (Phase Current Sensor)",
+          "characterId": "decoupling_capacitor",
+          "manufacturer": "YAGEO",
+          "partNumber": "CC0603KRX7R9BB104",
+          "footprint": {
+            "library": "Capacitor_SMD",
+            "footprint": "C_0603_1608Metric"
+          },
+          "resolutionTier": "mpn_symbol_footprint",
+          "quantityInDesign": 1
+        },
+        {
+          "instanceName": "decouple_phase_current_sensor_word__3",
+          "nameHuman": "Decoupling capacitor (Phase Current Sensor)",
+          "characterId": "decoupling_capacitor",
+          "manufacturer": "YAGEO",
+          "partNumber": "CC0603KRX7R9BB104",
+          "footprint": {
+            "library": "Capacitor_SMD",
+            "footprint": "C_0603_1608Metric"
+          },
+          "resolutionTier": "mpn_symbol_footprint",
+          "quantityInDesign": 1
+        },
+        {
+          "instanceName": "decouple_resolver_signal_interface_word",
+          "nameHuman": "Decoupling capacitor (Resolver Signal Interface)",
+          "characterId": "decoupling_capacitor",
+          "manufacturer": "YAGEO",
+          "partNumber": "CC0603KRX7R9BB104",
+          "footprint": {
+            "library": "Capacitor_SMD",
+            "footprint": "C_0603_1608Metric"
+          },
+          "resolutionTier": "mpn_symbol_footprint",
+          "quantityInDesign": 1
+        },
+        {
+          "instanceName": "decouple_temperature_probe_word",
+          "nameHuman": "Decoupling capacitor (Temperature Probe)",
+          "characterId": "decoupling_capacitor",
+          "manufacturer": "YAGEO",
+          "partNumber": "CC0603KRX7R9BB104",
+          "footprint": {
+            "library": "Capacitor_SMD",
+            "footprint": "C_0603_1608Metric"
+          },
+          "resolutionTier": "mpn_symbol_footprint",
+          "quantityInDesign": 1
+        },
+        {
+          "instanceName": "decouple_control_mcu_word",
+          "nameHuman": "Decoupling capacitor (Real-time MCU)",
+          "characterId": "decoupling_capacitor",
+          "manufacturer": "YAGEO",
+          "partNumber": "CC0603KRX7R9BB104",
+          "footprint": {
+            "library": "Capacitor_SMD",
+            "footprint": "C_0603_1608Metric"
+          },
+          "resolutionTier": "mpn_symbol_footprint",
+          "quantityInDesign": 1
+        },
+        {
+          "instanceName": "decouple_can_fd_transceiver_word",
+          "nameHuman": "Decoupling capacitor (CAN-FD transceiver)",
+          "characterId": "decoupling_capacitor",
+          "manufacturer": "YAGEO",
+          "partNumber": "CC0603KRX7R9BB104",
+          "footprint": {
+            "library": "Capacitor_SMD",
+            "footprint": "C_0603_1608Metric"
+          },
+          "resolutionTier": "mpn_symbol_footprint",
+          "quantityInDesign": 1
+        },
+        {
+          "instanceName": "decouple_current_sense_front_end_word__1",
+          "nameHuman": "Decoupling capacitor (Phase current sense front-end)",
+          "characterId": "decoupling_capacitor",
+          "manufacturer": "YAGEO",
+          "partNumber": "CC0603KRX7R9BB104",
+          "footprint": {
+            "library": "Capacitor_SMD",
+            "footprint": "C_0603_1608Metric"
+          },
+          "resolutionTier": "mpn_symbol_footprint",
+          "quantityInDesign": 1
+        },
+        {
+          "instanceName": "decouple_current_sense_front_end_word__2",
+          "nameHuman": "Decoupling capacitor (Phase current sense front-end)",
+          "characterId": "decoupling_capacitor",
+          "manufacturer": "YAGEO",
+          "partNumber": "CC0603KRX7R9BB104",
+          "footprint": {
+            "library": "Capacitor_SMD",
+            "footprint": "C_0603_1608Metric"
+          },
+          "resolutionTier": "mpn_symbol_footprint",
+          "quantityInDesign": 1
+        },
+        {
+          "instanceName": "decouple_current_sense_front_end_word__3",
+          "nameHuman": "Decoupling capacitor (Phase current sense front-end)",
+          "characterId": "decoupling_capacitor",
+          "manufacturer": "YAGEO",
+          "partNumber": "CC0603KRX7R9BB104",
+          "footprint": {
+            "library": "Capacitor_SMD",
+            "footprint": "C_0603_1608Metric"
+          },
+          "resolutionTier": "mpn_symbol_footprint",
+          "quantityInDesign": 1
+        },
+        {
+          "instanceName": "decouple_lv_buck_rails_word__1",
+          "nameHuman": "Decoupling capacitor (LV buck power rails)",
+          "characterId": "decoupling_capacitor",
+          "manufacturer": "YAGEO",
+          "partNumber": "CC0603KRX7R9BB104",
+          "footprint": {
+            "library": "Capacitor_SMD",
+            "footprint": "C_0603_1608Metric"
+          },
+          "resolutionTier": "mpn_symbol_footprint",
+          "quantityInDesign": 1
+        },
+        {
+          "instanceName": "decouple_lv_buck_rails_word__2",
+          "nameHuman": "Decoupling capacitor (LV buck power rails)",
+          "characterId": "decoupling_capacitor",
+          "manufacturer": "YAGEO",
+          "partNumber": "CC0603KRX7R9BB104",
+          "footprint": {
+            "library": "Capacitor_SMD",
+            "footprint": "C_0603_1608Metric"
+          },
+          "resolutionTier": "mpn_symbol_footprint",
+          "quantityInDesign": 1
+        },
+        {
+          "instanceName": "decouple_lv_buck_rails_word__3",
+          "nameHuman": "Decoupling capacitor (LV buck power rails)",
+          "characterId": "decoupling_capacitor",
+          "manufacturer": "YAGEO",
+          "partNumber": "CC0603KRX7R9BB104",
+          "footprint": {
+            "library": "Capacitor_SMD",
+            "footprint": "C_0603_1608Metric"
+          },
+          "resolutionTier": "mpn_symbol_footprint",
+          "quantityInDesign": 1
+        },
+        {
+          "instanceName": "decouple_hv_lv_isolation_barrier_word",
+          "nameHuman": "Decoupling capacitor (Draft HV/LV signal isolation barrier)",
+          "characterId": "decoupling_capacitor",
+          "manufacturer": "YAGEO",
+          "partNumber": "CC0603KRX7R9BB104",
+          "footprint": {
+            "library": "Capacitor_SMD",
+            "footprint": "C_0603_1608Metric"
+          },
+          "resolutionTier": "mpn_symbol_footprint",
+          "quantityInDesign": 1
+        }
+      ]
+    }
+  },
+  "boardPipelines": [
+    {
+      "boardId": "traction_gate_drive",
+      "role": "traction_gate_drive_board",
+      "projectDir": "/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/formula-e-front-mgu-20260729-1432/pcb-project/traction_gate_drive",
+      "pipelineOk": true,
+      "stageReached": "complete",
+      "componentCount": 32,
+      "unresolvedCount": 0
+    },
+    {
+      "boardId": "traction_control",
+      "role": "traction_control_board",
+      "projectDir": "/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/formula-e-front-mgu-20260729-1432/pcb-project/traction_control",
+      "pipelineOk": true,
+      "stageReached": "complete",
+      "componentCount": 28,
+      "unresolvedCount": 0
+    }
+  ],
+  "multiBoardMerged": false,
+  "implementedChannels": {
+    "gate_drive_channel": 6,
+    "desat_channel": 6,
+    "phase_current_sense": 3,
+    "resolver_channel": 1,
+    "vehicle_can": 1,
+    "lv_buck_rail": 3,
+    "hv_lv_isolation_barrier": 1
+  },
+  "required_gate_channels": 6,
+  "implemented_gate_channels": 6,
+  "required_channel_counts": {
+    "gate_drive_channel": 6,
+    "desat_channel": 6,
+    "phase_current_sense": 3,
+    "resolver_channel": 1,
+    "vehicle_can": 1,
+    "lv_buck_rail": 3,
+    "hv_lv_isolation_barrier": 1
+  },
+  "implemented_channel_counts": {
+    "gate_drive_channel": 6,
+    "desat_channel": 6,
+    "phase_current_sense": 3,
+    "resolver_channel": 1,
+    "vehicle_can": 1,
+    "lv_buck_rail": 3,
+    "hv_lv_isolation_barrier": 1
+  },
+  "NOT_FABRICATION_READY": true,
+  "forgeDraftOnly": true,
+  "supplierGerbers": false,
+  "hilPresent": false,
+  "ship_ok": false,
+  "supplier_gerbers": "OPEN",
+  "fitness_fail_reason": ""
+}

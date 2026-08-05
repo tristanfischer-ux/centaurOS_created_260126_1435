@@ -32,7 +32,8 @@ We publish **two torque bars**, not one. At the DEC-009 freeze (**24,000 rpm / 1
 | Thermal multiphysics | `45-multiphysics-thermal-field.png` | Radial temperature field (screening) |
 | Capability index | `46-multiphysics-capability-index.png` | **What the system can analyse** |
 | Bar B asks | `44-bar-b-executable-asks-one-pager.md` | Partner artefacts that close holds |
-| PCB | board-routed KiCad + honesty sheet | Draft boards; **not fabrication ready** |
+| PCB | board-routed KiCad + prototype fab packs | Draft-review **B+**; **prototype fab package** (not supplier-released / not HIL) |
+| Blender cycle-3 | `00-hero.png` + ghost/exploded | Race-kit re-render **landed** (HV/LV connectors, SiC stack, QD, machine-band materials) |
 | Workbook | engineering workbook xlsx | 31-tab audit trail |
 
 ---
@@ -66,7 +67,8 @@ We publish **two torque bars**, not one. At the DEC-009 freeze (**24,000 rpm / 1
 ## Hard honesty lines
 
 - Homologation readiness is low until partners replace seeds.  
-- PCB max claim: **DRAFT — NOT FABRICATION READY — UNPROVEN IN HARDWARE**.  
+- PCB max claim: **PROTOTYPE FAB PACKAGE — NOT SUPPLIER-RELEASED — NOT HIL-PROVEN — UNPROVEN IN HARDWARE**.
+- Blender cycle-3 re-render is on disk (heroes + morphology proof).  
 - Thermal field is **not** conjugate heat transfer and **not** a flow-bench calibration.  
 - Iron loss remains a **screening estimate** with a stated two-sided error band; yoke is the dominant volumetric source at ~2.1 T.
 - Twin deterministic checks: **161 pass / 0 fail** (ampacity / ledger / brief targets closed at source). Tab scorecard may still lag until full Excel rebuild.

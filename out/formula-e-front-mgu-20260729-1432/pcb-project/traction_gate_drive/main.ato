@@ -1,0 +1,419 @@
+component Part_gate_driver_board_word:
+    designator_prefix = "U"
+    footprint = "Package_SO:SOIC-8_3.9x4.9mm_P1.27mm"
+    mpn = "TBD (detailed design) - gate_driver_ic"
+    value = "gate_driver_ic"
+    signal VCC ~ pin 1
+    signal GND ~ pin 2
+    signal IN ~ pin 3
+    signal OUT ~ pin 4
+
+component Part_isolated_gate_driver_channel_word__1:
+    designator_prefix = "U"
+    footprint = "Package_SO:SOIC-8_3.81x9.347mm_P2.54mm"
+    mpn = "TBD (detailed design) - gate_driver_ic"
+    value = "gate_driver_ic"
+    signal VCC ~ pin 1
+    signal GND ~ pin 2
+    signal IN ~ pin 3
+    signal OUT ~ pin 4
+    signal DESAT ~ pin 5
+
+component Part_isolated_gate_driver_channel_word__2:
+    designator_prefix = "U"
+    footprint = "Package_SO:SOIC-8_3.81x9.347mm_P2.54mm"
+    mpn = "TBD (detailed design) - gate_driver_ic"
+    value = "gate_driver_ic"
+    signal VCC ~ pin 1
+    signal GND ~ pin 2
+    signal IN ~ pin 3
+    signal OUT ~ pin 4
+    signal DESAT ~ pin 5
+
+component Part_isolated_gate_driver_channel_word__3:
+    designator_prefix = "U"
+    footprint = "Package_SO:SOIC-8_3.81x9.347mm_P2.54mm"
+    mpn = "TBD (detailed design) - gate_driver_ic"
+    value = "gate_driver_ic"
+    signal VCC ~ pin 1
+    signal GND ~ pin 2
+    signal IN ~ pin 3
+    signal OUT ~ pin 4
+    signal DESAT ~ pin 5
+
+component Part_isolated_gate_driver_channel_word__4:
+    designator_prefix = "U"
+    footprint = "Package_SO:SOIC-8_3.81x9.347mm_P2.54mm"
+    mpn = "TBD (detailed design) - gate_driver_ic"
+    value = "gate_driver_ic"
+    signal VCC ~ pin 1
+    signal GND ~ pin 2
+    signal IN ~ pin 3
+    signal OUT ~ pin 4
+    signal DESAT ~ pin 5
+
+component Part_isolated_gate_driver_channel_word__5:
+    designator_prefix = "U"
+    footprint = "Package_SO:SOIC-8_3.81x9.347mm_P2.54mm"
+    mpn = "TBD (detailed design) - gate_driver_ic"
+    value = "gate_driver_ic"
+    signal VCC ~ pin 1
+    signal GND ~ pin 2
+    signal IN ~ pin 3
+    signal OUT ~ pin 4
+    signal DESAT ~ pin 5
+
+component Part_isolated_gate_driver_channel_word__6:
+    designator_prefix = "U"
+    footprint = "Package_SO:SOIC-8_3.81x9.347mm_P2.54mm"
+    mpn = "TBD (detailed design) - gate_driver_ic"
+    value = "gate_driver_ic"
+    signal VCC ~ pin 1
+    signal GND ~ pin 2
+    signal IN ~ pin 3
+    signal OUT ~ pin 4
+    signal DESAT ~ pin 5
+
+component Part_desat_protection_channel_word__1:
+    designator_prefix = "U"
+    footprint = "Package_SO:SOIC-8_3.81x9.347mm_P2.54mm"
+    mpn = "TBD (detailed design) - sensor_ic"
+    value = "sensor_ic"
+    signal VCC ~ pin 1
+    signal GND ~ pin 2
+    signal OUT ~ pin 3
+    signal NC ~ pin 4
+
+component Part_desat_protection_channel_word__2:
+    designator_prefix = "U"
+    footprint = "Package_SO:SOIC-8_3.81x9.347mm_P2.54mm"
+    mpn = "TBD (detailed design) - sensor_ic"
+    value = "sensor_ic"
+    signal VCC ~ pin 1
+    signal GND ~ pin 2
+    signal OUT ~ pin 3
+    signal NC ~ pin 4
+
+component Part_desat_protection_channel_word__3:
+    designator_prefix = "U"
+    footprint = "Package_SO:SOIC-8_3.81x9.347mm_P2.54mm"
+    mpn = "TBD (detailed design) - sensor_ic"
+    value = "sensor_ic"
+    signal VCC ~ pin 1
+    signal GND ~ pin 2
+    signal OUT ~ pin 3
+    signal NC ~ pin 4
+
+component Part_desat_protection_channel_word__4:
+    designator_prefix = "U"
+    footprint = "Package_SO:SOIC-8_3.81x9.347mm_P2.54mm"
+    mpn = "TBD (detailed design) - sensor_ic"
+    value = "sensor_ic"
+    signal VCC ~ pin 1
+    signal GND ~ pin 2
+    signal OUT ~ pin 3
+    signal NC ~ pin 4
+
+component Part_desat_protection_channel_word__5:
+    designator_prefix = "U"
+    footprint = "Package_SO:SOIC-8_3.81x9.347mm_P2.54mm"
+    mpn = "TBD (detailed design) - sensor_ic"
+    value = "sensor_ic"
+    signal VCC ~ pin 1
+    signal GND ~ pin 2
+    signal OUT ~ pin 3
+    signal NC ~ pin 4
+
+component Part_desat_protection_channel_word__6:
+    designator_prefix = "U"
+    footprint = "Package_SO:SOIC-8_3.81x9.347mm_P2.54mm"
+    mpn = "TBD (detailed design) - sensor_ic"
+    value = "sensor_ic"
+    signal VCC ~ pin 1
+    signal GND ~ pin 2
+    signal OUT ~ pin 3
+    signal NC ~ pin 4
+
+component Part_gate_drive_output_connector_word__1:
+    designator_prefix = "J"
+    footprint = "Connector_JST:JST_XH_B2B-XH-A_1x02_P2.50mm_Vertical"
+    mpn = "TBD (detailed design) - connector"
+    value = "connector"
+    signal P1 ~ pin 1
+    signal P2 ~ pin 2
+
+component Part_gate_drive_output_connector_word__2:
+    designator_prefix = "J"
+    footprint = "Connector_JST:JST_XH_B2B-XH-A_1x02_P2.50mm_Vertical"
+    mpn = "TBD (detailed design) - connector"
+    value = "connector"
+    signal P1 ~ pin 1
+    signal P2 ~ pin 2
+
+component Part_gate_drive_output_connector_word__3:
+    designator_prefix = "J"
+    footprint = "Connector_JST:JST_XH_B2B-XH-A_1x02_P2.50mm_Vertical"
+    mpn = "TBD (detailed design) - connector"
+    value = "connector"
+    signal P1 ~ pin 1
+    signal P2 ~ pin 2
+
+component Part_gate_drive_output_connector_word__4:
+    designator_prefix = "J"
+    footprint = "Connector_JST:JST_XH_B2B-XH-A_1x02_P2.50mm_Vertical"
+    mpn = "TBD (detailed design) - connector"
+    value = "connector"
+    signal P1 ~ pin 1
+    signal P2 ~ pin 2
+
+component Part_gate_drive_output_connector_word__5:
+    designator_prefix = "J"
+    footprint = "Connector_JST:JST_XH_B2B-XH-A_1x02_P2.50mm_Vertical"
+    mpn = "TBD (detailed design) - connector"
+    value = "connector"
+    signal P1 ~ pin 1
+    signal P2 ~ pin 2
+
+component Part_gate_drive_output_connector_word__6:
+    designator_prefix = "J"
+    footprint = "Connector_JST:JST_XH_B2B-XH-A_1x02_P2.50mm_Vertical"
+    mpn = "TBD (detailed design) - connector"
+    value = "connector"
+    signal P1 ~ pin 1
+    signal P2 ~ pin 2
+
+component Part_decouple_gate_driver_board_word:
+    designator_prefix = "C"
+    footprint = "Capacitor_SMD:C_0603_1608Metric"
+    mpn = "YAGEO CC0603KRX7R9BB104"
+    value = "CC0603KRX7R9BB104"
+    signal ___1 ~ pin 1
+    signal ___2 ~ pin 2
+
+component Part_decouple_isolated_gate_driver_channel_word__1:
+    designator_prefix = "C"
+    footprint = "Capacitor_SMD:C_0603_1608Metric"
+    mpn = "YAGEO CC0603KRX7R9BB104"
+    value = "CC0603KRX7R9BB104"
+    signal ___1 ~ pin 1
+    signal ___2 ~ pin 2
+
+component Part_decouple_isolated_gate_driver_channel_word__2:
+    designator_prefix = "C"
+    footprint = "Capacitor_SMD:C_0603_1608Metric"
+    mpn = "YAGEO CC0603KRX7R9BB104"
+    value = "CC0603KRX7R9BB104"
+    signal ___1 ~ pin 1
+    signal ___2 ~ pin 2
+
+component Part_decouple_isolated_gate_driver_channel_word__3:
+    designator_prefix = "C"
+    footprint = "Capacitor_SMD:C_0603_1608Metric"
+    mpn = "YAGEO CC0603KRX7R9BB104"
+    value = "CC0603KRX7R9BB104"
+    signal ___1 ~ pin 1
+    signal ___2 ~ pin 2
+
+component Part_decouple_isolated_gate_driver_channel_word__4:
+    designator_prefix = "C"
+    footprint = "Capacitor_SMD:C_0603_1608Metric"
+    mpn = "YAGEO CC0603KRX7R9BB104"
+    value = "CC0603KRX7R9BB104"
+    signal ___1 ~ pin 1
+    signal ___2 ~ pin 2
+
+component Part_decouple_isolated_gate_driver_channel_word__5:
+    designator_prefix = "C"
+    footprint = "Capacitor_SMD:C_0603_1608Metric"
+    mpn = "YAGEO CC0603KRX7R9BB104"
+    value = "CC0603KRX7R9BB104"
+    signal ___1 ~ pin 1
+    signal ___2 ~ pin 2
+
+component Part_decouple_isolated_gate_driver_channel_word__6:
+    designator_prefix = "C"
+    footprint = "Capacitor_SMD:C_0603_1608Metric"
+    mpn = "YAGEO CC0603KRX7R9BB104"
+    value = "CC0603KRX7R9BB104"
+    signal ___1 ~ pin 1
+    signal ___2 ~ pin 2
+
+component Part_decouple_desat_protection_channel_word__1:
+    designator_prefix = "C"
+    footprint = "Capacitor_SMD:C_0603_1608Metric"
+    mpn = "YAGEO CC0603KRX7R9BB104"
+    value = "CC0603KRX7R9BB104"
+    signal ___1 ~ pin 1
+    signal ___2 ~ pin 2
+
+component Part_decouple_desat_protection_channel_word__2:
+    designator_prefix = "C"
+    footprint = "Capacitor_SMD:C_0603_1608Metric"
+    mpn = "YAGEO CC0603KRX7R9BB104"
+    value = "CC0603KRX7R9BB104"
+    signal ___1 ~ pin 1
+    signal ___2 ~ pin 2
+
+component Part_decouple_desat_protection_channel_word__3:
+    designator_prefix = "C"
+    footprint = "Capacitor_SMD:C_0603_1608Metric"
+    mpn = "YAGEO CC0603KRX7R9BB104"
+    value = "CC0603KRX7R9BB104"
+    signal ___1 ~ pin 1
+    signal ___2 ~ pin 2
+
+component Part_decouple_desat_protection_channel_word__4:
+    designator_prefix = "C"
+    footprint = "Capacitor_SMD:C_0603_1608Metric"
+    mpn = "YAGEO CC0603KRX7R9BB104"
+    value = "CC0603KRX7R9BB104"
+    signal ___1 ~ pin 1
+    signal ___2 ~ pin 2
+
+component Part_decouple_desat_protection_channel_word__5:
+    designator_prefix = "C"
+    footprint = "Capacitor_SMD:C_0603_1608Metric"
+    mpn = "YAGEO CC0603KRX7R9BB104"
+    value = "CC0603KRX7R9BB104"
+    signal ___1 ~ pin 1
+    signal ___2 ~ pin 2
+
+component Part_decouple_desat_protection_channel_word__6:
+    designator_prefix = "C"
+    footprint = "Capacitor_SMD:C_0603_1608Metric"
+    mpn = "YAGEO CC0603KRX7R9BB104"
+    value = "CC0603KRX7R9BB104"
+    signal ___1 ~ pin 1
+    signal ___2 ~ pin 2
+
+module App:
+    gate_driver_board_word = new Part_gate_driver_board_word
+    isolated_gate_driver_channel_word__1 = new Part_isolated_gate_driver_channel_word__1
+    isolated_gate_driver_channel_word__2 = new Part_isolated_gate_driver_channel_word__2
+    isolated_gate_driver_channel_word__3 = new Part_isolated_gate_driver_channel_word__3
+    isolated_gate_driver_channel_word__4 = new Part_isolated_gate_driver_channel_word__4
+    isolated_gate_driver_channel_word__5 = new Part_isolated_gate_driver_channel_word__5
+    isolated_gate_driver_channel_word__6 = new Part_isolated_gate_driver_channel_word__6
+    desat_protection_channel_word__1 = new Part_desat_protection_channel_word__1
+    desat_protection_channel_word__2 = new Part_desat_protection_channel_word__2
+    desat_protection_channel_word__3 = new Part_desat_protection_channel_word__3
+    desat_protection_channel_word__4 = new Part_desat_protection_channel_word__4
+    desat_protection_channel_word__5 = new Part_desat_protection_channel_word__5
+    desat_protection_channel_word__6 = new Part_desat_protection_channel_word__6
+    gate_drive_output_connector_word__1 = new Part_gate_drive_output_connector_word__1
+    gate_drive_output_connector_word__2 = new Part_gate_drive_output_connector_word__2
+    gate_drive_output_connector_word__3 = new Part_gate_drive_output_connector_word__3
+    gate_drive_output_connector_word__4 = new Part_gate_drive_output_connector_word__4
+    gate_drive_output_connector_word__5 = new Part_gate_drive_output_connector_word__5
+    gate_drive_output_connector_word__6 = new Part_gate_drive_output_connector_word__6
+    decouple_gate_driver_board_word = new Part_decouple_gate_driver_board_word
+    decouple_isolated_gate_driver_channel_word__1 = new Part_decouple_isolated_gate_driver_channel_word__1
+    decouple_isolated_gate_driver_channel_word__2 = new Part_decouple_isolated_gate_driver_channel_word__2
+    decouple_isolated_gate_driver_channel_word__3 = new Part_decouple_isolated_gate_driver_channel_word__3
+    decouple_isolated_gate_driver_channel_word__4 = new Part_decouple_isolated_gate_driver_channel_word__4
+    decouple_isolated_gate_driver_channel_word__5 = new Part_decouple_isolated_gate_driver_channel_word__5
+    decouple_isolated_gate_driver_channel_word__6 = new Part_decouple_isolated_gate_driver_channel_word__6
+    decouple_desat_protection_channel_word__1 = new Part_decouple_desat_protection_channel_word__1
+    decouple_desat_protection_channel_word__2 = new Part_decouple_desat_protection_channel_word__2
+    decouple_desat_protection_channel_word__3 = new Part_decouple_desat_protection_channel_word__3
+    decouple_desat_protection_channel_word__4 = new Part_decouple_desat_protection_channel_word__4
+    decouple_desat_protection_channel_word__5 = new Part_decouple_desat_protection_channel_word__5
+    decouple_desat_protection_channel_word__6 = new Part_decouple_desat_protection_channel_word__6
+
+    signal VCC
+    signal GND
+    signal GATE_DRIVE_OUT_0
+    signal DESAT_SENSE_0
+    signal GATE_DRIVE_OUT_1
+    signal DESAT_SENSE_1
+    signal GATE_DRIVE_OUT_2
+    signal DESAT_SENSE_2
+    signal GATE_DRIVE_OUT_3
+    signal DESAT_SENSE_3
+    signal GATE_DRIVE_OUT_4
+    signal DESAT_SENSE_4
+    signal GATE_DRIVE_OUT_5
+    signal DESAT_SENSE_5
+
+    gate_driver_board_word.VCC ~ VCC
+    isolated_gate_driver_channel_word__1.VCC ~ VCC
+    isolated_gate_driver_channel_word__2.VCC ~ VCC
+    isolated_gate_driver_channel_word__3.VCC ~ VCC
+    isolated_gate_driver_channel_word__4.VCC ~ VCC
+    isolated_gate_driver_channel_word__5.VCC ~ VCC
+    isolated_gate_driver_channel_word__6.VCC ~ VCC
+    desat_protection_channel_word__1.VCC ~ VCC
+    desat_protection_channel_word__2.VCC ~ VCC
+    desat_protection_channel_word__3.VCC ~ VCC
+    desat_protection_channel_word__4.VCC ~ VCC
+    desat_protection_channel_word__5.VCC ~ VCC
+    desat_protection_channel_word__6.VCC ~ VCC
+    decouple_gate_driver_board_word.___1 ~ VCC
+    decouple_isolated_gate_driver_channel_word__1.___1 ~ VCC
+    decouple_isolated_gate_driver_channel_word__2.___1 ~ VCC
+    decouple_isolated_gate_driver_channel_word__3.___1 ~ VCC
+    decouple_isolated_gate_driver_channel_word__4.___1 ~ VCC
+    decouple_isolated_gate_driver_channel_word__5.___1 ~ VCC
+    decouple_isolated_gate_driver_channel_word__6.___1 ~ VCC
+    decouple_desat_protection_channel_word__1.___1 ~ VCC
+    decouple_desat_protection_channel_word__2.___1 ~ VCC
+    decouple_desat_protection_channel_word__3.___1 ~ VCC
+    decouple_desat_protection_channel_word__4.___1 ~ VCC
+    decouple_desat_protection_channel_word__5.___1 ~ VCC
+    decouple_desat_protection_channel_word__6.___1 ~ VCC
+    gate_driver_board_word.GND ~ GND
+    isolated_gate_driver_channel_word__1.GND ~ GND
+    isolated_gate_driver_channel_word__2.GND ~ GND
+    isolated_gate_driver_channel_word__3.GND ~ GND
+    isolated_gate_driver_channel_word__4.GND ~ GND
+    isolated_gate_driver_channel_word__5.GND ~ GND
+    isolated_gate_driver_channel_word__6.GND ~ GND
+    desat_protection_channel_word__1.GND ~ GND
+    desat_protection_channel_word__2.GND ~ GND
+    desat_protection_channel_word__3.GND ~ GND
+    desat_protection_channel_word__4.GND ~ GND
+    desat_protection_channel_word__5.GND ~ GND
+    desat_protection_channel_word__6.GND ~ GND
+    decouple_gate_driver_board_word.___2 ~ GND
+    decouple_isolated_gate_driver_channel_word__1.___2 ~ GND
+    decouple_isolated_gate_driver_channel_word__2.___2 ~ GND
+    decouple_isolated_gate_driver_channel_word__3.___2 ~ GND
+    decouple_isolated_gate_driver_channel_word__4.___2 ~ GND
+    decouple_isolated_gate_driver_channel_word__5.___2 ~ GND
+    decouple_isolated_gate_driver_channel_word__6.___2 ~ GND
+    decouple_desat_protection_channel_word__1.___2 ~ GND
+    decouple_desat_protection_channel_word__2.___2 ~ GND
+    decouple_desat_protection_channel_word__3.___2 ~ GND
+    decouple_desat_protection_channel_word__4.___2 ~ GND
+    decouple_desat_protection_channel_word__5.___2 ~ GND
+    decouple_desat_protection_channel_word__6.___2 ~ GND
+    isolated_gate_driver_channel_word__1.OUT ~ GATE_DRIVE_OUT_0
+    gate_drive_output_connector_word__1.P1 ~ GATE_DRIVE_OUT_0
+    desat_protection_channel_word__1.OUT ~ DESAT_SENSE_0
+    isolated_gate_driver_channel_word__1.DESAT ~ DESAT_SENSE_0
+    gate_drive_output_connector_word__1.P2 ~ DESAT_SENSE_0
+    isolated_gate_driver_channel_word__2.OUT ~ GATE_DRIVE_OUT_1
+    gate_drive_output_connector_word__2.P1 ~ GATE_DRIVE_OUT_1
+    desat_protection_channel_word__2.OUT ~ DESAT_SENSE_1
+    isolated_gate_driver_channel_word__2.DESAT ~ DESAT_SENSE_1
+    gate_drive_output_connector_word__2.P2 ~ DESAT_SENSE_1
+    isolated_gate_driver_channel_word__3.OUT ~ GATE_DRIVE_OUT_2
+    gate_drive_output_connector_word__3.P1 ~ GATE_DRIVE_OUT_2
+    desat_protection_channel_word__3.OUT ~ DESAT_SENSE_2
+    isolated_gate_driver_channel_word__3.DESAT ~ DESAT_SENSE_2
+    gate_drive_output_connector_word__3.P2 ~ DESAT_SENSE_2
+    isolated_gate_driver_channel_word__4.OUT ~ GATE_DRIVE_OUT_3
+    gate_drive_output_connector_word__4.P1 ~ GATE_DRIVE_OUT_3
+    desat_protection_channel_word__4.OUT ~ DESAT_SENSE_3
+    isolated_gate_driver_channel_word__4.DESAT ~ DESAT_SENSE_3
+    gate_drive_output_connector_word__4.P2 ~ DESAT_SENSE_3
+    isolated_gate_driver_channel_word__5.OUT ~ GATE_DRIVE_OUT_4
+    gate_drive_output_connector_word__5.P1 ~ GATE_DRIVE_OUT_4
+    desat_protection_channel_word__5.OUT ~ DESAT_SENSE_4
+    isolated_gate_driver_channel_word__5.DESAT ~ DESAT_SENSE_4
+    gate_drive_output_connector_word__5.P2 ~ DESAT_SENSE_4
+    isolated_gate_driver_channel_word__6.OUT ~ GATE_DRIVE_OUT_5
+    gate_drive_output_connector_word__6.P1 ~ GATE_DRIVE_OUT_5
+    desat_protection_channel_word__6.OUT ~ DESAT_SENSE_5
+    isolated_gate_driver_channel_word__6.DESAT ~ DESAT_SENSE_5
+    gate_drive_output_connector_word__6.P2 ~ DESAT_SENSE_5

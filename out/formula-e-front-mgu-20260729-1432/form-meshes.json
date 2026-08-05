@@ -1,0 +1,2130 @@
+{
+  "form": "traction_drive_concentric_bay_fill",
+  "form_id": "traction_drive",
+  "architecture": "concentric_fpk_stack",
+  "layers": [
+    "mcu_shelf_inverter",
+    "stator_wave_wound",
+    "hollow_rotor_magnets",
+    "planetary_diff_in_rotor",
+    "ontology_fff_covers_seals_flanges"
+  ],
+  "meshes": [
+    "u_se_td_bay_endwall_0",
+    "u_se_td_bay_endwall_1",
+    "u_se_td_bearing_cap_0",
+    "u_se_td_bearing_cap_1",
+    "u_se_td_cassette_cover",
+    "u_se_td_cast_rib_cam_0",
+    "u_se_td_cast_rib_cam_0_foot",
+    "u_se_td_cast_rib_cam_1",
+    "u_se_td_cast_rib_cam_1_foot",
+    "u_se_td_cast_rib_cam_2",
+    "u_se_td_cast_rib_cam_2_foot",
+    "u_se_td_cast_rib_cam_3",
+    "u_se_td_cast_rib_cam_3_foot",
+    "u_se_td_cast_rib_cam_4",
+    "u_se_td_cast_rib_cam_4_foot",
+    "u_se_td_cast_rib_rear_0",
+    "u_se_td_cast_rib_rear_0_foot",
+    "u_se_td_cast_rib_rear_1",
+    "u_se_td_cast_rib_rear_1_foot",
+    "u_se_td_cast_rib_rear_2",
+    "u_se_td_cast_rib_rear_2_foot",
+    "u_se_td_cast_rib_rear_3",
+    "u_se_td_cast_rib_rear_3_foot",
+    "u_se_td_cast_rib_rear_4",
+    "u_se_td_cast_rib_rear_4_foot",
+    "u_se_td_coldplate_fastener_0",
+    "u_se_td_coldplate_fastener_1",
+    "u_se_td_coldplate_fastener_2",
+    "u_se_td_coldplate_fastener_3",
+    "u_se_td_coldplate_fastener_4",
+    "u_se_td_coldplate_fastener_5",
+    "u_se_td_coldplate_machine_face",
+    "u_se_td_control_pcb",
+    "u_se_td_coolant_clamp_0",
+    "u_se_td_coolant_clamp_0_screw",
+    "u_se_td_coolant_clamp_1",
+    "u_se_td_coolant_clamp_1_screw",
+    "u_se_td_coolant_hose_0",
+    "u_se_td_coolant_hose_0_rib_0",
+    "u_se_td_coolant_hose_0_rib_1",
+    "u_se_td_coolant_hose_0_rib_2",
+    "u_se_td_coolant_hose_0_rib_3",
+    "u_se_td_coolant_hose_1",
+    "u_se_td_coolant_hose_1_rib_0",
+    "u_se_td_coolant_hose_1_rib_1",
+    "u_se_td_coolant_hose_1_rib_2",
+    "u_se_td_coolant_hose_1_rib_3",
+    "u_se_td_coolant_in",
+    "u_se_td_coolant_in_barb_0",
+    "u_se_td_coolant_in_barb_1",
+    "u_se_td_coolant_in_barb_2",
+    "u_se_td_coolant_in_bore",
+    "u_se_td_coolant_in_boss",
+    "u_se_td_coolant_in_boss_bolt_0",
+    "u_se_td_coolant_in_boss_bolt_1",
+    "u_se_td_coolant_in_boss_bolt_2",
+    "u_se_td_coolant_in_boss_bolt_3",
+    "u_se_td_coolant_in_collar",
+    "u_se_td_coolant_in_collar_lip",
+    "u_se_td_coolant_in_hex",
+    "u_se_td_coolant_jacket",
+    "u_se_td_coolant_out",
+    "u_se_td_coolant_out_barb_0",
+    "u_se_td_coolant_out_barb_1",
+    "u_se_td_coolant_out_barb_2",
+    "u_se_td_coolant_out_bore",
+    "u_se_td_coolant_out_boss",
+    "u_se_td_coolant_out_boss_bolt_0",
+    "u_se_td_coolant_out_boss_bolt_1",
+    "u_se_td_coolant_out_boss_bolt_2",
+    "u_se_td_coolant_out_boss_bolt_3",
+    "u_se_td_coolant_out_collar",
+    "u_se_td_coolant_out_collar_lip",
+    "u_se_td_coolant_out_hex",
+    "u_se_td_dclink_cap_0",
+    "u_se_td_dclink_cap_1",
+    "u_se_td_dclink_cap_2",
+    "u_se_td_diff_bulge",
+    "u_se_td_diff_nest",
+    "u_se_td_encoder",
+    "u_se_td_end_bell_0",
+    "u_se_td_end_bell_1",
+    "u_se_td_end_bell_face_0",
+    "u_se_td_end_bell_face_1",
+    "u_se_td_end_bolt_0",
+    "u_se_td_end_bolt_1",
+    "u_se_td_end_bolt_2",
+    "u_se_td_end_bolt_3",
+    "u_se_td_end_bolt_4",
+    "u_se_td_end_bolt_5",
+    "u_se_td_end_bolt_6",
+    "u_se_td_end_bolt_7",
+    "u_se_td_gasket_lip_0",
+    "u_se_td_gasket_lip_1",
+    "u_se_td_gate_drive_pcb",
+    "u_se_td_gate_drive_ribbon",
+    "u_se_td_gear_breather",
+    "u_se_td_gear_oil",
+    "u_se_td_gearbox",
+    "u_se_td_gearbox_bearing_0",
+    "u_se_td_gearbox_bearing_1",
+    "u_se_td_gearbox_cover",
+    "u_se_td_ground_stud",
+    "u_se_td_halfshaft_flange_0",
+    "u_se_td_halfshaft_flange_1",
+    "u_se_td_hollow_rotor",
+    "u_se_td_housing_machine_band",
+    "u_se_td_hv_bus_leg_h",
+    "u_se_td_hv_bus_leg_v",
+    "u_se_td_hv_cable_boot",
+    "u_se_td_hv_cable_boot_hazard",
+    "u_se_td_hv_connector",
+    "u_se_td_hv_connector_barrel",
+    "u_se_td_hv_connector_braid_boot",
+    "u_se_td_hv_connector_braid_collar",
+    "u_se_td_hv_connector_flange",
+    "u_se_td_hv_connector_flange_bolt_0",
+    "u_se_td_hv_connector_flange_bolt_1",
+    "u_se_td_hv_connector_flange_bolt_2",
+    "u_se_td_hv_connector_flange_bolt_3",
+    "u_se_td_hv_connector_hazard_band",
+    "u_se_td_hv_connector_hvil",
+    "u_se_td_hv_connector_key_flat",
+    "u_se_td_hv_connector_pin_0",
+    "u_se_td_hv_connector_pin_1",
+    "u_se_td_hv_connector_safety_collar",
+    "u_se_td_hv_hood",
+    "u_se_td_hv_shield",
+    "u_se_td_intermediate_shaft",
+    "u_se_td_inverter_coldplate",
+    "u_se_td_inverter_coldplate_rib_0",
+    "u_se_td_inverter_coldplate_rib_1",
+    "u_se_td_inverter_coldplate_rib_2",
+    "u_se_td_inverter_cover",
+    "u_se_td_inverter_housing",
+    "u_se_td_inverter_housing_wall_0",
+    "u_se_td_inverter_housing_wall_1",
+    "u_se_td_inverter_housing_wall_2",
+    "u_se_td_inverter_housing_wall_3",
+    "u_se_td_jacket_band",
+    "u_se_td_lv_connector",
+    "u_se_td_lv_connector_boot",
+    "u_se_td_lv_connector_flange",
+    "u_se_td_lv_connector_flange_bolt_0",
+    "u_se_td_lv_connector_flange_bolt_1",
+    "u_se_td_lv_connector_key_flat",
+    "u_se_td_lv_connector_pin_0",
+    "u_se_td_lv_connector_pin_1",
+    "u_se_td_lv_connector_pin_2",
+    "u_se_td_lv_connector_pin_3",
+    "u_se_td_lv_connector_pin_4",
+    "u_se_td_lv_connector_pin_5",
+    "u_se_td_lv_harness_boot",
+    "u_se_td_magnet_0",
+    "u_se_td_magnet_1",
+    "u_se_td_magnet_2",
+    "u_se_td_magnet_3",
+    "u_se_td_magnet_4",
+    "u_se_td_magnet_5",
+    "u_se_td_magnet_6",
+    "u_se_td_magnet_7",
+    "u_se_td_mcu_gasket_lip",
+    "u_se_td_mcu_shelf",
+    "u_se_td_mcu_shelf_lip_0",
+    "u_se_td_mcu_shelf_lip_1",
+    "u_se_td_microjet_0_0",
+    "u_se_td_microjet_0_1",
+    "u_se_td_microjet_0_2",
+    "u_se_td_microjet_0_3",
+    "u_se_td_microjet_1_0",
+    "u_se_td_microjet_1_1",
+    "u_se_td_microjet_1_2",
+    "u_se_td_microjet_1_3",
+    "u_se_td_motor_cover",
+    "u_se_td_motor_housing",
+    "u_se_td_motor_shaft",
+    "u_se_td_motor_terminal_0",
+    "u_se_td_motor_terminal_1",
+    "u_se_td_motor_terminal_2",
+    "u_se_td_mount_bolt_0",
+    "u_se_td_mount_bolt_1",
+    "u_se_td_mount_bolt_2",
+    "u_se_td_mount_bolt_3",
+    "u_se_td_mount_bolt_4",
+    "u_se_td_mount_bolt_5",
+    "u_se_td_mount_ear_0",
+    "u_se_td_mount_ear_1",
+    "u_se_td_mount_ear_2",
+    "u_se_td_mount_ear_3",
+    "u_se_td_mount_pad_0",
+    "u_se_td_mount_pad_1",
+    "u_se_td_mount_pad_2",
+    "u_se_td_mount_pad_3",
+    "u_se_td_mount_pad_4",
+    "u_se_td_mount_pad_5",
+    "u_se_td_nameplate",
+    "u_se_td_nameplate_border",
+    "u_se_td_oil_seal_0",
+    "u_se_td_oil_seal_1",
+    "u_se_td_oil_seal_2",
+    "u_se_td_oil_seal_3",
+    "u_se_td_output_gear_0",
+    "u_se_td_output_gear_1",
+    "u_se_td_output_shaft",
+    "u_se_td_output_shaft_b",
+    "u_se_td_pack_base",
+    "u_se_td_pack_base_rail_0",
+    "u_se_td_pack_base_rail_1",
+    "u_se_td_pack_housing",
+    "u_se_td_pack_housing_flange_0",
+    "u_se_td_pack_housing_flange_1",
+    "u_se_td_pcb",
+    "u_se_td_pcb_edge_pads",
+    "u_se_td_pcb_package_0",
+    "u_se_td_pcb_package_1",
+    "u_se_td_pcb_package_2",
+    "u_se_td_pcb_package_3",
+    "u_se_td_pe_busbar_0",
+    "u_se_td_pe_busbar_1",
+    "u_se_td_pe_busbar_ins_0",
+    "u_se_td_pe_busbar_ins_1",
+    "u_se_td_pe_filmcap_0",
+    "u_se_td_pe_filmcap_1",
+    "u_se_td_pe_filmcap_2",
+    "u_se_td_pe_gd_flex",
+    "u_se_td_pe_module_0",
+    "u_se_td_pe_module_1",
+    "u_se_td_pe_module_2",
+    "u_se_td_phase_bus_0_leg_h",
+    "u_se_td_phase_bus_0_leg_v",
+    "u_se_td_phase_bus_1_leg_h",
+    "u_se_td_phase_bus_1_leg_v",
+    "u_se_td_phase_bus_2_leg_h",
+    "u_se_td_phase_bus_2_leg_v",
+    "u_se_td_pinion_gear",
+    "u_se_td_planet_0",
+    "u_se_td_planet_1",
+    "u_se_td_planet_2",
+    "u_se_td_planet_carrier",
+    "u_se_td_post_diff_envelope",
+    "u_se_td_post_diff_pinion_0",
+    "u_se_td_post_diff_pinion_1",
+    "u_se_td_post_diff_wheel_0",
+    "u_se_td_post_diff_wheel_1",
+    "u_se_td_resolver_bulge",
+    "u_se_td_ring_gear",
+    "u_se_td_sic_inverter",
+    "u_se_td_sic_inverter_dbc",
+    "u_se_td_sic_inverter_mod_0",
+    "u_se_td_sic_inverter_mod_0_clamp_0",
+    "u_se_td_sic_inverter_mod_0_clamp_1",
+    "u_se_td_sic_inverter_mod_0_tab_0",
+    "u_se_td_sic_inverter_mod_0_tab_1",
+    "u_se_td_sic_inverter_mod_1",
+    "u_se_td_sic_inverter_mod_1_clamp_0",
+    "u_se_td_sic_inverter_mod_1_clamp_1",
+    "u_se_td_sic_inverter_mod_1_tab_0",
+    "u_se_td_sic_inverter_mod_1_tab_1",
+    "u_se_td_sic_inverter_mod_2",
+    "u_se_td_sic_inverter_mod_2_clamp_0",
+    "u_se_td_sic_inverter_mod_2_clamp_1",
+    "u_se_td_sic_inverter_mod_2_tab_0",
+    "u_se_td_sic_inverter_mod_2_tab_1",
+    "u_se_td_side_gear_0",
+    "u_se_td_side_gear_1",
+    "u_se_td_signal_ribbon",
+    "u_se_td_stator_ring",
+    "u_se_td_sun_gear",
+    "u_se_td_vehicle_cool_in",
+    "u_se_td_vehicle_cool_out",
+    "u_se_td_vehicle_hv",
+    "u_se_td_vehicle_lv",
+    "u_se_td_winding_end_0",
+    "u_se_td_winding_end_1"
+  ],
+  "mesh_provenance": {
+    "u_se_td_bearing_cap_0": {
+      "kind": "compound",
+      "primitive": "fff_ontology"
+    },
+    "u_se_td_bearing_cap_1": {
+      "kind": "compound",
+      "primitive": "fff_ontology"
+    },
+    "u_se_td_cassette_cover": {
+      "kind": "compound",
+      "primitive": "fff_ontology"
+    },
+    "u_se_td_control_pcb": {
+      "kind": "cad_family",
+      "family": "instrument_pcb"
+    },
+    "u_se_td_coolant_clamp_0": {
+      "kind": "compound",
+      "primitive": "fff_ontology"
+    },
+    "u_se_td_coolant_clamp_0_screw": {
+      "kind": "compound",
+      "primitive": "fff_ontology"
+    },
+    "u_se_td_coolant_clamp_1": {
+      "kind": "compound",
+      "primitive": "fff_ontology"
+    },
+    "u_se_td_coolant_clamp_1_screw": {
+      "kind": "compound",
+      "primitive": "fff_ontology"
+    },
+    "u_se_td_coolant_hose_0": {
+      "kind": "compound",
+      "primitive": "fff_ontology"
+    },
+    "u_se_td_coolant_hose_0_rib_0": {
+      "kind": "compound",
+      "primitive": "fff_ontology"
+    },
+    "u_se_td_coolant_hose_0_rib_1": {
+      "kind": "compound",
+      "primitive": "fff_ontology"
+    },
+    "u_se_td_coolant_hose_0_rib_2": {
+      "kind": "compound",
+      "primitive": "fff_ontology"
+    },
+    "u_se_td_coolant_hose_0_rib_3": {
+      "kind": "compound",
+      "primitive": "fff_ontology"
+    },
+    "u_se_td_coolant_hose_1": {
+      "kind": "compound",
+      "primitive": "fff_ontology"
+    },
+    "u_se_td_coolant_hose_1_rib_0": {
+      "kind": "compound",
+      "primitive": "fff_ontology"
+    },
+    "u_se_td_coolant_hose_1_rib_1": {
+      "kind": "compound",
+      "primitive": "fff_ontology"
+    },
+    "u_se_td_coolant_hose_1_rib_2": {
+      "kind": "compound",
+      "primitive": "fff_ontology"
+    },
+    "u_se_td_coolant_hose_1_rib_3": {
+      "kind": "compound",
+      "primitive": "fff_ontology"
+    },
+    "u_se_td_coolant_in": {
+      "kind": "compound",
+      "primitive": "fff_ontology"
+    },
+    "u_se_td_coolant_in_barb_0": {
+      "kind": "compound",
+      "primitive": "fff_ontology"
+    },
+    "u_se_td_coolant_in_barb_1": {
+      "kind": "compound",
+      "primitive": "fff_ontology"
+    },
+    "u_se_td_coolant_in_barb_2": {
+      "kind": "compound",
+      "primitive": "fff_ontology"
+    },
+    "u_se_td_coolant_in_bore": {
+      "kind": "compound",
+      "primitive": "fff_ontology"
+    },
+    "u_se_td_coolant_in_boss": {
+      "kind": "compound",
+      "primitive": "fff_ontology"
+    },
+    "u_se_td_coolant_in_boss_bolt_0": {
+      "kind": "compound",
+      "primitive": "fff_ontology"
+    },
+    "u_se_td_coolant_in_boss_bolt_1": {
+      "kind": "compound",
+      "primitive": "fff_ontology"
+    },
+    "u_se_td_coolant_in_boss_bolt_2": {
+      "kind": "compound",
+      "primitive": "fff_ontology"
+    },
+    "u_se_td_coolant_in_boss_bolt_3": {
+      "kind": "compound",
+      "primitive": "fff_ontology"
+    },
+    "u_se_td_coolant_in_collar": {
+      "kind": "compound",
+      "primitive": "fff_ontology"
+    },
+    "u_se_td_coolant_in_collar_lip": {
+      "kind": "compound",
+      "primitive": "fff_ontology"
+    },
+    "u_se_td_coolant_in_hex": {
+      "kind": "compound",
+      "primitive": "fff_ontology"
+    },
+    "u_se_td_coolant_jacket": {
+      "kind": "compound",
+      "primitive": "fff_ontology"
+    },
+    "u_se_td_coolant_out": {
+      "kind": "compound",
+      "primitive": "fff_ontology"
+    },
+    "u_se_td_coolant_out_barb_0": {
+      "kind": "compound",
+      "primitive": "fff_ontology"
+    },
+    "u_se_td_coolant_out_barb_1": {
+      "kind": "compound",
+      "primitive": "fff_ontology"
+    },
+    "u_se_td_coolant_out_barb_2": {
+      "kind": "compound",
+      "primitive": "fff_ontology"
+    },
+    "u_se_td_coolant_out_bore": {
+      "kind": "compound",
+      "primitive": "fff_ontology"
+    },
+    "u_se_td_coolant_out_boss": {
+      "kind": "compound",
+      "primitive": "fff_ontology"
+    },
+    "u_se_td_coolant_out_boss_bolt_0": {
+      "kind": "compound",
+      "primitive": "fff_ontology"
+    },
+    "u_se_td_coolant_out_boss_bolt_1": {
+      "kind": "compound",
+      "primitive": "fff_ontology"
+    },
+    "u_se_td_coolant_out_boss_bolt_2": {
+      "kind": "compound",
+      "primitive": "fff_ontology"
+    },
+    "u_se_td_coolant_out_boss_bolt_3": {
+      "kind": "compound",
+      "primitive": "fff_ontology"
+    },
+    "u_se_td_coolant_out_collar": {
+      "kind": "compound",
+      "primitive": "fff_ontology"
+    },
+    "u_se_td_coolant_out_collar_lip": {
+      "kind": "compound",
+      "primitive": "fff_ontology"
+    },
+    "u_se_td_coolant_out_hex": {
+      "kind": "compound",
+      "primitive": "fff_ontology"
+    },
+    "u_se_td_diff_bulge": {
+      "kind": "compound",
+      "primitive": "fff_ontology"
+    },
+    "u_se_td_diff_nest": {
+      "kind": "compound",
+      "primitive": "fff_ontology"
+    },
+    "u_se_td_encoder": {
+      "kind": "compound",
+      "primitive": "fff_ontology"
+    },
+    "u_se_td_end_bell_0": {
+      "kind": "compound",
+      "primitive": "fff_ontology"
+    },
+    "u_se_td_end_bell_1": {
+      "kind": "compound",
+      "primitive": "fff_ontology"
+    },
+    "u_se_td_end_bolt_0": {
+      "kind": "compound",
+      "primitive": "cast_language"
+    },
+    "u_se_td_end_bolt_1": {
+      "kind": "compound",
+      "primitive": "cast_language"
+    },
+    "u_se_td_end_bolt_2": {
+      "kind": "compound",
+      "primitive": "cast_language"
+    },
+    "u_se_td_end_bolt_3": {
+      "kind": "compound",
+      "primitive": "cast_language"
+    },
+    "u_se_td_end_bolt_4": {
+      "kind": "compound",
+      "primitive": "cast_language"
+    },
+    "u_se_td_end_bolt_5": {
+      "kind": "compound",
+      "primitive": "cast_language"
+    },
+    "u_se_td_end_bolt_6": {
+      "kind": "compound",
+      "primitive": "cast_language"
+    },
+    "u_se_td_end_bolt_7": {
+      "kind": "compound",
+      "primitive": "cast_language"
+    },
+    "u_se_td_gasket_lip_0": {
+      "kind": "compound",
+      "primitive": "cast_language"
+    },
+    "u_se_td_gasket_lip_1": {
+      "kind": "compound",
+      "primitive": "cast_language"
+    },
+    "u_se_td_gate_drive_pcb": {
+      "kind": "cad_family",
+      "family": "instrument_pcb"
+    },
+    "u_se_td_gate_drive_ribbon": {
+      "kind": "compound",
+      "primitive": "fff_ontology"
+    },
+    "u_se_td_gear_oil": {
+      "kind": "compound",
+      "primitive": "fff_ontology"
+    },
+    "u_se_td_gearbox": {
+      "kind": "compound",
+      "primitive": "fff_ontology"
+    },
+    "u_se_td_gearbox_bearing_0": {
+      "kind": "compound",
+      "primitive": "fff_ontology"
+    },
+    "u_se_td_gearbox_bearing_1": {
+      "kind": "compound",
+      "primitive": "fff_ontology"
+    },
+    "u_se_td_gearbox_cover": {
+      "kind": "compound",
+      "primitive": "fff_ontology"
+    },
+    "u_se_td_halfshaft_flange_0": {
+      "kind": "compound",
+      "primitive": "fff_ontology"
+    },
+    "u_se_td_halfshaft_flange_1": {
+      "kind": "compound",
+      "primitive": "fff_ontology"
+    },
+    "u_se_td_hollow_rotor": {
+      "kind": "compound",
+      "primitive": "fff_ontology"
+    },
+    "u_se_td_hv_bus_leg_h": {
+      "kind": "compound",
+      "primitive": "l_busbar_leg"
+    },
+    "u_se_td_hv_bus_leg_v": {
+      "kind": "compound",
+      "primitive": "l_busbar_leg"
+    },
+    "u_se_td_hv_cable_boot": {
+      "kind": "compound",
+      "primitive": "fff_ontology"
+    },
+    "u_se_td_hv_connector": {
+      "kind": "compound",
+      "primitive": "hv_connector_family"
+    },
+    "u_se_td_hv_connector_barrel": {
+      "kind": "compound",
+      "primitive": "hv_connector_family"
+    },
+    "u_se_td_hv_connector_braid_boot": {
+      "kind": "compound",
+      "primitive": "hv_connector_family"
+    },
+    "u_se_td_hv_connector_braid_collar": {
+      "kind": "compound",
+      "primitive": "hv_connector_family"
+    },
+    "u_se_td_hv_connector_hvil": {
+      "kind": "compound",
+      "primitive": "hv_connector_family"
+    },
+    "u_se_td_hv_connector_key_flat": {
+      "kind": "compound",
+      "primitive": "hv_connector_family"
+    },
+    "u_se_td_intermediate_shaft": {
+      "kind": "compound",
+      "primitive": "fff_ontology"
+    },
+    "u_se_td_inverter_coldplate": {
+      "kind": "compound",
+      "primitive": "ribbed_coldplate"
+    },
+    "u_se_td_inverter_coldplate_rib_0": {
+      "kind": "compound",
+      "primitive": "ribbed_coldplate"
+    },
+    "u_se_td_inverter_coldplate_rib_1": {
+      "kind": "compound",
+      "primitive": "ribbed_coldplate"
+    },
+    "u_se_td_inverter_coldplate_rib_2": {
+      "kind": "compound",
+      "primitive": "ribbed_coldplate"
+    },
+    "u_se_td_inverter_cover": {
+      "kind": "compound",
+      "primitive": "fff_ontology"
+    },
+    "u_se_td_inverter_housing": {
+      "kind": "compound",
+      "primitive": "fff_ontology"
+    },
+    "u_se_td_inverter_housing_wall_0": {
+      "kind": "compound",
+      "primitive": "fff_ontology"
+    },
+    "u_se_td_inverter_housing_wall_1": {
+      "kind": "compound",
+      "primitive": "fff_ontology"
+    },
+    "u_se_td_inverter_housing_wall_2": {
+      "kind": "compound",
+      "primitive": "fff_ontology"
+    },
+    "u_se_td_inverter_housing_wall_3": {
+      "kind": "compound",
+      "primitive": "fff_ontology"
+    },
+    "u_se_td_jacket_band": {
+      "kind": "compound",
+      "primitive": "fff_ontology"
+    },
+    "u_se_td_lv_harness_boot": {
+      "kind": "compound",
+      "primitive": "fff_ontology"
+    },
+    "u_se_td_magnet_0": {
+      "kind": "compound",
+      "primitive": "magnet_segment"
+    },
+    "u_se_td_magnet_1": {
+      "kind": "compound",
+      "primitive": "magnet_segment"
+    },
+    "u_se_td_magnet_2": {
+      "kind": "compound",
+      "primitive": "magnet_segment"
+    },
+    "u_se_td_magnet_3": {
+      "kind": "compound",
+      "primitive": "magnet_segment"
+    },
+    "u_se_td_magnet_4": {
+      "kind": "compound",
+      "primitive": "magnet_segment"
+    },
+    "u_se_td_magnet_5": {
+      "kind": "compound",
+      "primitive": "magnet_segment"
+    },
+    "u_se_td_magnet_6": {
+      "kind": "compound",
+      "primitive": "magnet_segment"
+    },
+    "u_se_td_magnet_7": {
+      "kind": "compound",
+      "primitive": "magnet_segment"
+    },
+    "u_se_td_mcu_gasket_lip": {
+      "kind": "compound",
+      "primitive": "cast_language"
+    },
+    "u_se_td_mcu_shelf": {
+      "kind": "compound",
+      "primitive": "lipped_shelf"
+    },
+    "u_se_td_mcu_shelf_lip_0": {
+      "kind": "compound",
+      "primitive": "lipped_shelf"
+    },
+    "u_se_td_mcu_shelf_lip_1": {
+      "kind": "compound",
+      "primitive": "lipped_shelf"
+    },
+    "u_se_td_microjet_0_0": {
+      "kind": "compound",
+      "primitive": "fff_ontology"
+    },
+    "u_se_td_microjet_0_1": {
+      "kind": "compound",
+      "primitive": "fff_ontology"
+    },
+    "u_se_td_microjet_0_2": {
+      "kind": "compound",
+      "primitive": "fff_ontology"
+    },
+    "u_se_td_microjet_0_3": {
+      "kind": "compound",
+      "primitive": "fff_ontology"
+    },
+    "u_se_td_microjet_1_0": {
+      "kind": "compound",
+      "primitive": "fff_ontology"
+    },
+    "u_se_td_microjet_1_1": {
+      "kind": "compound",
+      "primitive": "fff_ontology"
+    },
+    "u_se_td_microjet_1_2": {
+      "kind": "compound",
+      "primitive": "fff_ontology"
+    },
+    "u_se_td_microjet_1_3": {
+      "kind": "compound",
+      "primitive": "fff_ontology"
+    },
+    "u_se_td_motor_cover": {
+      "kind": "compound",
+      "primitive": "fff_ontology"
+    },
+    "u_se_td_motor_housing": {
+      "kind": "compound",
+      "primitive": "fff_ontology"
+    },
+    "u_se_td_motor_shaft": {
+      "kind": "compound",
+      "primitive": "fff_ontology"
+    },
+    "u_se_td_motor_terminal_0": {
+      "kind": "compound",
+      "primitive": "fff_ontology"
+    },
+    "u_se_td_motor_terminal_1": {
+      "kind": "compound",
+      "primitive": "fff_ontology"
+    },
+    "u_se_td_motor_terminal_2": {
+      "kind": "compound",
+      "primitive": "fff_ontology"
+    },
+    "u_se_td_mount_bolt_0": {
+      "kind": "compound",
+      "primitive": "cast_language"
+    },
+    "u_se_td_mount_bolt_1": {
+      "kind": "compound",
+      "primitive": "cast_language"
+    },
+    "u_se_td_mount_bolt_2": {
+      "kind": "compound",
+      "primitive": "cast_language"
+    },
+    "u_se_td_mount_bolt_3": {
+      "kind": "compound",
+      "primitive": "cast_language"
+    },
+    "u_se_td_mount_bolt_4": {
+      "kind": "compound",
+      "primitive": "cast_language"
+    },
+    "u_se_td_mount_bolt_5": {
+      "kind": "compound",
+      "primitive": "cast_language"
+    },
+    "u_se_td_mount_pad_0": {
+      "kind": "compound",
+      "primitive": "cast_language"
+    },
+    "u_se_td_mount_pad_1": {
+      "kind": "compound",
+      "primitive": "cast_language"
+    },
+    "u_se_td_mount_pad_2": {
+      "kind": "compound",
+      "primitive": "cast_language"
+    },
+    "u_se_td_mount_pad_3": {
+      "kind": "compound",
+      "primitive": "cast_language"
+    },
+    "u_se_td_mount_pad_4": {
+      "kind": "compound",
+      "primitive": "cast_language"
+    },
+    "u_se_td_mount_pad_5": {
+      "kind": "compound",
+      "primitive": "cast_language"
+    },
+    "u_se_td_oil_seal_0": {
+      "kind": "compound",
+      "primitive": "fff_ontology"
+    },
+    "u_se_td_oil_seal_1": {
+      "kind": "compound",
+      "primitive": "fff_ontology"
+    },
+    "u_se_td_oil_seal_2": {
+      "kind": "compound",
+      "primitive": "fff_ontology"
+    },
+    "u_se_td_oil_seal_3": {
+      "kind": "compound",
+      "primitive": "fff_ontology"
+    },
+    "u_se_td_output_gear_0": {
+      "kind": "compound",
+      "primitive": "fff_ontology"
+    },
+    "u_se_td_output_gear_1": {
+      "kind": "compound",
+      "primitive": "fff_ontology"
+    },
+    "u_se_td_output_shaft": {
+      "kind": "compound",
+      "primitive": "fff_ontology"
+    },
+    "u_se_td_output_shaft_b": {
+      "kind": "compound",
+      "primitive": "fff_ontology"
+    },
+    "u_se_td_pack_base": {
+      "kind": "compound",
+      "primitive": "ribbed_baseplate"
+    },
+    "u_se_td_pack_base_rail_0": {
+      "kind": "compound",
+      "primitive": "ribbed_baseplate"
+    },
+    "u_se_td_pack_base_rail_1": {
+      "kind": "compound",
+      "primitive": "ribbed_baseplate"
+    },
+    "u_se_td_pack_housing": {
+      "kind": "compound",
+      "primitive": "housing_spine"
+    },
+    "u_se_td_pack_housing_flange_0": {
+      "kind": "compound",
+      "primitive": "housing_spine"
+    },
+    "u_se_td_pack_housing_flange_1": {
+      "kind": "compound",
+      "primitive": "housing_spine"
+    },
+    "u_se_td_pcb": {
+      "kind": "cad_family",
+      "family": "instrument_pcb"
+    },
+    "u_se_td_pe_busbar_0": {
+      "kind": "compound",
+      "primitive": "pe_volume"
+    },
+    "u_se_td_pe_busbar_1": {
+      "kind": "compound",
+      "primitive": "pe_volume"
+    },
+    "u_se_td_pe_busbar_ins_0": {
+      "kind": "compound",
+      "primitive": "pe_volume"
+    },
+    "u_se_td_pe_busbar_ins_1": {
+      "kind": "compound",
+      "primitive": "pe_volume"
+    },
+    "u_se_td_pe_filmcap_0": {
+      "kind": "compound",
+      "primitive": "pe_volume"
+    },
+    "u_se_td_pe_filmcap_1": {
+      "kind": "compound",
+      "primitive": "pe_volume"
+    },
+    "u_se_td_pe_filmcap_2": {
+      "kind": "compound",
+      "primitive": "pe_volume"
+    },
+    "u_se_td_pe_gd_flex": {
+      "kind": "compound",
+      "primitive": "pe_volume"
+    },
+    "u_se_td_pe_module_0": {
+      "kind": "compound",
+      "primitive": "pe_volume"
+    },
+    "u_se_td_pe_module_1": {
+      "kind": "compound",
+      "primitive": "pe_volume"
+    },
+    "u_se_td_pe_module_2": {
+      "kind": "compound",
+      "primitive": "pe_volume"
+    },
+    "u_se_td_phase_bus_0_leg_h": {
+      "kind": "compound",
+      "primitive": "l_busbar_leg"
+    },
+    "u_se_td_phase_bus_0_leg_v": {
+      "kind": "compound",
+      "primitive": "l_busbar_leg"
+    },
+    "u_se_td_phase_bus_1_leg_h": {
+      "kind": "compound",
+      "primitive": "l_busbar_leg"
+    },
+    "u_se_td_phase_bus_1_leg_v": {
+      "kind": "compound",
+      "primitive": "l_busbar_leg"
+    },
+    "u_se_td_phase_bus_2_leg_h": {
+      "kind": "compound",
+      "primitive": "l_busbar_leg"
+    },
+    "u_se_td_phase_bus_2_leg_v": {
+      "kind": "compound",
+      "primitive": "l_busbar_leg"
+    },
+    "u_se_td_pinion_gear": {
+      "kind": "compound",
+      "primitive": "fff_ontology"
+    },
+    "u_se_td_planet_0": {
+      "kind": "compound",
+      "primitive": "fff_ontology"
+    },
+    "u_se_td_planet_1": {
+      "kind": "compound",
+      "primitive": "fff_ontology"
+    },
+    "u_se_td_planet_2": {
+      "kind": "compound",
+      "primitive": "fff_ontology"
+    },
+    "u_se_td_planet_carrier": {
+      "kind": "compound",
+      "primitive": "fff_ontology"
+    },
+    "u_se_td_ring_gear": {
+      "kind": "compound",
+      "primitive": "fff_ontology"
+    },
+    "u_se_td_sic_inverter": {
+      "kind": "compound",
+      "primitive": "sic_module_stack"
+    },
+    "u_se_td_sic_inverter_mod_0": {
+      "kind": "compound",
+      "primitive": "sic_module_stack"
+    },
+    "u_se_td_sic_inverter_mod_1": {
+      "kind": "compound",
+      "primitive": "sic_module_stack"
+    },
+    "u_se_td_sic_inverter_mod_2": {
+      "kind": "compound",
+      "primitive": "sic_module_stack"
+    },
+    "u_se_td_side_gear_0": {
+      "kind": "compound",
+      "primitive": "fff_ontology"
+    },
+    "u_se_td_side_gear_1": {
+      "kind": "compound",
+      "primitive": "fff_ontology"
+    },
+    "u_se_td_signal_ribbon": {
+      "kind": "compound",
+      "primitive": "fff_ontology"
+    },
+    "u_se_td_stator_ring": {
+      "kind": "compound",
+      "primitive": "fff_ontology"
+    },
+    "u_se_td_sun_gear": {
+      "kind": "compound",
+      "primitive": "fff_ontology"
+    },
+    "u_se_td_vehicle_cool_in": {
+      "kind": "compound",
+      "primitive": "vehicle_anchor"
+    },
+    "u_se_td_vehicle_cool_out": {
+      "kind": "compound",
+      "primitive": "vehicle_anchor"
+    },
+    "u_se_td_vehicle_hv": {
+      "kind": "compound",
+      "primitive": "vehicle_anchor"
+    },
+    "u_se_td_vehicle_lv": {
+      "kind": "compound",
+      "primitive": "vehicle_anchor"
+    },
+    "u_se_td_winding_end_0": {
+      "kind": "compound",
+      "primitive": "fff_ontology"
+    },
+    "u_se_td_winding_end_1": {
+      "kind": "compound",
+      "primitive": "fff_ontology"
+    }
+  },
+  "ontology_coverage": {
+    "score": 1.0,
+    "ok": true,
+    "covered": 48,
+    "ontology_count": 48,
+    "missing_ids": []
+  },
+  "bay_fill": true,
+  "lucid_role": "FFF_TRAINING_CHECK_ONLY",
+  "fff_rule": "fpk-deterministic-fff \u2014 every ontology part from physics",
+  "exterior_signature_features": [
+    {
+      "family": "bay",
+      "mesh": "u_se_td_bay_endwall_0"
+    },
+    {
+      "family": "bay",
+      "mesh": "u_se_td_bay_endwall_1"
+    },
+    {
+      "family": "bearing",
+      "mesh": "u_se_td_bearing_cap_0"
+    },
+    {
+      "family": "bearing",
+      "mesh": "u_se_td_bearing_cap_1"
+    },
+    {
+      "family": "cassette",
+      "mesh": "u_se_td_cassette_cover"
+    },
+    {
+      "family": "cast",
+      "mesh": "u_se_td_cast_rib_cam_0"
+    },
+    {
+      "family": "cast",
+      "mesh": "u_se_td_cast_rib_cam_0_foot"
+    },
+    {
+      "family": "cast",
+      "mesh": "u_se_td_cast_rib_cam_1"
+    },
+    {
+      "family": "cast",
+      "mesh": "u_se_td_cast_rib_cam_1_foot"
+    },
+    {
+      "family": "cast",
+      "mesh": "u_se_td_cast_rib_cam_2"
+    },
+    {
+      "family": "cast",
+      "mesh": "u_se_td_cast_rib_cam_2_foot"
+    },
+    {
+      "family": "cast",
+      "mesh": "u_se_td_cast_rib_cam_3"
+    },
+    {
+      "family": "cast",
+      "mesh": "u_se_td_cast_rib_cam_3_foot"
+    },
+    {
+      "family": "cast",
+      "mesh": "u_se_td_cast_rib_cam_4"
+    },
+    {
+      "family": "cast",
+      "mesh": "u_se_td_cast_rib_cam_4_foot"
+    },
+    {
+      "family": "cast",
+      "mesh": "u_se_td_cast_rib_rear_0"
+    },
+    {
+      "family": "cast",
+      "mesh": "u_se_td_cast_rib_rear_0_foot"
+    },
+    {
+      "family": "cast",
+      "mesh": "u_se_td_cast_rib_rear_1"
+    },
+    {
+      "family": "cast",
+      "mesh": "u_se_td_cast_rib_rear_1_foot"
+    },
+    {
+      "family": "cast",
+      "mesh": "u_se_td_cast_rib_rear_2"
+    },
+    {
+      "family": "cast",
+      "mesh": "u_se_td_cast_rib_rear_2_foot"
+    },
+    {
+      "family": "cast",
+      "mesh": "u_se_td_cast_rib_rear_3"
+    },
+    {
+      "family": "cast",
+      "mesh": "u_se_td_cast_rib_rear_3_foot"
+    },
+    {
+      "family": "cast",
+      "mesh": "u_se_td_cast_rib_rear_4"
+    },
+    {
+      "family": "cast",
+      "mesh": "u_se_td_cast_rib_rear_4_foot"
+    },
+    {
+      "family": "coldplate",
+      "mesh": "u_se_td_coldplate_fastener_0"
+    },
+    {
+      "family": "coldplate",
+      "mesh": "u_se_td_coldplate_fastener_1"
+    },
+    {
+      "family": "coldplate",
+      "mesh": "u_se_td_coldplate_fastener_2"
+    },
+    {
+      "family": "coldplate",
+      "mesh": "u_se_td_coldplate_fastener_3"
+    },
+    {
+      "family": "coldplate",
+      "mesh": "u_se_td_coldplate_fastener_4"
+    },
+    {
+      "family": "coldplate",
+      "mesh": "u_se_td_coldplate_fastener_5"
+    },
+    {
+      "family": "coldplate",
+      "mesh": "u_se_td_coldplate_machine_face"
+    },
+    {
+      "family": "control",
+      "mesh": "u_se_td_control_pcb"
+    },
+    {
+      "family": "coolant",
+      "mesh": "u_se_td_coolant_clamp_0"
+    },
+    {
+      "family": "coolant",
+      "mesh": "u_se_td_coolant_clamp_0_screw"
+    },
+    {
+      "family": "coolant",
+      "mesh": "u_se_td_coolant_clamp_1"
+    },
+    {
+      "family": "coolant",
+      "mesh": "u_se_td_coolant_clamp_1_screw"
+    },
+    {
+      "family": "coolant",
+      "mesh": "u_se_td_coolant_hose_0"
+    },
+    {
+      "family": "coolant",
+      "mesh": "u_se_td_coolant_hose_0_rib_0"
+    },
+    {
+      "family": "coolant",
+      "mesh": "u_se_td_coolant_hose_0_rib_1"
+    },
+    {
+      "family": "coolant",
+      "mesh": "u_se_td_coolant_hose_0_rib_2"
+    },
+    {
+      "family": "coolant",
+      "mesh": "u_se_td_coolant_hose_0_rib_3"
+    },
+    {
+      "family": "coolant",
+      "mesh": "u_se_td_coolant_hose_1"
+    },
+    {
+      "family": "coolant",
+      "mesh": "u_se_td_coolant_hose_1_rib_0"
+    },
+    {
+      "family": "coolant",
+      "mesh": "u_se_td_coolant_hose_1_rib_1"
+    },
+    {
+      "family": "coolant",
+      "mesh": "u_se_td_coolant_hose_1_rib_2"
+    },
+    {
+      "family": "coolant",
+      "mesh": "u_se_td_coolant_hose_1_rib_3"
+    },
+    {
+      "family": "coolant",
+      "mesh": "u_se_td_coolant_in"
+    },
+    {
+      "family": "coolant",
+      "mesh": "u_se_td_coolant_in_barb_0"
+    },
+    {
+      "family": "coolant",
+      "mesh": "u_se_td_coolant_in_barb_1"
+    },
+    {
+      "family": "coolant",
+      "mesh": "u_se_td_coolant_in_barb_2"
+    },
+    {
+      "family": "coolant",
+      "mesh": "u_se_td_coolant_in_bore"
+    },
+    {
+      "family": "coolant",
+      "mesh": "u_se_td_coolant_in_boss"
+    },
+    {
+      "family": "coolant",
+      "mesh": "u_se_td_coolant_in_boss_bolt_0"
+    },
+    {
+      "family": "coolant",
+      "mesh": "u_se_td_coolant_in_boss_bolt_1"
+    },
+    {
+      "family": "coolant",
+      "mesh": "u_se_td_coolant_in_boss_bolt_2"
+    },
+    {
+      "family": "coolant",
+      "mesh": "u_se_td_coolant_in_boss_bolt_3"
+    },
+    {
+      "family": "coolant",
+      "mesh": "u_se_td_coolant_in_collar"
+    },
+    {
+      "family": "coolant",
+      "mesh": "u_se_td_coolant_in_collar_lip"
+    },
+    {
+      "family": "coolant",
+      "mesh": "u_se_td_coolant_in_hex"
+    },
+    {
+      "family": "coolant",
+      "mesh": "u_se_td_coolant_jacket"
+    },
+    {
+      "family": "coolant",
+      "mesh": "u_se_td_coolant_out"
+    },
+    {
+      "family": "coolant",
+      "mesh": "u_se_td_coolant_out_barb_0"
+    },
+    {
+      "family": "coolant",
+      "mesh": "u_se_td_coolant_out_barb_1"
+    },
+    {
+      "family": "coolant",
+      "mesh": "u_se_td_coolant_out_barb_2"
+    },
+    {
+      "family": "coolant",
+      "mesh": "u_se_td_coolant_out_bore"
+    },
+    {
+      "family": "coolant",
+      "mesh": "u_se_td_coolant_out_boss"
+    },
+    {
+      "family": "coolant",
+      "mesh": "u_se_td_coolant_out_boss_bolt_0"
+    },
+    {
+      "family": "coolant",
+      "mesh": "u_se_td_coolant_out_boss_bolt_1"
+    },
+    {
+      "family": "coolant",
+      "mesh": "u_se_td_coolant_out_boss_bolt_2"
+    },
+    {
+      "family": "coolant",
+      "mesh": "u_se_td_coolant_out_boss_bolt_3"
+    },
+    {
+      "family": "coolant",
+      "mesh": "u_se_td_coolant_out_collar"
+    },
+    {
+      "family": "coolant",
+      "mesh": "u_se_td_coolant_out_collar_lip"
+    },
+    {
+      "family": "coolant",
+      "mesh": "u_se_td_coolant_out_hex"
+    },
+    {
+      "family": "dclink",
+      "mesh": "u_se_td_dclink_cap_0"
+    },
+    {
+      "family": "dclink",
+      "mesh": "u_se_td_dclink_cap_1"
+    },
+    {
+      "family": "dclink",
+      "mesh": "u_se_td_dclink_cap_2"
+    },
+    {
+      "family": "diff",
+      "mesh": "u_se_td_diff_bulge"
+    },
+    {
+      "family": "diff",
+      "mesh": "u_se_td_diff_nest"
+    },
+    {
+      "family": "encoder",
+      "mesh": "u_se_td_encoder"
+    },
+    {
+      "family": "end",
+      "mesh": "u_se_td_end_bell_0"
+    },
+    {
+      "family": "end",
+      "mesh": "u_se_td_end_bell_1"
+    },
+    {
+      "family": "end",
+      "mesh": "u_se_td_end_bell_face_0"
+    },
+    {
+      "family": "end",
+      "mesh": "u_se_td_end_bell_face_1"
+    },
+    {
+      "family": "end",
+      "mesh": "u_se_td_end_bolt_0"
+    },
+    {
+      "family": "end",
+      "mesh": "u_se_td_end_bolt_1"
+    },
+    {
+      "family": "end",
+      "mesh": "u_se_td_end_bolt_2"
+    },
+    {
+      "family": "end",
+      "mesh": "u_se_td_end_bolt_3"
+    },
+    {
+      "family": "end",
+      "mesh": "u_se_td_end_bolt_4"
+    },
+    {
+      "family": "end",
+      "mesh": "u_se_td_end_bolt_5"
+    },
+    {
+      "family": "end",
+      "mesh": "u_se_td_end_bolt_6"
+    },
+    {
+      "family": "end",
+      "mesh": "u_se_td_end_bolt_7"
+    },
+    {
+      "family": "gasket",
+      "mesh": "u_se_td_gasket_lip_0"
+    },
+    {
+      "family": "gasket",
+      "mesh": "u_se_td_gasket_lip_1"
+    },
+    {
+      "family": "gate",
+      "mesh": "u_se_td_gate_drive_pcb"
+    },
+    {
+      "family": "gate",
+      "mesh": "u_se_td_gate_drive_ribbon"
+    },
+    {
+      "family": "gear",
+      "mesh": "u_se_td_gear_breather"
+    },
+    {
+      "family": "gear",
+      "mesh": "u_se_td_gear_oil"
+    },
+    {
+      "family": "gearbox",
+      "mesh": "u_se_td_gearbox"
+    },
+    {
+      "family": "gearbox",
+      "mesh": "u_se_td_gearbox_bearing_0"
+    },
+    {
+      "family": "gearbox",
+      "mesh": "u_se_td_gearbox_bearing_1"
+    },
+    {
+      "family": "gearbox",
+      "mesh": "u_se_td_gearbox_cover"
+    },
+    {
+      "family": "ground",
+      "mesh": "u_se_td_ground_stud"
+    },
+    {
+      "family": "halfshaft",
+      "mesh": "u_se_td_halfshaft_flange_0"
+    },
+    {
+      "family": "halfshaft",
+      "mesh": "u_se_td_halfshaft_flange_1"
+    },
+    {
+      "family": "hollow",
+      "mesh": "u_se_td_hollow_rotor"
+    },
+    {
+      "family": "housing",
+      "mesh": "u_se_td_housing_machine_band"
+    },
+    {
+      "family": "hv",
+      "mesh": "u_se_td_hv_bus_leg_h"
+    },
+    {
+      "family": "hv",
+      "mesh": "u_se_td_hv_bus_leg_v"
+    },
+    {
+      "family": "hv",
+      "mesh": "u_se_td_hv_cable_boot"
+    },
+    {
+      "family": "hv",
+      "mesh": "u_se_td_hv_cable_boot_hazard"
+    },
+    {
+      "family": "hv",
+      "mesh": "u_se_td_hv_connector"
+    },
+    {
+      "family": "hv",
+      "mesh": "u_se_td_hv_connector_barrel"
+    },
+    {
+      "family": "hv",
+      "mesh": "u_se_td_hv_connector_braid_boot"
+    },
+    {
+      "family": "hv",
+      "mesh": "u_se_td_hv_connector_braid_collar"
+    },
+    {
+      "family": "hv",
+      "mesh": "u_se_td_hv_connector_flange"
+    },
+    {
+      "family": "hv",
+      "mesh": "u_se_td_hv_connector_flange_bolt_0"
+    },
+    {
+      "family": "hv",
+      "mesh": "u_se_td_hv_connector_flange_bolt_1"
+    },
+    {
+      "family": "hv",
+      "mesh": "u_se_td_hv_connector_flange_bolt_2"
+    },
+    {
+      "family": "hv",
+      "mesh": "u_se_td_hv_connector_flange_bolt_3"
+    },
+    {
+      "family": "hv",
+      "mesh": "u_se_td_hv_connector_hazard_band"
+    },
+    {
+      "family": "hv",
+      "mesh": "u_se_td_hv_connector_hvil"
+    },
+    {
+      "family": "hv",
+      "mesh": "u_se_td_hv_connector_key_flat"
+    },
+    {
+      "family": "hv",
+      "mesh": "u_se_td_hv_connector_pin_0"
+    },
+    {
+      "family": "hv",
+      "mesh": "u_se_td_hv_connector_pin_1"
+    },
+    {
+      "family": "hv",
+      "mesh": "u_se_td_hv_connector_safety_collar"
+    },
+    {
+      "family": "hv",
+      "mesh": "u_se_td_hv_hood"
+    },
+    {
+      "family": "hv",
+      "mesh": "u_se_td_hv_shield"
+    },
+    {
+      "family": "intermediate",
+      "mesh": "u_se_td_intermediate_shaft"
+    },
+    {
+      "family": "inverter",
+      "mesh": "u_se_td_inverter_coldplate"
+    },
+    {
+      "family": "inverter",
+      "mesh": "u_se_td_inverter_coldplate_rib_0"
+    },
+    {
+      "family": "inverter",
+      "mesh": "u_se_td_inverter_coldplate_rib_1"
+    },
+    {
+      "family": "inverter",
+      "mesh": "u_se_td_inverter_coldplate_rib_2"
+    },
+    {
+      "family": "inverter",
+      "mesh": "u_se_td_inverter_cover"
+    },
+    {
+      "family": "inverter",
+      "mesh": "u_se_td_inverter_housing"
+    },
+    {
+      "family": "inverter",
+      "mesh": "u_se_td_inverter_housing_wall_0"
+    },
+    {
+      "family": "inverter",
+      "mesh": "u_se_td_inverter_housing_wall_1"
+    },
+    {
+      "family": "inverter",
+      "mesh": "u_se_td_inverter_housing_wall_2"
+    },
+    {
+      "family": "inverter",
+      "mesh": "u_se_td_inverter_housing_wall_3"
+    },
+    {
+      "family": "jacket",
+      "mesh": "u_se_td_jacket_band"
+    },
+    {
+      "family": "lv",
+      "mesh": "u_se_td_lv_connector"
+    },
+    {
+      "family": "lv",
+      "mesh": "u_se_td_lv_connector_boot"
+    },
+    {
+      "family": "lv",
+      "mesh": "u_se_td_lv_connector_flange"
+    },
+    {
+      "family": "lv",
+      "mesh": "u_se_td_lv_connector_flange_bolt_0"
+    },
+    {
+      "family": "lv",
+      "mesh": "u_se_td_lv_connector_flange_bolt_1"
+    },
+    {
+      "family": "lv",
+      "mesh": "u_se_td_lv_connector_key_flat"
+    },
+    {
+      "family": "lv",
+      "mesh": "u_se_td_lv_connector_pin_0"
+    },
+    {
+      "family": "lv",
+      "mesh": "u_se_td_lv_connector_pin_1"
+    },
+    {
+      "family": "lv",
+      "mesh": "u_se_td_lv_connector_pin_2"
+    },
+    {
+      "family": "lv",
+      "mesh": "u_se_td_lv_connector_pin_3"
+    },
+    {
+      "family": "lv",
+      "mesh": "u_se_td_lv_connector_pin_4"
+    },
+    {
+      "family": "lv",
+      "mesh": "u_se_td_lv_connector_pin_5"
+    },
+    {
+      "family": "lv",
+      "mesh": "u_se_td_lv_harness_boot"
+    },
+    {
+      "family": "magnet",
+      "mesh": "u_se_td_magnet_0"
+    },
+    {
+      "family": "magnet",
+      "mesh": "u_se_td_magnet_1"
+    },
+    {
+      "family": "magnet",
+      "mesh": "u_se_td_magnet_2"
+    },
+    {
+      "family": "magnet",
+      "mesh": "u_se_td_magnet_3"
+    },
+    {
+      "family": "magnet",
+      "mesh": "u_se_td_magnet_4"
+    },
+    {
+      "family": "magnet",
+      "mesh": "u_se_td_magnet_5"
+    },
+    {
+      "family": "magnet",
+      "mesh": "u_se_td_magnet_6"
+    },
+    {
+      "family": "magnet",
+      "mesh": "u_se_td_magnet_7"
+    },
+    {
+      "family": "mcu",
+      "mesh": "u_se_td_mcu_gasket_lip"
+    },
+    {
+      "family": "mcu",
+      "mesh": "u_se_td_mcu_shelf"
+    },
+    {
+      "family": "mcu",
+      "mesh": "u_se_td_mcu_shelf_lip_0"
+    },
+    {
+      "family": "mcu",
+      "mesh": "u_se_td_mcu_shelf_lip_1"
+    },
+    {
+      "family": "microjet",
+      "mesh": "u_se_td_microjet_0_0"
+    },
+    {
+      "family": "microjet",
+      "mesh": "u_se_td_microjet_0_1"
+    },
+    {
+      "family": "microjet",
+      "mesh": "u_se_td_microjet_0_2"
+    },
+    {
+      "family": "microjet",
+      "mesh": "u_se_td_microjet_0_3"
+    },
+    {
+      "family": "microjet",
+      "mesh": "u_se_td_microjet_1_0"
+    },
+    {
+      "family": "microjet",
+      "mesh": "u_se_td_microjet_1_1"
+    },
+    {
+      "family": "microjet",
+      "mesh": "u_se_td_microjet_1_2"
+    },
+    {
+      "family": "microjet",
+      "mesh": "u_se_td_microjet_1_3"
+    },
+    {
+      "family": "motor",
+      "mesh": "u_se_td_motor_cover"
+    },
+    {
+      "family": "motor",
+      "mesh": "u_se_td_motor_housing"
+    },
+    {
+      "family": "motor",
+      "mesh": "u_se_td_motor_shaft"
+    },
+    {
+      "family": "motor",
+      "mesh": "u_se_td_motor_terminal_0"
+    },
+    {
+      "family": "motor",
+      "mesh": "u_se_td_motor_terminal_1"
+    },
+    {
+      "family": "motor",
+      "mesh": "u_se_td_motor_terminal_2"
+    },
+    {
+      "family": "mount",
+      "mesh": "u_se_td_mount_bolt_0"
+    },
+    {
+      "family": "mount",
+      "mesh": "u_se_td_mount_bolt_1"
+    },
+    {
+      "family": "mount",
+      "mesh": "u_se_td_mount_bolt_2"
+    },
+    {
+      "family": "mount",
+      "mesh": "u_se_td_mount_bolt_3"
+    },
+    {
+      "family": "mount",
+      "mesh": "u_se_td_mount_bolt_4"
+    },
+    {
+      "family": "mount",
+      "mesh": "u_se_td_mount_bolt_5"
+    },
+    {
+      "family": "mount",
+      "mesh": "u_se_td_mount_ear_0"
+    },
+    {
+      "family": "mount",
+      "mesh": "u_se_td_mount_ear_1"
+    },
+    {
+      "family": "mount",
+      "mesh": "u_se_td_mount_ear_2"
+    },
+    {
+      "family": "mount",
+      "mesh": "u_se_td_mount_ear_3"
+    },
+    {
+      "family": "mount",
+      "mesh": "u_se_td_mount_pad_0"
+    },
+    {
+      "family": "mount",
+      "mesh": "u_se_td_mount_pad_1"
+    },
+    {
+      "family": "mount",
+      "mesh": "u_se_td_mount_pad_2"
+    },
+    {
+      "family": "mount",
+      "mesh": "u_se_td_mount_pad_3"
+    },
+    {
+      "family": "mount",
+      "mesh": "u_se_td_mount_pad_4"
+    },
+    {
+      "family": "mount",
+      "mesh": "u_se_td_mount_pad_5"
+    },
+    {
+      "family": "nameplate",
+      "mesh": "u_se_td_nameplate"
+    },
+    {
+      "family": "nameplate",
+      "mesh": "u_se_td_nameplate_border"
+    },
+    {
+      "family": "oil",
+      "mesh": "u_se_td_oil_seal_0"
+    },
+    {
+      "family": "oil",
+      "mesh": "u_se_td_oil_seal_1"
+    },
+    {
+      "family": "oil",
+      "mesh": "u_se_td_oil_seal_2"
+    },
+    {
+      "family": "oil",
+      "mesh": "u_se_td_oil_seal_3"
+    },
+    {
+      "family": "output",
+      "mesh": "u_se_td_output_gear_0"
+    },
+    {
+      "family": "output",
+      "mesh": "u_se_td_output_gear_1"
+    },
+    {
+      "family": "output",
+      "mesh": "u_se_td_output_shaft"
+    },
+    {
+      "family": "output",
+      "mesh": "u_se_td_output_shaft_b"
+    },
+    {
+      "family": "pack",
+      "mesh": "u_se_td_pack_base"
+    },
+    {
+      "family": "pack",
+      "mesh": "u_se_td_pack_base_rail_0"
+    },
+    {
+      "family": "pack",
+      "mesh": "u_se_td_pack_base_rail_1"
+    },
+    {
+      "family": "pack",
+      "mesh": "u_se_td_pack_housing"
+    },
+    {
+      "family": "pack",
+      "mesh": "u_se_td_pack_housing_flange_0"
+    },
+    {
+      "family": "pack",
+      "mesh": "u_se_td_pack_housing_flange_1"
+    },
+    {
+      "family": "pcb",
+      "mesh": "u_se_td_pcb"
+    },
+    {
+      "family": "pcb",
+      "mesh": "u_se_td_pcb_edge_pads"
+    },
+    {
+      "family": "pcb",
+      "mesh": "u_se_td_pcb_package_0"
+    },
+    {
+      "family": "pcb",
+      "mesh": "u_se_td_pcb_package_1"
+    },
+    {
+      "family": "pcb",
+      "mesh": "u_se_td_pcb_package_2"
+    },
+    {
+      "family": "pcb",
+      "mesh": "u_se_td_pcb_package_3"
+    },
+    {
+      "family": "pe",
+      "mesh": "u_se_td_pe_busbar_0"
+    },
+    {
+      "family": "pe",
+      "mesh": "u_se_td_pe_busbar_1"
+    },
+    {
+      "family": "pe",
+      "mesh": "u_se_td_pe_busbar_ins_0"
+    },
+    {
+      "family": "pe",
+      "mesh": "u_se_td_pe_busbar_ins_1"
+    },
+    {
+      "family": "pe",
+      "mesh": "u_se_td_pe_filmcap_0"
+    },
+    {
+      "family": "pe",
+      "mesh": "u_se_td_pe_filmcap_1"
+    },
+    {
+      "family": "pe",
+      "mesh": "u_se_td_pe_filmcap_2"
+    },
+    {
+      "family": "pe",
+      "mesh": "u_se_td_pe_gd_flex"
+    },
+    {
+      "family": "pe",
+      "mesh": "u_se_td_pe_module_0"
+    },
+    {
+      "family": "pe",
+      "mesh": "u_se_td_pe_module_1"
+    },
+    {
+      "family": "pe",
+      "mesh": "u_se_td_pe_module_2"
+    },
+    {
+      "family": "phase",
+      "mesh": "u_se_td_phase_bus_0_leg_h"
+    },
+    {
+      "family": "phase",
+      "mesh": "u_se_td_phase_bus_0_leg_v"
+    },
+    {
+      "family": "phase",
+      "mesh": "u_se_td_phase_bus_1_leg_h"
+    },
+    {
+      "family": "phase",
+      "mesh": "u_se_td_phase_bus_1_leg_v"
+    },
+    {
+      "family": "phase",
+      "mesh": "u_se_td_phase_bus_2_leg_h"
+    },
+    {
+      "family": "phase",
+      "mesh": "u_se_td_phase_bus_2_leg_v"
+    },
+    {
+      "family": "pinion",
+      "mesh": "u_se_td_pinion_gear"
+    },
+    {
+      "family": "planet",
+      "mesh": "u_se_td_planet_0"
+    },
+    {
+      "family": "planet",
+      "mesh": "u_se_td_planet_1"
+    },
+    {
+      "family": "planet",
+      "mesh": "u_se_td_planet_2"
+    },
+    {
+      "family": "planet",
+      "mesh": "u_se_td_planet_carrier"
+    },
+    {
+      "family": "post",
+      "mesh": "u_se_td_post_diff_envelope"
+    },
+    {
+      "family": "post",
+      "mesh": "u_se_td_post_diff_pinion_0"
+    },
+    {
+      "family": "post",
+      "mesh": "u_se_td_post_diff_pinion_1"
+    },
+    {
+      "family": "post",
+      "mesh": "u_se_td_post_diff_wheel_0"
+    },
+    {
+      "family": "post",
+      "mesh": "u_se_td_post_diff_wheel_1"
+    },
+    {
+      "family": "resolver",
+      "mesh": "u_se_td_resolver_bulge"
+    },
+    {
+      "family": "ring",
+      "mesh": "u_se_td_ring_gear"
+    },
+    {
+      "family": "sic",
+      "mesh": "u_se_td_sic_inverter"
+    },
+    {
+      "family": "sic",
+      "mesh": "u_se_td_sic_inverter_dbc"
+    },
+    {
+      "family": "sic",
+      "mesh": "u_se_td_sic_inverter_mod_0"
+    },
+    {
+      "family": "sic",
+      "mesh": "u_se_td_sic_inverter_mod_0_clamp_0"
+    },
+    {
+      "family": "sic",
+      "mesh": "u_se_td_sic_inverter_mod_0_clamp_1"
+    },
+    {
+      "family": "sic",
+      "mesh": "u_se_td_sic_inverter_mod_0_tab_0"
+    },
+    {
+      "family": "sic",
+      "mesh": "u_se_td_sic_inverter_mod_0_tab_1"
+    },
+    {
+      "family": "sic",
+      "mesh": "u_se_td_sic_inverter_mod_1"
+    },
+    {
+      "family": "sic",
+      "mesh": "u_se_td_sic_inverter_mod_1_clamp_0"
+    },
+    {
+      "family": "sic",
+      "mesh": "u_se_td_sic_inverter_mod_1_clamp_1"
+    },
+    {
+      "family": "sic",
+      "mesh": "u_se_td_sic_inverter_mod_1_tab_0"
+    },
+    {
+      "family": "sic",
+      "mesh": "u_se_td_sic_inverter_mod_1_tab_1"
+    },
+    {
+      "family": "sic",
+      "mesh": "u_se_td_sic_inverter_mod_2"
+    },
+    {
+      "family": "sic",
+      "mesh": "u_se_td_sic_inverter_mod_2_clamp_0"
+    },
+    {
+      "family": "sic",
+      "mesh": "u_se_td_sic_inverter_mod_2_clamp_1"
+    },
+    {
+      "family": "sic",
+      "mesh": "u_se_td_sic_inverter_mod_2_tab_0"
+    },
+    {
+      "family": "sic",
+      "mesh": "u_se_td_sic_inverter_mod_2_tab_1"
+    },
+    {
+      "family": "side",
+      "mesh": "u_se_td_side_gear_0"
+    },
+    {
+      "family": "side",
+      "mesh": "u_se_td_side_gear_1"
+    },
+    {
+      "family": "signal",
+      "mesh": "u_se_td_signal_ribbon"
+    },
+    {
+      "family": "stator",
+      "mesh": "u_se_td_stator_ring"
+    },
+    {
+      "family": "sun",
+      "mesh": "u_se_td_sun_gear"
+    },
+    {
+      "family": "vehicle",
+      "mesh": "u_se_td_vehicle_cool_in"
+    },
+    {
+      "family": "vehicle",
+      "mesh": "u_se_td_vehicle_cool_out"
+    },
+    {
+      "family": "vehicle",
+      "mesh": "u_se_td_vehicle_hv"
+    },
+    {
+      "family": "vehicle",
+      "mesh": "u_se_td_vehicle_lv"
+    },
+    {
+      "family": "winding",
+      "mesh": "u_se_td_winding_end_0"
+    },
+    {
+      "family": "winding",
+      "mesh": "u_se_td_winding_end_1"
+    }
+  ]
+}
