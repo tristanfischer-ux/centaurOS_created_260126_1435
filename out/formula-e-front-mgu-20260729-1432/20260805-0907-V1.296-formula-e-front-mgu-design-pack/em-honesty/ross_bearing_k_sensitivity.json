@@ -1,0 +1,60 @@
+{
+  "schema": "forgeos.multiphysics.ross_bearing_k_sensitivity/v1",
+  "ran_at": "2026-08-05T10:09:55Z",
+  "ship_ok": false,
+  "operating_rpm": 24000.0,
+  "base_kxx_n_m": 50000000.0,
+  "required_subcritical_factor": 1.2,
+  "rows": [
+    {
+      "k_factor": 0.25,
+      "kxx_n_m": 12500000.0,
+      "first_critical_rpm": 11029.287,
+      "margin_over_operating": 0.4596,
+      "clear_subcritical_1p2": false
+    },
+    {
+      "k_factor": 0.5,
+      "kxx_n_m": 25000000.0,
+      "first_critical_rpm": 16018.578,
+      "margin_over_operating": 0.6674,
+      "clear_subcritical_1p2": false
+    },
+    {
+      "k_factor": 1.0,
+      "kxx_n_m": 50000000.0,
+      "first_critical_rpm": 22922.382,
+      "margin_over_operating": 0.9551,
+      "clear_subcritical_1p2": false
+    },
+    {
+      "k_factor": 2.0,
+      "kxx_n_m": 100000000.0,
+      "first_critical_rpm": 32540.931,
+      "margin_over_operating": 1.3559,
+      "clear_subcritical_1p2": true
+    },
+    {
+      "k_factor": 4.0,
+      "kxx_n_m": 200000000.0,
+      "first_critical_rpm": 45926.893,
+      "margin_over_operating": 1.9136,
+      "clear_subcritical_1p2": true
+    },
+    {
+      "k_factor": 8.0,
+      "kxx_n_m": 400000000.0,
+      "first_critical_rpm": 64385.595,
+      "margin_over_operating": 2.6827,
+      "clear_subcritical_1p2": true
+    }
+  ],
+  "baseline_first_critical_rpm": 22922.382,
+  "k_factor_for_clear_1p2": 2.0,
+  "headline": "Assumed-bearing stiffness sweep vs 24k. Identity OPEN.",
+  "honest_limits": [
+    "isotropic assumed K/C",
+    "steel equivalent disk",
+    "not modal/dyno correlated"
+  ]
+}

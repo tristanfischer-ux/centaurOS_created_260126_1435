@@ -82,3 +82,7 @@ em-honesty/r6_capability_index.png
 em-honesty/ross_critical_speeds.png
 em-honesty/ross_fia_front_kit_case.json
 em-honesty/stabilize_fe_front_honesty.json
+49-r4 dense CalculiX (765 nodes) centrif vs T-grad
+51b-ross-bearing-k-sensitivity.png
+ross_bearing_k_sensitivity.json
+r4_calculix_dense.json

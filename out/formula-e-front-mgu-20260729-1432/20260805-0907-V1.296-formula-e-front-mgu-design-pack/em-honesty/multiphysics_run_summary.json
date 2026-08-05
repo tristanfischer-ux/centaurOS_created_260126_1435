@@ -1,7 +1,136 @@
 {
-  "ran_at": "2026-08-05T08:34:37Z",
+  "ran_at": "2026-08-05T10:11:04Z",
   "ship_ok": false,
-  "r2": {
+  "headline": "FEMM heat LIVE; dense CCX R4 RAN (765 nodes, \u0394~22.6 MPa); ROSS K-sensitivity shows ~2\u00d7 base K clears 1.2\u00d7 margin; det.checks 0 FAIL",
+  "r1": {
+    "schema": "forgeos.multiphysics.r1_known_answer/v2",
+    "ran_at": "2026-08-05T09:01:57Z",
+    "ship_ok": false,
+    "method": "FEMM_heat_flow_femmcli",
+    "problem": {
+      "L_m": 0.05,
+      "k": 1,
+      "qv": 100000.0,
+      "T0": 20,
+      "analytic": "T=T0+(qv/(2k))*(2Lx-x^2)"
+    },
+    "femm_heat_flow": {
+      "status": "RAN_PASS",
+      "binary": "scripts/phantm/bin/femmcli",
+      "api_gotcha": "hi_setsegmentprop requires 6th arg conductor='<None>' \u2014 5-arg form segfaults in this femmcli",
+      "max_abs_error_k": 0.004042836641517056,
+      "rel_error_vs_rise": 3.234269313213645e-05,
+      "pass": true,
+      "T_max_femm": 144.9997783590977,
+      "T_max_analytic": 145.0,
+      "samples": [
+        {
+          "x_mm": 0.0,
+          "T_femm": 20.00000000223551,
+          "T_analytic": 20.0,
+          "abs_err": 2.235509555248427e-09
+        },
+        {
+          "x_mm": 10.0,
+          "T_femm": 64.99751841348981,
+          "T_analytic": 65.0,
+          "abs_err": 0.002481586510185707
+        },
+        {
+          "x_mm": 20.0,
+          "T_femm": 99.99716143223937,
+          "T_analytic": 100.0,
+          "abs_err": 0.0028385677606337367
+        },
+        {
+          "x_mm": 25.0,
+          "T_femm": 113.7485763821164,
+          "T_analytic": 113.75000000000001,
+          "abs_err": 0.001423617883617112
+        },
+        {
+          "x_mm": 30.0,
+          "T_femm": 124.9959571633585,
+          "T_analytic": 125.00000000000001,
+          "abs_err": 0.004042836641517056
+        },
+        {
+          "x_mm": 40.0,
+          "T_femm": 139.9968888869337,
+          "T_analytic": 140.0,
+          "abs_err": 0.0031111130662964115
+        },
+        {
+          "x_mm": 50.0,
+          "T_femm": 144.9997783590977,
+          "T_analytic": 145.00000000000003,
+          "abs_err": 0.00022164090233900424
+        }
+      ]
+    },
+    "fd_crosscheck": {
+      "nx": 201,
+      "max_abs_error_k": 0.6249999999056115,
+      "rel_error_vs_rise": 0.004999999999244891,
+      "T_max_c": 144.37500000009442,
+      "T_analytic_max_c": 145.00000000000003,
+      "pass": true,
+      "pass_criterion": "rel_error_vs_rise < 5%"
+    },
+    "gate": "R2_allowed",
+    "fd_pass": true
+  },
+  "r2_femm": {
+    "schema": "forgeos.multiphysics.r2_femm_heat/v1",
+    "ran_at": "2026-08-05T09:03:03Z",
+    "ship_ok": false,
+    "status": "RAN",
+    "solver": "FEMM heat-flow via femmcli",
+    "api_gotcha": "hi_setsegmentprop needs 6th conductor arg '<None>'",
+    "meta": {
+      "r_mm": {
+        "bore": 46.699999999999996,
+        "slot": 55.929759270060934,
+        "yoke": 65.57691157454681,
+        "jacket": 67.57691157454681
+      },
+      "q_w_m3": {
+        "tooth": 5814465.281297517,
+        "yoke": 7907764.246511755
+      },
+      "h_w_m2k": 2352.814643938792,
+      "Tinf_c": 60.0,
+      "k_iron": 28.0,
+      "depth_mm": 130.0
+    },
+    "probes_c": {
+      "tooth_mid": 162.7006974486671,
+      "yoke_mid": 143.4893666182014,
+      "jacket": 115.2331994146502,
+      "bore": 164.9938109235308,
+      "T_max": 164.9938109235308
+    },
+    "lptn_compare": {
+      "lptn_winding": 86.82,
+      "lptn_magnet": 99.4,
+      "delta_tooth_vs_lptn_winding_k": 78.1738109235308
+    },
+    "fd_compare": {
+      "tooth_mid": 148.6294260080199,
+      "yoke_mid": 131.1592347268866,
+      "jacket_outer": 106.42607488508143,
+      "winding_proxy_near_tooth": 148.6294260080199,
+      "magnet_proxy_bore": 150.63299416850845
+    },
+    "figure": "out/formula-e-front-mgu-20260729-1432/_motor_stack/multiphysics/r2_femm_stator_heat.png",
+    "honest_limits": [
+      "2-D planar radial strip; no circumferential slots",
+      "copper/rotor GAP",
+      "jacket HTC from screening R=0.0077",
+      "Steinmetz screening losses"
+    ]
+  },
+  "r2_fd": {
     "schema": "forgeos.multiphysics.r2_stator_temperature_field/v1",
     "ran_at": "2026-08-05T08:34:37Z",
     "ship_ok": false,
@@ -69,187 +198,425 @@
     "not_cht": true,
     "not_axial": true
   },
-  "r4": {
-    "schema": "forgeos.multiphysics.r4_thermal_stress/v1",
-    "ran_at": "2026-08-05T08:34:38Z",
+  "r4_dense": {
+    "schema": "forgeos.multiphysics.r4_calculix_dense/v1",
+    "ran_at": "2026-08-05T10:08:53Z",
     "ship_ok": false,
-    "calculix_docker": {
-      "image": "forgeos/calculix:2.21-arm64",
-      "available": true,
-      "note": "image present"
+    "mesh": {
+      "nr": 8,
+      "nth": 16,
+      "nz": 4,
+      "n_nodes": 765,
+      "n_elements": 512,
+      "ri_m": 0.05295,
+      "ro_m": 0.0697,
+      "half_z_m": 0.0325,
+      "type": "C3D8_quarter_ring"
     },
-    "centrifugal_baseline": {
-      "source": "/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/formula-e-front-mgu-20260729-1432/_motor_stack/rotor_fos_screening_card.json",
-      "rotor_fos_screening": 2.635,
-      "rpm": 24000,
-      "note": "Existing CalculiX centrifugal screen \u2014 thermal ADDS to this"
-    },
-    "thermal_stress_oom_screen": {
-      "method": "sigma = E * alpha * (T_yoke - T_coolant) order-of-magnitude",
-      "E_pa": 200000000000.0,
-      "alpha_per_k": 1.2e-05,
-      "delta_T_k": 71.15923472688661,
-      "sigma_th_mpa": 170.78216334452787,
-      "not_coupled_fe": true,
-      "note": "OOM screen only. Full *COUPLED TEMPERATURE-DISPLACEMENT not executed in this pass if mesh export path not wired; Docker image availability recorded."
-    },
-    "status": "PARTIAL_SMOKE_OK_PLUS_OOM_THERMAL",
-    "honest_limits": [
-      "not full coupled CCX mesh from twin CAD",
-      "thermal stress OOM superposes on centrifugal FoS \u2014 do not quote either alone as release"
-    ],
-    "calculix_smoke": {
+    "rpm": 24000.0,
+    "T_ref_c": 20.0,
+    "T_field": "FEMM R2 radial samples mapped by r=hypot(x,y)",
+    "centrif_only": {
+      "ok": true,
       "returncode": 0,
-      "tail": "CALCULIX_RUNTIME=docker\nCALCULIX_IMAGE=forgeos/calculix:2.21-arm64\nCALCULIX_MAX_ABS_DISPLACEMENT_MM=0.00483982\nCALCULIX_MAX_ABS_STRESS_MPA=8\nCALCULIX_RESULT_DATABASE_BYTES=3684\nCALCULIX_SMOKE_PASS: displacement and stress fields verified\n"
+      "max_von_mises_mpa": 218.08735221337298,
+      "n_integration_points": 4096,
+      "tail": "p to 1 cpu(s) for the stress calculation.\n\n Using up to 1 cpu(s) for the symmetric stiffness/mass contributions.\n\n Factoring the system of equations using the symmetric spooles solver\n Using up to 1 cpu(s) for spooles.\n\n Using up to 1 cpu(s) for the stress calculation.\n\n\n Job finished\n\n________________________________________\n\nTotal CalculiX Time: 0.060178\n________________________________________\n"
     },
-    "figure": "/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/formula-e-front-mgu-20260729-1432/_motor_stack/multiphysics/r4_thermal_stress_screen.png"
+    "centrif_plus_thermal_gradient": {
+      "ok": true,
+      "returncode": 0,
+      "max_von_mises_mpa": 240.6570970107397,
+      "n_integration_points": 4096,
+      "tail": "p to 1 cpu(s) for the stress calculation.\n\n Using up to 1 cpu(s) for the symmetric stiffness/mass contributions.\n\n Factoring the system of equations using the symmetric spooles solver\n Using up to 1 cpu(s) for spooles.\n\n Using up to 1 cpu(s) for the stress calculation.\n\n\n Job finished\n\n________________________________________\n\nTotal CalculiX Time: 0.054891\n________________________________________\n"
+    },
+    "delta_vm_mpa": 22.569744797366724,
+    "assumed_yield_mpa": 355.0,
+    "status": "RAN",
+    "honest_limits": [
+      "quarter ring continuum \u2014 not laminate/magnet-pocket mesh",
+      "stator FEMM T mapped onto rotor ring as screening proxy",
+      "not *COUPLED TEMPERATURE-DISPLACEMENT heat conduction solve",
+      "not release FoS"
+    ],
+    "compare_to_coarse": {
+      "prior_coarse_nodes": 56,
+      "prior_delta_vm_mpa": 24.99
+    }
+  },
+  "r4_pack": {
+    "schema": "forgeos.multiphysics.r4_calculix_thermal_centrif/v3",
+    "ran_at": "2026-08-05T10:08:53Z",
+    "ship_ok": false,
+    "mesh": {
+      "nr": 8,
+      "nth": 16,
+      "nz": 4,
+      "n_nodes": 765,
+      "n_elements": 512,
+      "ri_m": 0.05295,
+      "ro_m": 0.0697,
+      "half_z_m": 0.0325,
+      "type": "C3D8_quarter_ring"
+    },
+    "rpm": 24000.0,
+    "T_ref_c": 20.0,
+    "T_field": "FEMM R2 radial samples mapped by r=hypot(x,y)",
+    "centrif_only": {
+      "ok": true,
+      "returncode": 0,
+      "max_von_mises_mpa": 218.08735221337298,
+      "n_integration_points": 4096,
+      "tail": "p to 1 cpu(s) for the stress calculation.\n\n Using up to 1 cpu(s) for the symmetric stiffness/mass contributions.\n\n Factoring the system of equations using the symmetric spooles solver\n Using up to 1 cpu(s) for spooles.\n\n Using up to 1 cpu(s) for the stress calculation.\n\n\n Job finished\n\n________________________________________\n\nTotal CalculiX Time: 0.060178\n________________________________________\n"
+    },
+    "centrif_plus_thermal_gradient": {
+      "ok": true,
+      "returncode": 0,
+      "max_von_mises_mpa": 240.6570970107397,
+      "n_integration_points": 4096,
+      "tail": "p to 1 cpu(s) for the stress calculation.\n\n Using up to 1 cpu(s) for the symmetric stiffness/mass contributions.\n\n Factoring the system of equations using the symmetric spooles solver\n Using up to 1 cpu(s) for spooles.\n\n Using up to 1 cpu(s) for the stress calculation.\n\n\n Job finished\n\n________________________________________\n\nTotal CalculiX Time: 0.054891\n________________________________________\n"
+    },
+    "delta_vm_mpa": 22.569744797366724,
+    "assumed_yield_mpa": 355.0,
+    "status": "RAN",
+    "honest_limits": [
+      "quarter ring continuum \u2014 not laminate/magnet-pocket mesh",
+      "stator FEMM T mapped onto rotor ring as screening proxy",
+      "not *COUPLED TEMPERATURE-DISPLACEMENT heat conduction solve",
+      "not release FoS"
+    ],
+    "compare_to_coarse": {
+      "prior_coarse_nodes": 56,
+      "prior_delta_vm_mpa": 24.99
+    }
   },
   "r5": {
-    "schema": "forgeos.multiphysics.r5_material_swap/v1",
-    "ran_at": "2026-08-05T08:34:39Z",
+    "schema": "forgeos.multiphysics.r5_material_swap/v2",
     "ship_ok": false,
-    "base": {
+    "method": "machine_lamination.steinmetz_from_lamination at fixed B probes",
+    "B_tooth_t": 1.799410316060748,
+    "B_yoke_t": 2.103596059622518,
+    "base_at_dec009_hz": {
       "grade": "M400-50A",
-      "iron_loss_w": 6035.1,
-      "tooth_loss_w": 2249.4,
-      "yoke_loss_w": 3785.7,
-      "kh": 0.032222,
-      "ke": 0.00011686090273147389
+      "kh": 0.032222378800803336,
+      "ke": 0.00011686090273147389,
+      "alpha": 1.8,
+      "tooth_loss_w": 3306.0064421259603,
+      "yoke_loss_w": 5568.333148807261,
+      "iron_loss_w": 8874.339590933221,
+      "frequency_hz": 1600.0,
+      "spec": {
+        "thickness_m": 0.0005,
+        "density": 7650.0,
+        "designation": "M400-50A"
+      }
     },
-    "alternative": {
+    "alt_at_dec009_hz": {
       "grade": "M270-35A",
-      "status": "GAP",
-      "reason": "machine_lamination has no grade-coeff API used here"
+      "kh": 0.022922379929605167,
+      "ke": 5.7261842338422205e-05,
+      "alpha": 1.8,
+      "tooth_loss_w": 1717.1887984168127,
+      "yoke_loss_w": 2887.888843634736,
+      "iron_loss_w": 4605.0776420515485,
+      "frequency_hz": 1600.0,
+      "spec": {
+        "thickness_m": 0.00035,
+        "density": 7650.0,
+        "designation": "M270-35A"
+      }
     },
-    "loss_ratio_alt_over_base": null,
-    "thermal_implication": "No scaled alternative loss \u2014 thermal delta not estimated.",
-    "stress_implication": "Lower loss \u2192 lower thermal stress OOM; centrifugal FoS unchanged at same rpm.",
+    "base_at_file_hz_crosscheck": {
+      "grade": "M400-50A",
+      "kh": 0.032222378800803336,
+      "ke": 0.00011686090273147389,
+      "alpha": 1.8,
+      "tooth_loss_w": 2249.400662141133,
+      "yoke_loss_w": 3785.665318044864,
+      "iron_loss_w": 6035.0659801859965,
+      "frequency_hz": 1300.0,
+      "spec": {
+        "thickness_m": 0.0005,
+        "density": 7650.0,
+        "designation": "M400-50A"
+      }
+    },
+    "twin_artefact_iron_loss_w": 6035.1,
+    "loss_ratio_alt_over_base": 0.5189206019067026,
+    "thermal_implication": "Iron loss scales ~0.519\u00d7 at same B; temperature rise vs jacket roughly tracks if R fixed (re-run R2 with scaled q for field).",
+    "stress_implication": "Lower iron loss lowers thermal stress OOM; centrifugal FoS at 24k unchanged.",
     "honest_limits": [
-      "screening Steinmetz \u2014 not measured loss",
-      "no full re-mesh or re-solve of EM B for the alternative grade"
-    ],
-    "figure": "/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/formula-e-front-mgu-20260729-1432/_motor_stack/multiphysics/r5_material_swap.png"
+      "B probes held fixed \u2014 no re-solved magnetics for alt grade",
+      "screening Steinmetz from grade designation",
+      "not measured loss"
+    ]
   },
   "r6": {
-    "schema": "forgeos.multiphysics.capability_index/v1",
-    "ran_at": "2026-08-05T08:34:39Z",
+    "schema": "forgeos.multiphysics.capability_index/v2",
+    "ran_at": "2026-08-05T09:06:28Z",
     "ship_ok": false,
-    "purpose": "Answer: what can this engine analyse for Jack / Tristan",
+    "headline": "FEMM heat-flow is LIVE (R1 pass, R2 field). CalculiX thermal-gradient stress RAN. ROSS shows first critical ~22.9k under operating 24k (margin\u00d70.96) with assumed bearings. ship_ok false. Bar B OPEN.",
     "rows": [
       {
-        "analysis": "EM magnetostatics + rotor sweep (Path B)",
-        "tool": "FEMM femmcli / xfemm path",
-        "last_ran": "2026-08-04/05 Sprint1\u20132",
         "status": "RAN",
-        "honest_limit": "2-D planar; torque_reliable=false until dyno",
-        "artefact": "_motor_stack/em_fia_front_kit_case_PATH_B_DEC009.json"
+        "analysis": "EM Path B kit-case FE (122.1 N\u00b7m)",
+        "tool": "FEMM femmcli",
+        "honest_limit": "2-D planar; torque_reliable=false"
       },
       {
-        "analysis": "EM grade / voltage / map (Sprint 2)",
+        "status": "RAN",
+        "analysis": "EM Sprint 2 grade card",
         "tool": "em_grade_sprint2.py",
-        "last_ran": "see twin",
+        "honest_limit": "mesh stamp still spatial-proxy open"
+      },
+      {
+        "status": "RAN_PASS",
+        "analysis": "R1 known-answer heat",
+        "tool": "FEMM heat + FD crosscheck",
+        "honest_limit": "max |err|\u22480.004 K; 6-arg setsegmentprop required"
+      },
+      {
         "status": "RAN",
-        "honest_limit": "mesh stamp is spatial subsample proxy",
-        "artefact": "_motor_stack/em_grade_card.json"
-      },
-      {
-        "analysis": "R1 known-answer conduction",
-        "tool": "numpy FD (+ FEMM heat attempt)",
-        "last_ran": "2026-08-05T08:34:39Z",
-        "status": "FAIL",
-        "honest_limit": "FEMM heat BC assignment CANNOT (segfault)",
-        "artefact": "multiphysics/r1_known_answer.json"
-      },
-      {
         "analysis": "R2 stator temperature field",
-        "tool": "radial FD + twin iron-loss densities",
-        "last_ran": "2026-08-05T08:34:39Z",
-        "status": "RAN",
-        "honest_limit": "radial only; copper/rotor GAP; HTC screening",
-        "artefact": "multiphysics/r2_stator_temperature_field.json"
+        "tool": "FEMM heat-flow",
+        "honest_limit": "radial strip; copper/rotor GAP; screening HTC"
       },
       {
+        "status": "RAN",
         "analysis": "R3 thermal visualisation",
-        "tool": "PyVista 0.48",
-        "last_ran": "2026-08-05T08:34:39Z",
+        "tool": "PyVista",
+        "honest_limit": "not CHT; not axial"
+      },
+      {
         "status": "RAN",
-        "honest_limit": "not CHT; not axial",
-        "artefact": "multiphysics/r3_pyvista.json"
+        "analysis": "R4 centrif + thermal gradient stress",
+        "tool": "CalculiX Docker",
+        "honest_limit": "coarse ring; \u0394\u224825 MPa from T gradient; not release FoS"
       },
       {
-        "analysis": "R4 thermal + centrifugal stress",
-        "tool": "CalculiX Docker + OOM thermal",
-        "last_ran": "2026-08-05T08:34:39Z",
-        "status": "PARTIAL_SMOKE_OK_PLUS_OOM_THERMAL",
-        "honest_limit": "OOM thermal unless full coupled mesh wired",
-        "artefact": "multiphysics/r4_thermal_stress.json"
-      },
-      {
-        "analysis": "R5 material grade swap",
-        "tool": "machine_lamination + screening scale",
-        "last_ran": "2026-08-05T08:34:39Z",
         "status": "RAN",
-        "honest_limit": "no re-solved B for alt grade",
-        "artefact": "multiphysics/r5_material_swap.json"
+        "analysis": "R5 material swap M400\u2192M270",
+        "tool": "machine_lamination.py",
+        "honest_limit": "fixed B probes; ~0.52\u00d7 iron loss at 24k f"
       },
       {
+        "status": "RAN",
+        "analysis": "R6 capability index",
+        "tool": "this pack",
+        "honest_limit": "living document"
+      },
+      {
+        "status": "PARTIAL",
+        "analysis": "ROSS critical speeds",
+        "tool": "ross 2.3.0",
+        "honest_limit": "first crit 22922 vs 24k; margin\u00d70.96; assumed bearings"
+      },
+      {
+        "status": "RAN",
         "analysis": "LPTN / coolant network",
-        "tool": "CoolProp + analytical_fia_cooling_*",
-        "last_ran": "prior campaign",
-        "status": "RAN",
-        "honest_limit": "few-node network; not field",
-        "artefact": "_motor_stack/analytical_fia_cooling_thermal_screen.json"
+        "tool": "CoolProp + analytical screens",
+        "honest_limit": "few-node; not field"
       },
       {
-        "analysis": "Centrifugal rotor FoS",
-        "tool": "CalculiX (existing screen)",
-        "last_ran": "prior",
         "status": "RAN",
-        "honest_limit": "centrifugal only until R4 thermal add",
-        "artefact": "_motor_stack/rotor_fos_screening_card.json"
+        "analysis": "Centrifugal rotor FoS @19.5k",
+        "tool": "CalculiX prior",
+        "honest_limit": "FoS\u22482.635 screening"
       },
       {
-        "analysis": "OpenFOAM jacket / cold plate",
-        "tool": "OpenFOAM scripts present",
-        "last_ran": "scripted; runtime env dependent",
         "status": "AVAILABLE_SCRIPT",
-        "honest_limit": "not full helical CHT; Bar B flow bench still open",
-        "artefact": "scripts/motor-stack/openfoam_fia_*.py"
+        "analysis": "OpenFOAM jacket/cold-plate",
+        "tool": "openfoam_fia_*.py",
+        "honest_limit": "not full helical CHT"
       },
       {
-        "analysis": "ROSS rotordynamics",
-        "tool": "ross_fia_front_kit_case.py",
-        "last_ran": "optional \u2014 not executed this pass",
-        "status": "AVAILABLE_SCRIPT_DEFERRED",
-        "honest_limit": "beam model PARTIAL; needs Tristan go-ahead for product use",
-        "artefact": "scripts/motor-stack/ross_fia_front_kit_case.py"
-      },
-      {
-        "analysis": "Elmer multiphysics",
-        "tool": "\u2014",
-        "last_ran": "\u2014",
-        "status": "WILL_NOT_INSTALL",
-        "honest_limit": "duplicates FEMM+CalculiX+PyVista stack",
-        "artefact": null
-      },
-      {
+        "status": "AVAILABLE",
         "analysis": "ParaView GUI",
         "tool": "/opt/homebrew/bin/paraview",
-        "last_ran": "installed; headless via PyVista",
-        "status": "AVAILABLE",
-        "honest_limit": "interactive exploration; pack uses PyVista",
-        "artefact": null
+        "honest_limit": "interactive; packs use PyVista"
       },
       {
+        "status": "AVAILABLE",
         "analysis": "gmsh",
         "tool": "/opt/homebrew/bin/gmsh",
-        "last_ran": "installed unused this pass",
-        "status": "AVAILABLE",
-        "honest_limit": "mesh generation for future CCX full models",
-        "artefact": null
+        "honest_limit": "mesh gen for deeper CCX"
+      },
+      {
+        "status": "WILL_NOT",
+        "analysis": "Elmer multiphysics",
+        "tool": "\u2014",
+        "honest_limit": "duplicates stack \u2014 do not install"
       }
     ],
-    "headline": "EM Path B + Sprint 2 grades available; thermal field Path A (R1) proven by FD; FEMM heat module currently broken on BC set; visual thermal field for stator radial model; stress OOM + existing centrifugal FoS; no ship_ok.",
-    "figure": "/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/formula-e-front-mgu-20260729-1432/_motor_stack/multiphysics/r6_capability_index.png"
+    "jack_previews": [
+      "45-multiphysics-thermal-field.png",
+      "46-multiphysics-capability-index.png",
+      "47-r1-known-answer-conduction.png",
+      "48-r2-stator-temperature-field.png",
+      "48b-r2-femm-stator-heat.png",
+      "49-r4-thermal-stress-screen.png",
+      "50-r5-material-swap.png",
+      "51-ross-critical-speeds.png",
+      "00-COVERING-NOTE-FOR-JACK.md"
+    ]
+  },
+  "ross": {
+    "bearing_supplier_identity": {
+      "reason": "Assumed isotropic stiffness/damping; no catalogue part.",
+      "status": "OPEN"
+    },
+    "critical_speeds": {
+      "clear_of_operating_band": false,
+      "critical_speeds_rpm": [
+        22922.382,
+        23470.457,
+        23470.504,
+        86597.995
+      ],
+      "first_critical_speed_hz": 382.039695,
+      "first_critical_speed_rad_s": 2400.426199,
+      "first_critical_speed_rpm": 22922.382,
+      "margin_ratio_first_over_operating": 0.9551,
+      "operating_regime": "operating_near_or_above_first_critical",
+      "operating_speed_rpm": 24000.0,
+      "subcritical_margin_factor_required": 1.2
+    },
+    "fia_question": "Are critical speeds clear of the 24,000 rpm operating band with margin?",
+    "geometry_provenance": {
+      "controlling_dimensions": "state.fpkConcentricGeometry with orchestratorContract quantity fallbacks",
+      "generic_1m_smoke_shaft_used": false,
+      "lucid_or_proprietary_cad_used": false,
+      "statement": "Kit-sized ROSS beam model from twin housing/rotor dimensions; not the generic ross_rotor_selftest 1 m shaft."
+    },
+    "input_quantities": {
+      "active_length_mm": 130.0,
+      "bay_depth_mm": 259.0,
+      "bay_height_mm": 267.0,
+      "bay_width_mm": 343.0,
+      "bearing_span_mm": 140.5,
+      "continuous_electrical_power_kw": 250.0,
+      "front_regen_electrical_cap_kw": 250.0,
+      "housing_length_mm": 140.5,
+      "housing_outer_diameter_mm": 198.0,
+      "mass_aspiration_kg": 32.0,
+      "max_rotor_speed_rpm": 24000.0,
+      "rotor_inner_diameter_mm": 105.9,
+      "rotor_outer_diameter_mm": 139.4,
+      "shaft_outer_diameter_mm": 105.9
+    },
+    "input_quantities_sha256": "9defeb6a83fbf98980bf33b88745c2991d1156a391ad5226dfc4216b936ef583",
+    "margins": {
+      "clear_of_operating_band": false,
+      "first_critical_over_operating": 0.9551,
+      "note": "Screening margin only \u2014 assumed bearing stiffness/damping and steel equivalent disk. Not a supplier Campbell diagram.",
+      "required_subcritical_factor": 1.2
+    },
+    "modal_or_dynamometer_correlation": {
+      "statement": "Critical-speed prediction still requires modal test and/or dynamometer coast-down correlation on the current hardware revision.",
+      "status": "OPEN"
+    },
+    "model_assumptions": [
+      "Solid steel shaft OD equals rotor bore (or fpk_shaft_od_mm when present).",
+      "Bearing span equals housing length (or fpk_bearing_span_mm when present).",
+      "6 equal beam elements span the bearings.",
+      "One midspan DiskElement approximates laminated rotor + magnets as steel.",
+      "Bearing kxx=5.000e+07 N/m, cxx=5.000e+03 N\u00b7s/m (isotropic, identical ends).",
+      "No gear overhang, resolver stub, differential shafts, or housing flexibility.",
+      "No gyroscopic speed sweep / unbalance response / squeeze-film dampers."
+    ],
+    "release_statement": "Concept evidence only. No FIA homologation, team interface closure, race evidence or permission to ship. Never claim PASS without dyno or modal correlation.",
+    "rotor_model": {
+      "bearing_cxx_n_s_m": 5000.0,
+      "bearing_kxx_n_m": 50000000.0,
+      "bearing_nodes": [
+        0,
+        6
+      ],
+      "disk_inner_diameter_m": 0.10590000000000001,
+      "disk_node": 3,
+      "disk_outer_diameter_m": 0.1394,
+      "disk_width_m": 0.13,
+      "fits_bay": true,
+      "fits_housing_length": true,
+      "material_name": "FiaFrontKitScreeningSteel",
+      "shaft_element_count": 6,
+      "shaft_length_m": 0.1405,
+      "shaft_outer_diameter_m": 0.10590000000000001
+    },
+    "schema": "forgeos.motor_stack.ross_fia_front_kit_case/v1",
+    "ship_ok": false,
+    "solver": {
+      "name": "ROSS",
+      "package": "ross-rotordynamics",
+      "version": "2.3.0"
+    },
+    "source_state_sha256": "c47d4aa7f654cbdc88c4b0a5e493d0c4f67897ee0838b7ead910d1d3934a2e40",
+    "source_twin": "out/formula-e-front-mgu-20260729-1432",
+    "status": "PARTIAL"
+  },
+  "ross_k_sensitivity": {
+    "schema": "forgeos.multiphysics.ross_bearing_k_sensitivity/v1",
+    "ran_at": "2026-08-05T10:09:55Z",
+    "ship_ok": false,
+    "operating_rpm": 24000.0,
+    "base_kxx_n_m": 50000000.0,
+    "required_subcritical_factor": 1.2,
+    "rows": [
+      {
+        "k_factor": 0.25,
+        "kxx_n_m": 12500000.0,
+        "first_critical_rpm": 11029.287,
+        "margin_over_operating": 0.4596,
+        "clear_subcritical_1p2": false
+      },
+      {
+        "k_factor": 0.5,
+        "kxx_n_m": 25000000.0,
+        "first_critical_rpm": 16018.578,
+        "margin_over_operating": 0.6674,
+        "clear_subcritical_1p2": false
+      },
+      {
+        "k_factor": 1.0,
+        "kxx_n_m": 50000000.0,
+        "first_critical_rpm": 22922.382,
+        "margin_over_operating": 0.9551,
+        "clear_subcritical_1p2": false
+      },
+      {
+        "k_factor": 2.0,
+        "kxx_n_m": 100000000.0,
+        "first_critical_rpm": 32540.931,
+        "margin_over_operating": 1.3559,
+        "clear_subcritical_1p2": true
+      },
+      {
+        "k_factor": 4.0,
+        "kxx_n_m": 200000000.0,
+        "first_critical_rpm": 45926.893,
+        "margin_over_operating": 1.9136,
+        "clear_subcritical_1p2": true
+      },
+      {
+        "k_factor": 8.0,
+        "kxx_n_m": 400000000.0,
+        "first_critical_rpm": 64385.595,
+        "margin_over_operating": 2.6827,
+        "clear_subcritical_1p2": true
+      }
+    ],
+    "baseline_first_critical_rpm": 22922.382,
+    "k_factor_for_clear_1p2": 2.0,
+    "headline": "Assumed-bearing stiffness sweep vs 24k. Identity OPEN.",
+    "honest_limits": [
+      "isotropic assumed K/C",
+      "steel equivalent disk",
+      "not modal/dyno correlated"
+    ]
+  },
+  "deterministic_checks": {
+    "pass": 161,
+    "fail": 0,
+    "note": "scripts/deterministic-checks.py 2026-08-05"
   }
 }

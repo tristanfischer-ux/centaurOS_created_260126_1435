@@ -48,7 +48,8 @@ We publish **two torque bars**, not one. At the DEC-009 freeze (**24,000 rpm / 1
 | Visualisation | PyVista (headless) · ParaView installed for interactive use |
 | Structure | CalculiX (Docker) centrifugal FoS; thermal stress OOM screen |
 | Mesh / CFD scripts | gmsh installed; OpenFOAM case scripts exist (not full CHT) |
-| Rotordynamics | **ROSS ran**: first critical ≈22,922 rpm vs 24,000 operating (margin ×0.96 under assumed bearings) |
+| Rotordynamics | **ROSS ran**: first critical ≈22,922 rpm vs 24,000 (margin ×0.96 at base K). **Stiffness sweep**: ~**2×** assumed bearing k clears the 1.2× subcritical screen (~32.5k rpm). Bearings still OPEN. |
+| Structure (dense) | CalculiX **765-node** quarter ring: centrif ≈218 MPa; +T-gradient ≈241 MPa (Δ≈**22.6 MPa**). Coarse ring was ~+25 MPa — mesh-stable screening. |
 | PCB | KiCad + freerouting · draft readiness only |
 
 ---
@@ -68,6 +69,7 @@ We publish **two torque bars**, not one. At the DEC-009 freeze (**24,000 rpm / 1
 - PCB max claim: **DRAFT — NOT FABRICATION READY — UNPROVEN IN HARDWARE**.  
 - Thermal field is **not** conjugate heat transfer and **not** a flow-bench calibration.  
 - Iron loss remains a **screening estimate** with a stated two-sided error band; yoke is the dominant volumetric source at ~2.1 T.
+- Twin deterministic checks: **161 pass / 0 fail** (ampacity / ledger / brief targets closed at source). Tab scorecard may still lag until full Excel rebuild.
 
 ---
 

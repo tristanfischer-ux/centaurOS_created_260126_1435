@@ -1,5 +1,5 @@
 {
-  "schema": "forgeos.multiphysics.r4_calculix_thermal_centrif/v3",
+  "schema": "forgeos.multiphysics.r4_calculix_dense/v1",
   "ran_at": "2026-08-05T10:08:53Z",
   "ship_ok": false,
   "mesh": {

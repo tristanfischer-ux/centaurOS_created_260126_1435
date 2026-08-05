@@ -1,28 +1,46 @@
 {
-  "schema": "forgeos.multiphysics.r4_calculix_thermal_centrif/v2",
-  "ran_at": "2026-08-05T09:05:37Z",
+  "schema": "forgeos.multiphysics.r4_calculix_thermal_centrif/v3",
+  "ran_at": "2026-08-05T10:08:53Z",
   "ship_ok": false,
+  "mesh": {
+    "nr": 8,
+    "nth": 16,
+    "nz": 4,
+    "n_nodes": 765,
+    "n_elements": 512,
+    "ri_m": 0.05295,
+    "ro_m": 0.0697,
+    "half_z_m": 0.0325,
+    "type": "C3D8_quarter_ring"
+  },
   "rpm": 24000.0,
   "T_ref_c": 20.0,
-  "T_field": "FEMM R2 radial samples mapped to ring nodes",
+  "T_field": "FEMM R2 radial samples mapped by r=hypot(x,y)",
   "centrif_only": {
     "ok": true,
-    "max_von_mises_mpa": 215.02860925417545,
-    "n": 144
+    "returncode": 0,
+    "max_von_mises_mpa": 218.08735221337298,
+    "n_integration_points": 4096,
+    "tail": "p to 1 cpu(s) for the stress calculation.\n\n Using up to 1 cpu(s) for the symmetric stiffness/mass contributions.\n\n Factoring the system of equations using the symmetric spooles solver\n Using up to 1 cpu(s) for spooles.\n\n Using up to 1 cpu(s) for the stress calculation.\n\n\n Job finished\n\n________________________________________\n\nTotal CalculiX Time: 0.060178\n________________________________________\n"
   },
   "centrif_plus_thermal_gradient": {
     "ok": true,
-    "max_von_mises_mpa": 240.0161919602836,
-    "n": 144
+    "returncode": 0,
+    "max_von_mises_mpa": 240.6570970107397,
+    "n_integration_points": 4096,
+    "tail": "p to 1 cpu(s) for the stress calculation.\n\n Using up to 1 cpu(s) for the symmetric stiffness/mass contributions.\n\n Factoring the system of equations using the symmetric spooles solver\n Using up to 1 cpu(s) for spooles.\n\n Using up to 1 cpu(s) for the stress calculation.\n\n\n Job finished\n\n________________________________________\n\nTotal CalculiX Time: 0.054891\n________________________________________\n"
   },
-  "delta_vm_mpa": 24.987582706108157,
+  "delta_vm_mpa": 22.569744797366724,
   "assumed_yield_mpa": 355.0,
   "status": "RAN",
   "honest_limits": [
-    "coarse C3D8 quarter ring",
-    "stator-field T mapped onto rotor ring as screening proxy",
-    "not laminate/magnet-pocket mesh",
+    "quarter ring continuum \u2014 not laminate/magnet-pocket mesh",
+    "stator FEMM T mapped onto rotor ring as screening proxy",
+    "not *COUPLED TEMPERATURE-DISPLACEMENT heat conduction solve",
     "not release FoS"
   ],
-  "figure": "/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/formula-e-front-mgu-20260729-1432/_motor_stack/multiphysics/r4_calculix_thermal_centrif.png"
+  "compare_to_coarse": {
+    "prior_coarse_nodes": 56,
+    "prior_delta_vm_mpa": 24.99
+  }
 }
