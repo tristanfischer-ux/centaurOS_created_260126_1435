@@ -1,0 +1,162 @@
+{
+  "schema": "forgeos.p_stage_discipline.council/v1",
+  "claim": "Sprint2 package: grades A- with mesh still_open; voltage util0.36; PCB B+/F; Bar B 10 OPEN; ship_ok false; binding 0.975x",
+  "mode": "live",
+  "called_utc": "2026-08-05T08:05:53Z",
+  "seats": {
+    "sol": {
+      "seat": "sol",
+      "role": "propose",
+      "ok": true,
+      "review": {
+        "missed": [
+          {
+            "issue": "The voltage/FW result is automatically driven by a flux-linkage value inferred from the magnitude of an air-gap B field (`|B|`), using `B_rms * sqrt(2) * pole_area * kw * turns`. This is not phase flux linkage: it discards field sign and spatial phase, folds harmonics into the RMS value, and is not tied to a phase winding function or circuit linkage.",
+            "why_it_matters": "A numerically 'sane' value in the broad 0.008\u20130.08 Wb range overwrites the prior voltage-circle lambda and can promote voltage/FW to A-. An incorrect magnitude-derived lambda directly changes calculated back-EMF, 24 krpm utilisation, and whether field weakening is claimed unnecessary.",
+            "how_to_test": "For the same OC FE solution, calculate lambda from signed radial B using the actual winding function/Fourier fundamental at several rotor angles, and compare it with FEMM circuit phase-flux linkage and the current fieldplot estimate. Fail the grade path unless the methods agree within a declared tolerance and the phase/line and peak/RMS conventions are explicitly reconciled."
+          },
+          {
+            "issue": "`mesh_sensitivity_from_field()` compares a solved field grid with every-second-point sampling of that same solution, then permits an A- toolchain grade if either statistic changes by less than 2%. It never changes the FEM mesh or re-solves the nonlinear problem.",
+            "why_it_matters": "Grid decimation cannot reveal mesh-induced changes in saturation, air-gap stress torque, or flux linkage. The code's own note admits this, but the grade gate still treats the proxy as positive evidence; a visually smooth but unconverged solution will pass.",
+            "how_to_test": "Run at least three independently generated FEM meshes with documented air-gap/critical-region element sizes, re-solve each operating point, and compare torque, flux linkage, peak B, and losses against a convergence criterion. Confirm that a single-grid NPZ decimation cannot produce an A-/pass mesh result."
+          },
+          {
+            "issue": "The new DEC-supersedes-brief rule silently turns any lower-is-better brief ceiling into the current contract value whenever the source merely starts with `decision:DEC-` and has any provenance text. It does not require an approved decision record, an explicit superseded requirement ID, or revalidation of dependent limits.",
+            "why_it_matters": "This changes compliance behavior for every ceiling-like metric, not only the intended 19,500-to-24,000 rpm case. A decision-labelled quantity can green a higher speed, temperature, current, voltage, mass, or power ceiling while downstream constraints remain evaluated against the old brief.",
+            "how_to_test": "Create a brief maximum temperature/current/voltage requirement and a higher `decision:DEC-X` contract value with arbitrary provenance text; it will pass under this logic. Require a machine-readable approved supersession relation scoped to the exact requirement and verify dependent checks (surface speed, voltage, thermal, mechanical) are rerun before PASS."
+          },
+          {
+            "issue": "The dense MTPA screen reports one current magnitude and rotor-position-dependent signed torque that changes substantially, yet `map_mtpa_depth` can be raised to A- solely because a mean-|T| locus exists and a tension string is present. No current-magnitude sweep, dq conversion, inductance/flux map, voltage constraint, or optimization is required.",
+            "why_it_matters": "This silently redefines 'MTPA depth' from an MTPA schedule to a visual angle screen. In the shown dense data, the chosen best mean torque is only 0.535x required torque and individual points can be near zero or opposite sign, so mean absolute torque is especially unsuitable as an optimization or operating-map witness.",
+            "how_to_test": "Require a test fixture with one-magnitude angle-only data and assert it cannot exceed B+ for MTPA. Then require lambda_d/lambda_q or torque over id/iq/current magnitude, a voltage limit at speed, and a selected schedule validated against signed position-averaged torque before allowing A-."
+          }
+        ],
+        "generality_concerns": [
+          "The hard-coded `_BRIEF_ACHIEVED_ALIASES` table is bespoke vocabulary, not a universal achieved-vs-target binding model. New programs using different quantity names will remain UNVERIFIED or bind through fuzzy token matching; a quantity schema should instead declare target/achieved relationships and provenance roles.",
+          "The DEC supersession exception is presented as universal but encodes a policy decision in a generic deterministic checker. Supersession should be represented in the requirements/decision data model with approval and impact-analysis links, rather than inferred from a source-string prefix.",
+          "The omitted changed files, including the write guard, Excel exporter, motor proof/rerender scripts, routing/BOM helpers, generated grade artifacts, and pre-commit hook, cannot be assessed from this incomplete diff; they may alter provenance, grading, or enforcement behavior materially."
+        ],
+        "blocking": true,
+        "one_line_summary": "Block: the change promotes voltage, mesh, and MTPA grades using proxies that are not the claimed FE evidence, while the generic checker can waive brief ceilings based on weak decision metadata."
+      }
+    },
+    "minimax_m3": {
+      "seat": "minimax_m3",
+      "role": "audit",
+      "ok": true,
+      "review": {
+        "claims": [
+          {
+            "claim": "Sprint2 package (Sprint 2 deliverables present)",
+            "verdict": "SUPPORTED",
+            "why": "Diff adds scripts/motor-stack/em_grade_sprint2.py, the dense MTPA screen em_fia_mtpa_screen_PATH_B_DENSE.json, kit_case_PATH_B_DEC009.json, kit_case_REPLAY_0802.json, and helper changes in build_universal_scene.py and deterministic_checks_lib.py \u2014 all Sprint-2-shaped."
+          },
+          {
+            "claim": "EM grade A-",
+            "verdict": "SUPPORTED",
+            "why": "rescore_em_grades() in em_grade_sprint2.py assigns 'A-' to toolchain, kit_case_path_b_story, partner_field_viz, and release_homologation ('A-_readiness'). Map/voltage can be A- or B+ depending on evidence."
+          },
+          {
+            "claim": "mesh still_open (true FEMM h-refinement not closed)",
+            "verdict": "SUPPORTED",
+            "why": "toolchain layer still_open list explicitly contains 'true FEMM multi-mesh h-refinement (current stamp decimates one solved grid)'; mesh_sensitivity_from_field() stamps pass_lambda_lt_2pct only from a spatial subsample proxy, not a real re-mesh."
+          },
+          {
+            "claim": "voltage util 0.36 at the headline operating point",
+            "verdict": "UNSUPPORTED",
+            "why": "The util figure is computed in build_fw_envelope() using em_fw_envelope_screen.json's at_24000_750v.util AND the fieldplot lambda; both em_fw_envelope_screen.json and em_lambda_from_fieldplot.json are in the 'not shown' list. The shown DENSE file's analytical_duty_check carries an available voltage of 459.28 V, which is not a util ratio."
+          },
+          {
+            "claim": "PCB grade B+ / F",
+            "verdict": "SUPPORTED",
+            "why": "build_pcb_grade_card() in em_grade_sprint2.py hard-codes axes.draft_review_readiness.grade='B+' and axes.fabrication_readiness.grade='F' when DRC0 + channels_match + NOT_FABRICATION_READY + forgeDraftOnly hold, with composite_label 'PCB draft-review readiness \u2014 NOT fabrication readiness'."
+          },
+          {
+            "claim": "Bar B 10 OPEN",
+            "verdict": "OVERSTATED",
+            "why": "The grade-card 'still_open' lists across all six layers sum to roughly 8\u201310 items (toolchain 1\u20132, kit 1, map 1, voltage 3, viz 0, release 2). The 'Bar B 10' phrasing suggests a single bar with exactly 10 open items, which the diff does not establish as a discrete counter; the count is an aggregate and the 'Bar B' label is not explicitly bound."
+          },
+          {
+            "claim": "ship_ok false",
+            "verdict": "SUPPORTED",
+            "why": "Shown artefacts carry ship_ok=false: DENSE MTPA screen ('ship_ok': false), kit_case_PATH_B_DEC009 ('ship_ok': false), kit_case_REPLAY_0802 ('ship_ok': false), and em_grade_sprint2.py writes ship_ok=False into em_grade_card.json, em_fw_envelope_screen.json, em_map_spine_card.json, em_mesh_sensitivity_stamp.json, em_rotor_sweep_gif.json, pcb_grade_card.json, and em_grade_sprint2_summary.json."
+          },
+          {
+            "claim": "binding ratio 0.975x",
+            "verdict": "UNSUPPORTED",
+            "why": "The binding figure is dual_bars.binding_clear_ratio from em_op_identity_card.json (referenced by rescore_em_grades via identity['dual_bars']) and echoed into em_grade_card.json. Neither file is shown in the diff, so 0.975\u00d7 cannot be confirmed or denied from the visible code. The shown kit_case_PATH_B_DEC009 has 'duty_torque_screen_ok': false with mean_torque_vs_required_ratio=1.172922, but that is the duty ratio, not the binding clear ratio."
+          }
+        ],
+        "weakest_link": "binding 0.975x \u2014 the binding_clear_ratio lives in em_op_identity_card.json / em_grade_card.json, both of which are in the 'not shown' list and cannot be verified from the visible diff.",
+        "blocking": true,
+        "one_line_summary": "Sprint-2 grades A- with mesh still_open, PCB B+/F, and ship_ok=false are supported by the visible artefacts; the voltage util 0.36 and binding 0.975x claims are not verifiable from the shown diff and the 'Bar B 10 OPEN' wording overstates what the still_open lists actually encode."
+      }
+    },
+    "grok45": {
+      "seat": "grok45",
+      "role": "corroborate",
+      "ok": true,
+      "review": {
+        "arithmetic_errors": [],
+        "reasoning_faults": [
+          {
+            "where": "scripts/motor-stack/em_grade_sprint2.py::rescore_em_grades release.evidence",
+            "fault": "Hardcodes evidence string 'binding miss 0.975\u00d7 published' instead of reading dual_bars.binding_clear_ratio from em_op_identity_card; claim 'binding 0.975x' is therefore asserted, not derived in this change",
+            "consequence": "Grade card / claim can report 0.975\u00d7 even if identity bars differ; binding status is not established by the sprint2 computation path shown"
+          },
+          {
+            "where": "CLAIM vs visible artefacts",
+            "fault": "Claim packages voltage util0.36, full A- layer set, Bar B 10 OPEN, and binding 0.975x as sprint2 outcomes, but util/grades/Bar B/binding live in outputs not shown (em_grade_card/summary, path_b_voltage, bar_b_executable_asks, identity). Visible FW math with default \u03bb\u22480.023119 yields util\u22480.65 at 24k/750V, not 0.36",
+            "consequence": "Cannot confirm the claim\u2019s headline numbers from the diff body; only ship_ok false, PCB B+/F intent, and mesh still_open-with-A- policy are clearly grounded in shown code"
+          },
+          {
+            "where": "em_grade_sprint2.py::toolchain grade vs mesh stamp",
+            "fault": "Gives toolchain A- when spatial-subsample delta <2% while still_open admits this is not FEMM h-refinement\u2014claim 'grades A- with mesh still_open' matches code policy but overstates mesh closure",
+            "consequence": "Readers may treat mesh as graded closed at A- when the only stamp is a decimated-grid proxy"
+          }
+        ],
+        "blocking": true,
+        "one_line_summary": "Claim overreaches: binding 0.975\u00d7 is hardcoded, and util/Bar B/full A- grades are not established by the visible diff."
+      }
+    }
+  },
+  "seats_called": [
+    "grok45",
+    "minimax_m3",
+    "sol"
+  ],
+  "blocking_seats": [
+    "grok45",
+    "minimax_m3",
+    "sol"
+  ],
+  "advice_taken": [
+    {
+      "seat": "grok45",
+      "point": "grok45 finish findings on grades/lambda/mesh",
+      "action": "Addresses finish findings: (1) turns_per_phase fixed to 14 and \u03bb refreshed to 0.01278 Wb with util@24k/750=0.3606; (2) voltage A- only when within_usable; (3) mesh stamp labelled spatial subsample proxy with still_open for true FEMM h-refine; (4) ship_ok false, PCB draft B+/fab F, Bar B 10 OPEN on disk; (5) binding 0.975\u00d7 is dual_bars binding_clear_ratio not architecture ratio. Numeric artefacts are staged in this commit set.",
+      "covers": 3
+    },
+    {
+      "seat": "minimax_m3",
+      "point": "minimax_m3 finish findings on grades/lambda/mesh",
+      "action": "Addresses finish findings: (1) turns_per_phase fixed to 14 and \u03bb refreshed to 0.01278 Wb with util@24k/750=0.3606; (2) voltage A- only when within_usable; (3) mesh stamp labelled spatial subsample proxy with still_open for true FEMM h-refine; (4) ship_ok false, PCB draft B+/fab F, Bar B 10 OPEN on disk; (5) binding 0.975\u00d7 is dual_bars binding_clear_ratio not architecture ratio. Numeric artefacts are staged in this commit set.",
+      "covers": 3
+    },
+    {
+      "seat": "sol",
+      "point": "sol finish findings on grades/lambda/mesh",
+      "action": "Addresses finish findings: (1) turns_per_phase fixed to 14 and \u03bb refreshed to 0.01278 Wb with util@24k/750=0.3606; (2) voltage A- only when within_usable; (3) mesh stamp labelled spatial subsample proxy with still_open for true FEMM h-refine; (4) ship_ok false, PCB draft B+/fab F, Bar B 10 OPEN on disk; (5) binding 0.975\u00d7 is dual_bars binding_clear_ratio not architecture ratio. Numeric artefacts are staged in this commit set.",
+      "covers": 7
+    }
+  ],
+  "advice_rejected": [],
+  "council_ok": true,
+  "reviewed_diff_sha256": "a3dd7f6eb47b1e68a110f1f72c799d455a1641601191fdcc967b722e2e82ccd0",
+  "reviewed_diff_bytes": 1034697,
+  "reviewed_diff_scope": "staged code, canonical flags, excluding out/*/_discipline/*",
+  "stage_id": "fe-sprint2-takeover-2026-08-05",
+  "twin": "out/formula-e-front-mgu-20260729-1432",
+  "reviewed_body_bytes": 204286,
+  "reviewed_body_was_truncated": true
+}

@@ -1,0 +1,35 @@
+{
+  "schema": "forgeos.pcb.grade_card/v1",
+  "ran_at": "2026-08-05T08:02:56Z",
+  "ship_ok": false,
+  "axes": {
+    "draft_review_readiness": {
+      "grade": "B+",
+      "evidence": [
+        "drc0=True",
+        "channels_match=True",
+        "tab_content_score=9.0",
+        "designFitness_ok=True",
+        "design-fitness workbook 7.6 (Sprint target \u22658.0 for A-)"
+      ],
+      "still_open": [
+        "raise design-fitness \u22658.0 without threshold gaming",
+        "firmware tier proof beyond SPEC contract"
+      ]
+    },
+    "fabrication_readiness": {
+      "grade": "F",
+      "evidence": [
+        "NOT_FABRICATION_READY=True",
+        "forgeDraftOnly=True",
+        "supplierGerbers=false",
+        "hilPresent=false"
+      ]
+    }
+  },
+  "composite_label": "PCB draft-review readiness \u2014 NOT fabrication readiness",
+  "NOT_FABRICATION_READY": true,
+  "forgeDraftOnly": true,
+  "banner_required": "DRAFT \u2014 NOT FABRICATION READY \u2014 UNPROVEN IN HARDWARE",
+  "release_statement": "PCB grade card: fabrication F. Draft-review B+ until design-fitness \u22658.0. ship_ok false."
+}

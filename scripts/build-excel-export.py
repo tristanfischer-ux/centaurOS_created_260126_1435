@@ -2878,7 +2878,7 @@ def compute_ship_axes(state: dict, run_dir: str, v: Optional[dict]) -> List[dict
             _rd = str(_pcb_two_axis_assessment(_pcb, run_dir or "").get("readiness") or "")
             _forge_only = bool(_pcb.get("forgeDraftOnly")) or not _supplier_gbr
             _pass = (
-                _rd.startswith("FAB-READY")
+                (_rd.startswith("FAB-READY") or _rd.startswith("DRAFT — NOT FABRICATION READY"))
                 and _supplier_gbr
                 and _hil_ok
                 and not _forge_only
@@ -11651,12 +11651,18 @@ def _bom_install_derivation(state: dict) -> List[dict]:
         if not isinstance(row, dict):
             continue
         req = str(row.get("requirement") or "").strip()
+        # ↳ / sub_of children are presentation apportionments of a priced parent —
+        # they must not double-count into class subtotals.
         if req.startswith("↳") or row.get("sub_of"):
             continue
-        # INTENT (2026-07-29 0846): desaturated traction twins (status SUB-COMPONENT)
-        # must not inflate class subtotals vs the principal BoM Σ.
-        if str(row.get("status") or "").upper() in ("SUB-COMPONENT", "SUBCOMPONENT"):
-            continue
+        # ⭐⭐ CLASS SUBTOTALS MUST SUM TO MATERIALS (2026-08-05). A status
+        # SUB-COMPONENT line that still carries its own line_gbp is IN the
+        # costStack raw-materials Σ (desaturated traction twins: Traction Motor
+        # £18.5k + Traction Inverter £2.7k on the FE FPK twin). Skipping them
+        # left Σ class subtotals £31k while BoM materials read £52k and floored
+        # the Cost waterfall scorer. Inclusion rule = the materials total's own
+        # rule: every positive line_gbp row that is not a ↳/sub_of child.
+        # Status alone is not a materials filter.
         line = num(row.get("line_gbp")) or 0.0
         if line <= 0:
             continue
@@ -19682,7 +19688,7 @@ def _pcb_readiness_style(readiness: str) -> Tuple[PatternFill, str, str]:
     KeyError on the disclosed string (the very board that IS fab-ready), while the
     startswith-switched selftests passed. One helper, one truth, no KeyError."""
     rl = str(readiness or "")
-    if rl.startswith("FAB-READY"):
+    if rl.startswith("FAB-READY") or rl.startswith("DRAFT — NOT FABRICATION READY"):
         return FILL_PASS, "006100", "INFO"
     if rl.startswith("ENGINEERING DRAFT"):
         return FILL_ADVISORY, "9C6500", "MED"
@@ -29655,7 +29661,7 @@ def _sc_pcb(wb, ws, state, run_dir):
     if a["resolved_n"]:
         weak_n = a["resolved_n"] - a["verified_n"]
         if weak_n:
-            iss.append(f"[{'HIGH' if not str(a['readiness']).startswith('FAB-READY') else 'MED'}] {weak_n} of "
+            iss.append(f"[{'HIGH' if not (str(a['readiness']).startswith('FAB-READY') or str(a['readiness']).startswith('DRAFT — NOT FABRICATION READY')) else 'MED'}] {weak_n} of "
                        f"{a['resolved_n']} resolved part(s) carry no verified MPN/package "
                        "(function_class only, design-fitness "
                        f"{a['fitness_score']:.1f}/10) — see the resolution-tier legend")
@@ -34743,6 +34749,23 @@ def _selftest() -> int:
         if "ESTIMATE" not in _n2 or "ASSUMPTION" not in _n2:
             print(f"  FAIL waterfall-honest-fallback: a bar with no derivable basis must state "
                   f"ESTIMATE + its ASSUMPTION, got {_n2!r}"); bad += 1
+        # (7d) SUB-COMPONENT priced lines still enter class subtotals so Σ class == materials
+        # (FE FPK desaturated Traction Motor £18.5k was dropped → Cost waterfall 0).
+        _deriv_sc = _bom_install_derivation({
+            "requirementsBom": [
+                {"requirement": "SiC Traction Inverter", "status": "NOT FOUND",
+                 "line_gbp": 2700},
+                {"requirement": "Traction Motor · 350 kW", "status": "SUB-COMPONENT",
+                 "line_gbp": 18500},
+                {"requirement": "↳ stator lamination", "status": "SUB-COMPONENT",
+                 "line_gbp": 100, "sub_of": "parent"},
+            ],
+        })
+        _sub_sum = sum(d["subtotal"] for d in _deriv_sc)
+        if abs(_sub_sum - 21200) > 0.5:
+            print(f"  FAIL waterfall-class-subtotals: SUB-COMPONENT priced lines must enter "
+                  f"class subtotals (expect £21,200, got £{_sub_sum:,.0f}); ↳/sub_of still "
+                  f"excluded"); bad += 1
     # (8) CALC TRACEABILITY LINK (Tristan 2026-06-29: "why is the value in C16 not connected to the
     #     result in B60?"). A data-flow Value must link to the worked-calc result of the SAME tool +
     #     value, UNAMBIGUOUSLY — and must NOT link on an ambiguous (≥2) or mismatched value.
@@ -38851,9 +38874,9 @@ def _selftest() -> int:
         bespoke_missing=False, fitness_score=10.0, n_electronic_gap=0,
         n_on_board=16, n_electronic_design=16, n_electronic_full=16,
         n_non_fab_tier=0, all_on_board_fab_tier=True)
-    if not _allmpn_r.startswith("FAB-READY"):
+    if not (_allmpn_r.startswith("FAB-READY") or _allmpn_r.startswith("DRAFT — NOT FABRICATION READY")):
         print(f"  FAIL pcb-readiness Fix1 proveNoFalsePositive: an all-catalogue-MPN board "
-              f"must still read FAB-READY, got {_allmpn_r!r}"); bad += 1
+              f"must still read draft-not-fab max banner, got {_allmpn_r!r}"); bad += 1
     # proveCatch Fix 4: an architecture gap (required channel board with 0 built words) → DRAFT.
     _archgap_r, _ = _pcb_readiness_verdict(
         pipeline_ok=True, drc_ok=True, routed_ok=True, gerbers_ok=True,
@@ -39110,8 +39133,8 @@ def _selftest() -> int:
         n_on_board=10, n_electronic_design=10, n_electronic_full=10,
         n_non_fab_tier=0, all_on_board_fab_tier=True,
         firmware_proof_ok=True, firmware_proof_tier=3)
-    if not _fh_r3.startswith("FAB-READY — UNPROVEN IN HARDWARE"):
-        print(f"  FAIL firmware-honesty tier3: banner must be FAB-READY — UNPROVEN IN HARDWARE, got {_fh_r3!r}"); bad += 1
+    if "UNPROVEN IN HARDWARE" not in _fh_r3 or _fh_r3.startswith("FAB-READY"):
+        print(f"  FAIL firmware-honesty tier3: banner must be draft-not-fab + UNPROVEN, got {_fh_r3!r}"); bad += 1
     if "FUNCTIONALLY VERIFIED" in _fh_r3:
         print(f"  FAIL firmware-honesty tier3: banner must NEVER contain FUNCTIONALLY VERIFIED, got {_fh_r3!r}"); bad += 1
     if "VIRTUAL" not in _fh_why3 and "not HIL" not in _fh_why3:
@@ -39131,8 +39154,8 @@ def _selftest() -> int:
         n_on_board=10, n_electronic_design=10, n_electronic_full=10,
         n_non_fab_tier=0, all_on_board_fab_tier=True,
         firmware_proof_ok=True, firmware_proof_tier=0)
-    if not _fh_r0.startswith("FAB-READY — UNPROVEN IN HARDWARE"):
-        print(f"  FAIL firmware-honesty tier0: banner must be FAB-READY — UNPROVEN IN HARDWARE, got {_fh_r0!r}"); bad += 1
+    if "UNPROVEN IN HARDWARE" not in _fh_r0 or _fh_r0.startswith("FAB-READY"):
+        print(f"  FAIL firmware-honesty tier0: banner must be draft-not-fab + UNPROVEN, got {_fh_r0!r}"); bad += 1
     if "FUNCTIONALLY VERIFIED" in _fh_r0 or "FUNCTIONALLY VERIFIED" in _fh_why0:
         print(f"  FAIL firmware-honesty tier0: must never claim FUNCTIONALLY VERIFIED"); bad += 1
     _fh_status0 = _pcb_firmware_status_string(0, True)
@@ -39146,8 +39169,8 @@ def _selftest() -> int:
         n_on_board=10, n_electronic_design=10, n_electronic_full=10,
         n_non_fab_tier=0, all_on_board_fab_tier=True,
         firmware_proof_ok=None, firmware_proof_tier=None)
-    if not _fh_r_none.startswith("FAB-READY"):
-        print(f"  FAIL firmware-honesty no-proof: must still be FAB-READY (absent proof ≠ FAIL), got {_fh_r_none!r}"); bad += 1
+    if not (_fh_r_none.startswith("FAB-READY") or _fh_r_none.startswith("DRAFT — NOT FABRICATION READY")):
+        print(f"  FAIL firmware-honesty no-proof: must still be draft-not-fab max (absent proof ≠ FAIL), got {_fh_r_none!r}"); bad += 1
     _fh_status_none = _pcb_firmware_status_string(None, None)
     if _fh_status_none not in ("NOT RUN", "—"):
         print(f"  FAIL firmware-honesty no-proof: status cell must be NOT RUN or —, got {_fh_status_none!r}"); bad += 1
@@ -39238,9 +39261,9 @@ def _selftest() -> int:
     _cl_readiness, _cl_why = _pcb_readiness_verdict(
         pipeline_ok=True, drc_ok=True, routed_ok=True, gerbers_ok=True,
         bespoke_missing=False, fitness_score=_cl_score, n_electronic_gap=0)
-    if not _cl_readiness.startswith("FAB-READY"):
+    if not (_cl_readiness.startswith("FAB-READY") or _cl_readiness.startswith("DRAFT — NOT FABRICATION READY")):
         print(f"  FAIL pcb-readiness proveNoFalsePositive: DRC-clean/routed/Gerber-complete "
-              f"+ a verified-tier BoM (fitness {_cl_score:.1f}/10) must read FAB-READY, "
+              f"+ a verified-tier BoM (fitness {_cl_score:.1f}/10) must read draft-not-fab max banner, "
               f"got {_cl_readiness!r}"); bad += 1
     # proveCatch: hygiene failure (DRC dirty) hard-FAILs regardless of fitness, and a
     # bespoke-required-but-undelivered board FAILs even with clean hygiene flags unset.
@@ -39261,9 +39284,9 @@ def _selftest() -> int:
     _gap_readiness, _ = _pcb_readiness_verdict(
         pipeline_ok=True, drc_ok=True, routed_ok=True, gerbers_ok=True,
         bespoke_missing=False, fitness_score=10.0, n_electronic_gap=1)
-    if _gap_readiness.startswith("FAB-READY"):
+    if _gap_readiness.startswith("FAB-READY") or _gap_readiness.startswith("DRAFT — NOT FABRICATION READY"):
         print("  FAIL pcb-readiness proveCatch: an unresolved ELECTRONIC gap must block "
-              "FAB-READY even when every RESOLVED part is verified-tier"); bad += 1
+              "draft-not-fab max banner even when every RESOLVED part is verified-tier"); bad += 1
     # proveCatch (2026-07-14): 3 on-board vs 29 design electronics → DRAFT, never FAB-READY.
     _partial_r, _partial_why = _pcb_readiness_verdict(
         pipeline_ok=True, drc_ok=True, routed_ok=True, gerbers_ok=True,
@@ -39276,9 +39299,9 @@ def _selftest() -> int:
         pipeline_ok=True, drc_ok=True, routed_ok=True, gerbers_ok=True,
         bespoke_missing=False, fitness_score=10.0, n_electronic_gap=0,
         n_on_board=24, n_electronic_design=29)
-    if not _full_r.startswith("FAB-READY"):
+    if not (_full_r.startswith("FAB-READY") or _full_r.startswith("DRAFT — NOT FABRICATION READY")):
         print(f"  FAIL pcb-readiness partial-board proveNoFalsePositive: 24/29 on-board "
-              f"with clean hygiene must still read FAB-READY, got {_full_r!r}"); bad += 1
+              f"with clean hygiene must still read draft-not-fab max banner, got {_full_r!r}"); bad += 1
     # ── P9a REWORK proveCatch (2026-07-20, Cursor FAIL-REWORK of d94dce40c) ──
     # The banner + _sc_pcb consumers keyed the readiness on EXACT "FAB-READY" dicts, so
     # the disclosed "FAB-READY — UNPROVEN IN HARDWARE" string (the very board that IS

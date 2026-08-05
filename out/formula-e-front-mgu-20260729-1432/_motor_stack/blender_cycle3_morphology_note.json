@@ -1,0 +1,68 @@
+{
+  "schema": "forgeos.motor_stack.blender_cycle3_morphology/v1",
+  "ran_at": "2026-08-05T12:00:00Z",
+  "ship_ok": false,
+  "status": "provisional_visualisation_uplift",
+  "goal": "Race FE powertrain kit language — not generic industrial charcoal clay",
+  "prior": {
+    "cycle2": "involute teeth + coolant QD boss/hex/collar/barb/hose/clamp",
+    "visual_brief": "out/.../jack_em_pack/10-fe-visual-brief.md"
+  },
+  "changes": {
+    "universal_materials": {
+      "helper": "scripts/blender-templates/forge_blender_lib.py::make_powertrain_role_mat",
+      "roles": [
+        "cast_al_housing",
+        "machined_al",
+        "anodised_al",
+        "carbon_structure",
+        "sic_module_body",
+        "ceramic_dbc",
+        "steel_machined",
+        "steel_fastener",
+        "copper_bus",
+        "hv_shell_dark",
+        "hv_safety_orange",
+        "rubber_boot",
+        "braid_shield",
+        "coolant_port_body",
+        "coolant_qd_collar"
+      ],
+      "bom_pbr": "scripts/lib/bom_physical_properties.py — SiC, carbon fibre, ceramic DBC, anodised Al"
+    },
+    "sic_module_stack": {
+      "helper": "_fpk_place_sic_inverter_stack",
+      "morphology": "carrier + ceramic_DBC + 3× module packages + Cu terminal tabs + clamp cues"
+    },
+    "hv_connector_kit": {
+      "helper": "_fpk_place_hv_connector",
+      "morphology": "flange+bolts + shell + key_flat + safety_orange_collar + dual_pins + HVIL + braid_collar + hazard_band + boot"
+    },
+    "lv_connector_kit": {
+      "helper": "_fpk_place_lv_connector",
+      "morphology": "flange+bolts + shell + key_flat + 2×3 pin face + strain-relief boot"
+    },
+    "housing_race_details": {
+      "machine_band": "u_se_td_housing_machine_band (lighter brushed Al mid-barrel)",
+      "end_bell_faces": "u_se_td_end_bell_face_* machined land rings",
+      "cast_ribs": "T-section web + foot (not flat slabs)",
+      "nameplate": "border (machined Al) + plate (steel)"
+    },
+    "coolant_qd": {
+      "status": "kept from cycle-2; collars now use make_powertrain_role_mat(coolant_qd_collar)"
+    }
+  },
+  "explicitly_not_claimed": [
+    "FIA coolant / HV / LV connector XYZ ICD",
+    "Partner STEP / silhouette paste",
+    "Released gear tooth set / ISO 6336 strength",
+    "ship_ok / Bar A close",
+    "SiC module MPN or supplier Gerbers"
+  ],
+  "re_render": {
+    "runner": "scripts/motor-stack/rerender-fe-front-race-kit.sh",
+    "before_dir": "out/formula-e-front-mgu-20260729-1432/_cycle3_before",
+    "after_dir": "out/formula-e-front-mgu-20260729-1432/_cycle3_previews",
+    "command": "bash scripts/motor-stack/rerender-fe-front-race-kit.sh"
+  }
+}

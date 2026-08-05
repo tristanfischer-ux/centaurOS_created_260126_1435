@@ -1,0 +1,229 @@
+======== SEAT: moonshotai/kimi-k3 ========
+# Takeover Review: FE Front MGU Twin
+
+**Verdict up front:** Plan is structurally sound but P2 as written is grade-fixing. P1 must gate everything. Torque miss (0.975x vs binding) is a design/requirement gap — no amount of Sprint 2 EM polish closes it, and any pack that reads otherwise is greenwash.
+
+---
+
+## 1) P0–P5 Verdicts
+
+| Item | Verdict | Conditions / Hard stops |
+|---|---|---|
+| **P0** Own twin | **APPROVE, harden** | Snapshot hash manifest *before* any writes (P1 needs a baseline). Explicitly revoke idle Grok's write path — "idle" is not "locked out." Named owner + lock artefact committed. |
+| **P1** Honesty audit | **APPROVE, make it gating** | Full sweep of all 47 artefacts, not sampled. Required quote set everywhere: 122.1 / 104.1 / 125.2 / 0.975x / torque_reliable=false. **Also audit the dual-bar stabilize itself** — "already applied" is unverified; confirm 122.1 is the post-stabilize mean. Any pass-claim or lone 1.17x quote = HARD STOP, fix before P2. |
+| **P2** Sprint2 EM to A- | **REVISE** | Work items (lambda, FW envelope, FOC spine, mesh stamp) are correct. **"Re-score all A-" as planned output is deciding the verdict before the trial.** Plan execution; grade results. A- requires per-axis cited artefacts; no new evidence = old grade stands. State explicitly: criteria are sim-internal (convergence, limit consistency), not validation — "without dyno" must not read as dyno-equivalent. |
+| **P3** PCB draft A- | **APPROVE, with teeth** | Grade axis renamed "PCB draft-readiness." Fitness rubric **frozen** — if 7.6 is below the A- threshold, iterate the board for real or report B+. Channel match must run against the **new** FOC spine (hard dependency on P2), not stale demands. NOT_FABRICATION_READY + forgeDraftOnly + FAB-READY-UNPROVEN retained verbatim. |
+| **P4** Pack V1.296 | **APPROVE, strictly after P1–P3** | Coherence = errata-append only. **Never rewrite V1.295 artefacts in place.** Changelog enumerates every delta. Jack spine leads with the binding miss, not the grades. |
+| **P5** Council + staged commit | **REVISE to gate** | Council becomes a checklist gate: ship_ok=false, NOT_HOMOLOGATED, NOT_FABRICATION_READY, torque_reliable=false, banner verbatim, zero invented data. Any fail routes back to the offending step. Commit only after all six pass. |
+
+---
+
+## 2) Top 3 Greenwash / Wrong-Order Risks
+
+1. **Pre-committed grades.** "Re-score all A-" (plan) + "all EM A- min, PCB too" (Tristan) = outcome fixed before evidence. This is greenwash by construction. *Hard stop: any A- without a new cited artefact from this sprint is void.*
+2. **Torque-fail burial.** All-A- optics against a 0.975x binding miss. Sprint 2 raises model confidence; it cannot make 122.1 ≥ 125.2, and DEC-008/009 frozen means no scope escape. *Hard stop: V1.296 blocked until torque_reliable=false and 0.975x sit in the spine header, first page.*
+3. **PCB threshold/banner drift.** Pressure to convert 7.6/10 into A- by editing the rubric, softening the banner, or channel-matching against stale EM numbers. Wrong-order variant: grading PCB before the FOC spine exists. *Hard stop: rubric frozen, banner frozen, zero Gerbers.*
+
+---
+
+## 3) What NOT to Do
+
+- Do NOT flip or caveat torque_reliable; do NOT quote 1.17x vs architecture without 0.975x vs binding adjacent.
+- Do NOT invent dyno data, dyno-correction factors, or "expected measured" values presented as measurements.
+- Do NOT emit Gerbers, drill files, pick-and-place, fab BOM, or fab quotes.
+- Do NOT move the fitness rubric threshold to make 7.6 pass. Improve the board or keep B+.
+- Do NOT rewrite V1.295 artefacts in place — errata-append with changelog.
+- Do NOT let the idle Grok instance regain write access mid-sprint.
+- Do NOT promise Tristan grades. Commit to work items; grades are output, not deliverable.
+- Do NOT give the rotor GIF any grade weight — it's a render, not evidence.
+- Do NOT let the version bump imply content that doesn't exist; V1.296 changelog must list actual deltas.
+
+---
+
+## 4) Hard Success Criteria for A-
+
+**EM axes (evidence-cited, sim-internal):**
+- *Pure-FE lambda:* FE-only extraction at defined operating points; two successive mesh refinements differ <2%; analytic cross-check within ±5% with deviation explained; script + hash committed.
+- *FW envelope:* mapped to 24,000 rpm (DEC-009); respects DEC-008 duty; voltage limit curve enforced; base-region/FW boundary identified; extrapolation flagged where present.
+- *FOC map spine:* full torque-speed grid incl. FW region; MTPA/limit loci; provenance (FE version + mesh stamp hash); feeds both grade card and PCB channel-match.
+- *Mesh stamp:* element counts + torque/energy deltas between refinements (<1% torque delta final pair); committed as stamped artefact.
+- *Voltage (B+→A-):* DC-link + inverter limits stated; no FOC-map operating point violates the voltage ellipse.
+- *Map (B+→A-):* full grid coverage, limit curves, provenance hash. No coverage gap → no A-.
+- *GIF:* present, labeled SIM-ONLY, zero grade weight.
+
+**PCB
+usage {'prompt_tokens': 564, 'completion_tokens': 6000, 'total_tokens': 6564, 'cost': 0.091692, 'is_byok': False, 'prompt_tokens_details': {'cached_tokens': 0, 'cache_write_tokens': 0, 'audio_tokens': 0, 'video_tokens': 0}, 'cost_details': {'upstream_inference_cost': 0.091692, 'upstream_inference_prompt_cost': 0.001692, 'upstream_inference_completions_cost': 0.09}, 'completion_tokens_details': {'reasoning_tokens': 4674, 'image_tokens': 0, 'audio_tokens': 0}}
+
+======== SEAT: openai/gpt-5.6-sol ========
+## 1) P0–P5 disposition
+
+| Item | Decision | Review |
+|---|---|---|
+| **P0 Own twin; no concurrent writers; ship_ok false** | **Approve — mandatory first** | Lock the twin/worktree, record baseline hash and preserve `ship_ok=false`, `NOT_HOMOLOGATED`, DEC-008 and DEC-009. No handoff until lock ownership is explicit. |
+| **P1 Honesty audit dual bars vs Jack pack lagging quotes** | **Approve — expand scope** | Audit every prose claim, grade card, caption and fieldplot—not only quotes. Every relevant surface must show **122.1/104.1 = 1.17× architecture pass** and **122.1/125.2 = 0.975× binding fail**, with `torque_reliable=false`. |
+| **P2 Sprint 2 EM to A- without dyno** | **Revise** | A- is permissible only for **model/toolchain/evidence-package maturity**. It cannot mean validated torque, reliable torque, homologation, or hardware correlation. If the existing rubric requires dyno correlation for A-, this item is **rejected** rather than waived. |
+| **P3 PCB draft-readiness A- not fab** | **Revise sharply** | Grade it **“PCB draft-review readiness: A-”**, not “PCB A-” without qualification. Keep `NOT_FABRICATION_READY` and `forgeDraftOnly`; retain the `FAB-READY-UNPROVEN` warning until renamed or eliminated. DRC 0 and 7.6/10 alone do not establish fabrication readiness. |
+| **P4 Pack V1.296 + coherence + Jack spine** | **Approve conditionally** | Generate only after the honesty audit, Sprint 2 execution, PCB review and independent rescoring. The pack must be generated from authoritative sources, not manually patched. |
+| **P5 Council finish + commit staged only** | **Revise** | Council may accept an honest evidence package; it may not waive the binding torque failure or relabel draft PCB work. Review the exact staged diff and commit only intended files. No release/ship approval. |
+
+## 2) Top three greenwash or wrong-order risks
+
+1. **Turning an evidence grade into a performance claim.**  
+   Path B still fails the binding target at **0.975×** and is deliberately `torque_reliable=false`. “All EM A-” must not obscure that.
+
+2. **Calling PCB draft quality “PCB A-” without the scope qualifier.**  
+   Two boards, DRC 0 and channel agreement do not imply ERC closure, manufacturing outputs, thermal/current validation, stack-up approval or fabrication readiness.
+
+3. **Packaging before eliminating stale claims.**  
+   V1.296 would amplify inconsistency if any Jack-facing quote, plot or grade card still presents only the 1.17× architecture bar while omitting the binding failure.
+
+## 3) What NOT to do
+
+- Do not set `ship_ok=true`, remove `NOT_HOMOLOGATED`, or imply release approval.
+- Do not change DEC-008 or DEC-009.
+- Do not claim binding torque compliance, torque reliability, dyno correlation or hardware validation.
+- Do not invent dyno data, Gerbers, fab outputs, measurements or reviews.
+- Do not generate Gerbers merely to improve a grade.
+- Do not average away a blocker with stronger visualization/toolchain scores.
+- Do not let Council override an unmet technical criterion.
+- Do not hand-edit generated Jack-pack outputs to hide source incoherence.
+- Do not allow concurrent writers or absorb unrelated worktree changes.
+- Do not use the ambiguous banner `FAB-READY-UNPROVEN` as if “fab-ready” were established.
+
+## 4) Hard success criteria for all A-
+
+### EM A- — evidence/package scope only
+
+All must pass; no averaging around failures:
+
+- Pure-FE lambda, FW envelope and FOC map spine are present, reproducible and internally consistent.
+- Inputs, units, assumptions, tool versions, commands and source hashes are recorded.
+- DEC-008 intermittent duty and DEC-009 24k/130 mm are unchanged and traceable.
+- Mesh stamp contains provenance and objective quality checks; rotor GIF is generated from the same authoritative geometry.
+- Voltage, current, speed, thermal and saturation limits are explicit and consistent across maps and prose.
+- Every torque presentation includes both bars and the exact status:
+  - Architecture: **pass, 1.17×**
+  - Binding: **fail, 0.975×**
+  - `torque_reliable=false`
+- No wording implies dyno correlation, homologation or production validation.
+- Independent rerun produces materially identical outputs.
+- Every EM rubric category scores at least A- under a rubric fixed **before** rescoring.
+- **Hard stop:** if A- formally requires physical correlation, EM cannot receive A- without dyno evidence.
+
+### PCB A- — explicitly “draft-review readiness”
+
+- Both boards reproduce DRC 0 under recorded tool/version/rules.
+- ERC and unresolved warning disposition are documented; no unexplained critical errors.
+- Channel/net/interface mapping is complete and cross-checked against the twin.
+- Power/current paths, protection, grounding, isolation/clearance, thermal assumptions and connector constraints are reviewed.
+- Stack-up and mechanical assumptions are explicit, even if not manufacturer-approved.
+- BOM status, substitutions and unavailable/unknown parts are visible.
+- Open issues are severity-ranked; no undisclosed critical blocker.
+- Fitness score is independently recomputed under a predeclared rubric and meets its A- threshold.
+- Every PCB-facing output says:
+  - **Draft-review readiness: A-**
+  - `NOT_FABRICATION_READY`
+  - `forgeDraftOnly`
+  - No Gerbers/fabrication package supplied
+- **Hard stop:** no unqualified “PCB A-”, “fab-ready”, or release-ready claim.
+
+## 5) Recommended sequence
+
+1. Acquire exclusive ownership; record baseline commit, worktree status and artefact inventory.
+2. Pin invariants: `ship_ok=false`, `NOT_HOMOLOGATED`, DEC-008/009 frozen, `torque_reliable=false`.
+3. Freeze the EM and PCB grading rubrics and explicitly scope what A- means.
+4. Audit all 47 existing Jack-pack artefacts for stale torque, reliability, homologation and PCB wording.
+5. Correct source-of-truth content so both torque bars and the binding failure propagate everywhere.
+6. Execute pure-FE lambda, FW envelope and FOC map spine reproducibly.
+7. Produce the mesh stamp and rotor GIF with hashes, tool provenance and geometry consistency checks.
+8. Complete PCB draft-review evidence; do not create or imply fabrication outputs.
+9. Run automated coherence checks across maps, plots, captions, grade cards, banners and manifest.
+10. Independently rescore every EM category and PCB draft-readiness; stop on any category below A- or any semantic misrepresentation.
+11. Generate V1.296 and the Jack spine from authoritative sources; review the full diff.
+12. Council reviews the evidence and exact staged set; commit only if honest and coherent, while retaining all non-ship/non-homologated gates.
+usage {'prompt_tokens': 478, 'completion_tokens': 2549, 'total_tokens': 3027, 'cost': 0.07886, 'is_byok': False, 'prompt_tokens_details': {'cached_tokens': 0, 'cache_write_tokens': 0, 'audio_tokens': 0, 'video_tokens': 0}, 'cost_details': {'upstream_inference_cost': 0.07886, 'upstream_inference_prompt_cost': 0.00239, 'upstream_inference_completions_cost': 0.07647}, 'completion_tokens_details': {'reasoning_tokens': 1034, 'image_tokens': 0, 'audio_tokens': 0}}
+
+======== SEAT: z-ai/glm-5.2 ========
+# Adversarial Review: FE Front MGU Twin Takeover
+
+## 1) Per-Item Verdict
+
+| Item | Verdict | Reason |
+|------|---------|--------|
+| **P0** Own twin, no concurrent writers, ship_ok false | **APPROVE** | Non-negotiable baseline. Correct. |
+| **P1** Honesty audit dual bars vs Jack pack lagging quotes | **APPROVE** | Necessary prerequisite. Must explicitly verify `torque_reliable=false` is propagated to all 47 Jack artefacts, not just quote text. |
+| **P2** Sprint 2 EM to A- without dyno | **REVISE** | Blanket "all A-" is the single biggest greenwash risk. Map B+→A- is defensible *if* FOC map spine delivers a documented fidelity delta. Voltage B+→A- has no Sprint 2 deliverable that addresses it — that grade stays B+ unless you identify a specific analytical improvement. Do not conflate "completing deliverables" with "earning A-." |
+| **P3** PCB draft-readiness A- | **REVISE** | 7.6/10 fitness is not A-; it's B/B+ territory. Calling a `forgeDraftOnly`, `NOT_FABRICATION_READY` board "A-" — even qualified — is grade signaling that exceeds evidence. Either improve fitness to ≥8.0 with documented design-review rigour, or hold at B+ with an explicit explanation. The `FAB-READY-UNPROVEN` banner must survive regardless. |
+| **P4** Pack V1.296 + coherence + Jack spine | **APPROVE** | Correct integration step, but strictly gated: must not execute until P2/P3 are closed with per-item evidence. No concurrent packaging of unresolved grades. |
+| **P5** Council finish + staged commit only | **APPROVE** | Correct governance closeout. Staged commit prevents accidental `ship_ok` flip. |
+
+---
+
+## 2) Top 3 Greenwash / Wrong-Order Risks
+
+1. **Blanket "all EM A-" driven by Tristan's ask, not by evidence.** Sprint 1 graded map B+ and voltage B+ honestly. Sprint 2 adds deliverables (FOC spine, lambda, GIF, mesh) but unless each deliverable has a *specific, measurable* impact on the grade of the item it touches, "re-score all A-" is target-driven inflation. Voltage has no Sprint 2 work item that addresses its B+ — so how does it become A-? It doesn't, and saying so is greenwash.
+
+2. **PCB A- on a 7.6/10 `forgeDraftOnly` board.** The fitness score itself disqualifies A-. The qualifier "draft-readiness" is a semantic escape hatch: anyone reading "PCB A-" in a grade card will infer fab proximity that does not exist. This is exactly the kind of qualified-but-misleading signal that leaks into downstream decisions.
+
+3. **P4 packaging before P2/P3 evidence is closed.** If V1.296 is packed with inflated or unresolved grades, the Jack spine inherits the contamination. The 47 existing artefacts become a credibility anchor for numbers that haven't been earned. P4 must be serial-gated, not parallel-optimistic.
+
+---
+
+## 3) What NOT to Do
+
+- **Do not** invent dyno data, Gerbers, or physical validation evidence. Sprint 2 is simulation/analytical only — say so.
+- **Do not** adjust the Path B binding target (125.2 Nm) to make 0.975× look like a pass. It fails. `torque_reliable=false` stays.
+- **Do not** unfreeze DEC-008 or DEC-009. Frozen means frozen.
+- **Do not** upgrade any grade without citing the specific artefact and delta that justifies it.
+- **Do not** remove or soften `NOT_FABRICATION_READY`, `NOT_HOMOLOGATED`, `FAB-READY-UNPROVEN`, or `forgeDraftOnly` banners.
+- **Do not** run P2 and P4 concurrently. P4 waits.
+- **Do not** let "other Grok idle" pressure create phantom deliverables.
+
+---
+
+## 4) Hard Success Criteria for All A- Including PCB
+
+**EM items (per item, not blanket):**
+
+| Criterion | Requirement |
+|-----------|-------------|
+| **Delta documentation** | Each A- must cite: (a) Sprint 1 grade, (b) Sprint 2 work performed, (c) measurable fidelity/ completeness improvement, (d) artefact hash proving the work exists |
+| **Map A-** | FOC map spine implemented AND re-scored; fidelity metric improved by a documented delta vs Sprint 1 B+ baseline |
+| **Voltage A-** | BLOCKED unless a specific Sprint 2 analytical improvement is identified. If none exists, voltage stays B+. No hand-waving. |
+| **torque_reliable** | Remains `false`. A- grade explicitly scoped to "simulation fidelity," not "physical torque validation." Grade card must state this in the grade line, not a footnote. |
+| **Already A- items** | Toolchain, kit, viz: confirm no regression; re-score is a confirmation pass, not a free upgrade. |
+
+**PCB A- (if pursued):**
+
+| Criterion | Requirement |
+|-----------|-------------|
+| **Fitness score** | ≥ 8.0/10 (7.6 is NOT A-) |
+| **DRC** | Remains 0 |
+| **Scope** | Grade card must read: "Design Draft Review: A- | Fabrication Readiness: F | Composite: NOT_FABRICATION_READY" |
+| **Banners** | `FAB-READY-UNPROVEN` and `forgeDraftOnly` survive in pack metadata |
+| **If fitness < 8.0** | PCB grade stays B+; write explicit explanation to Tristan: "7.6/10 does not support A-; B+ is the honest grade for a draft-only board." |
+
+---
+
+## 5) Recommended Sequence (12 steps max)
+
+| Step | Action | Gate |
+|------|--------|------|
+| 1 | Confirm twin ownership; no concurrent writers; `ship_ok=false` locked | Must pass before step 2 |
+| 2 | Audit all 47 Jack artefacts for stale quotes vs twin current state; flag every mismatch | — |
+| 3 | Fix stale quotes; propagate `torque_reliable=false` and Path B 0.975× failure into Jack pack; confirm DEC-008/009 freeze language intact | All flags resolved before step 5 |
+| 4 | For each Sprint 2 EM item, write one-line evidence requirement for A- (what delta, what artefact) | — |
+| 5 | Execute FOC map spine; re-score map; document fidelity delta vs B+ baseline | Map A- only if delta is real |
+| 6 | Execute remaining Sprint 2 deliverables: pure-FE lambda, FW envelope, mesh stamp, rotor GIF | — |
+| 7 | Per-item re-score: award A- only where step 4 evidence is met; **voltage stays B+ if no analytical delta exists** | Honest grades locked |
+| 8 | PCB: attempt fitness improvement to ≥8.0 via design review; if unsuccessful, accept B+ with written justification to Tristan | — |
+| 9 | PCB grade card: scope "design draft" only; fabrication readiness = F; banners survive | — |
+| 10 | Pack V1.296: integrate only closed artefacts with per-item evidence links; reject any item missing its delta citation | — |
+| 11 | Coherence check: V1.296 vs Jack spine; no orphaned references; no grade without artefact hash | Zero orphans |
+| 12 | Council finish; staged commit only; final confirmation `ship_ok=false`, `NOT_HOMOLOGATED` | End state |
+
+---
+
+**Bottom line:** P0 and P1 are clean. P2 and P3 need surgery — blanket A- is greenwash, and 7.6/10 PCB is not A-. Fix the grading discipline before packing V1.296, or the entire Jack spine inherits unearned credibility. The honest answer to Tristan may include "voltage stays B+ and PCB stays B+" — and that's the correct engineering answer, not a failure.
+usage {'prompt_tokens': 489, 'completion_tokens': 4836, 'total_tokens': 5325, 'cost': 0.01207476, 'is_byok': False, 'prompt_tokens_details': {'cached_tokens': 0, 'cache_write_tokens': 0, 'audio_tokens': 0, 'video_tokens': 0}, 'cost_details': {'upstream_inference_cost': 0.01207476, 'upstream_inference_prompt_cost': 0.00037164, 'upstream_inference_completions_cost': 0.01170312}, 'completion_tokens_details': {'reasoning_tokens': 2984, 'image_tokens': 0, 'audio_tokens': 0}}
+

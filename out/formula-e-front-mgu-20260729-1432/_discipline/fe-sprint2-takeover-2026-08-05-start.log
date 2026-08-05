@@ -1,0 +1,19 @@
+[discipline] plan ref   -> resolves to JLR-FE-FRONT-FPK-BAR-A-BAR-B-CLOSEOUT-TRACKER-2026-07-31.md
+[discipline] plan fit   -> out/formula-e-front-mgu-20260729-1432/_discipline/fe-sprint2-takeover-2026-08-05-plan-fit.json
+[discipline] capability -> exit 0
+[discipline] calc guard -> exit 0
+      intent: Sprint2 EM evidence to A- where earned; PCB draft banner honesty; Bar B executable asks; Blender cycle-3 race kit morphology. Universal engine fixes. ship_ok stays false.
+       [STRONG] 31.68  scripts/motor-stack/prove_cycle3_race_kit_morphology.py
+                proveCatch: cycle-3 race-kit morphology is present in source (no Blender).
+       [STRONG] 29.11  scripts/motor-stack/render_phase_e_partner_pack.py
+                Phase E — partner-gated ask pack (W5.*) + voltage-screen honesty tighten.
+       [STRONG] 24.74  scripts/lib/check_bar_b_register_freshness.py
+                Deterministic Bar B register freshness — stamped file vs live twin rebuild.
+       [STRONG] 24.47  scripts/lib/functional_form.py
+[discipline] start council -> seats ['grok45', 'minimax_m3', 'sol'] BLOCKING: grok45, minimax_m3, sol
+
+[discipline] START BLOCKED:
+  - evidence file does not exist: em_grade_sprint2_summary.json
+  - evidence file does not exist: pcb-firmware-honesty.contract.json
+  - evidence file does not exist: bar_b_executable_asks.json
+  - start council seats blocking with no recorded rejection: grok45, minimax_m3, sol — read out/formula-e-front-mgu-20260729-1432/_discipline/fe-sprint2-takeover-2026-08-05-start-council.json, then either change the approach or add an advice_rejected entry with a reason, and re-run start

@@ -1,0 +1,54 @@
+{
+  "schema": "forgeos.fpk.jack_em_pack/v1",
+  "rendered_at": "2026-08-04T15:11:00Z",
+  "twin": "/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/formula-e-front-mgu-20260729-1432",
+  "path_b": "/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/formula-e-front-mgu-20260729-1432/_motor_stack/em_fia_front_kit_case_PATH_B_DEC009.json",
+  "figures": [
+    "_motor_stack/jack_em_pack/00-verdict-one-pager.png",
+    "_motor_stack/jack_em_pack/00b-open-by-design.png",
+    "_motor_stack/jack_em_pack/00c-how-to-read-pack.png",
+    "_motor_stack/jack_em_pack/01-dual-torque-bars.png",
+    "_motor_stack/jack_em_pack/02-torque-vs-rotor-angle.png",
+    "_motor_stack/jack_em_pack/03-airgap-flux-vs-angle.png",
+    "_motor_stack/jack_em_pack/04-geometry-identity-card.png",
+    "_motor_stack/jack_em_pack/05-product-hero-em-callouts.jpg",
+    "_motor_stack/jack_em_pack/06-thermal-duty-storyboard.png",
+    "_motor_stack/jack_em_pack/07-pcb-honesty-sheet.png",
+    "_motor_stack/jack_em_pack/08-system-block-diagram.png",
+    "_motor_stack/jack_em_pack/09-inverter-mass-budget.png",
+    "_motor_stack/jack_em_pack/10-fe-visual-brief.md",
+    "_motor_stack/jack_em_pack/11-coolant-loop-one-pager.png",
+    "_motor_stack/jack_em_pack/12-torque-ripple-load-sheet.png",
+    "_motor_stack/jack_em_pack/13-kit-assembly-envelopes-lite.png",
+    "_motor_stack/jack_em_pack/14-busbar-esl-budget.png",
+    "_motor_stack/jack_em_pack/15-iron-loss-corner-table.png",
+    "_motor_stack/jack_em_pack/16-bearing-reaction-oom.png",
+    "_motor_stack/jack_em_pack/17-rotor-fos-screening-card.png",
+    "_motor_stack/jack_em_pack/18-nvh-modal-open-register.png",
+    "_motor_stack/jack_em_pack/19-gear-oil-status.png",
+    "_motor_stack/jack_em_pack/20-gear-ratio-writeback-blocked.png",
+    "_motor_stack/jack_em_pack/21-path-b-voltage-feasibility.png",
+    "_motor_stack/jack_em_pack/22-dyno-request-matrix.png",
+    "_motor_stack/jack_em_pack/23-partner-asks-ranked.png",
+    "_motor_stack/jack_em_pack/24-lap-log-columns-ask.png",
+    "_motor_stack/jack_em_pack/44-bar-b-executable-asks-one-pager.md"
+  ],
+  "pdf": "_motor_stack/jack_em_pack/FE-FRONT-PATH-B-EM-HONESTY-PACK.pdf",
+  "claims": {
+    "path_b_mean_nm": 122.099939,
+    "ship_ok": false,
+    "not_claimed": [
+      "ship_ok",
+      "Bar A close",
+      "torque_reliable",
+      "dyno_results",
+      "MTPA_voltage_circle"
+    ]
+  },
+  "phase_e": {
+    "w5_1_dyno_matrix": true,
+    "w5_partner_asks": true,
+    "w5_2_lap_log_columns": true,
+    "voltage_honesty_tighten": true
+  }
+}

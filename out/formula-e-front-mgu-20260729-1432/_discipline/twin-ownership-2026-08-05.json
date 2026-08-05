@@ -1,0 +1,17 @@
+{
+  "schema": "forgeos.fpk.twin_ownership/v1",
+  "twin": "out/formula-e-front-mgu-20260729-1432",
+  "owner_session": "019fd07c-0c0b-73f0-be3b-2814a354cebc",
+  "owner_label": "grok-build-this-session-sole",
+  "declared_at": "2026-08-05T07:42:07Z",
+  "git_head": "2eceae5f6c0d9cd2e7198aa8881f1946d6bd28e2",
+  "invariants": {
+    "ship_ok": false,
+    "torque_reliable_must_stay_false_without_dyno": true,
+    "not_fabrication_ready_pcb": true,
+    "dec_008_frozen": true,
+    "dec_009_frozen": true,
+    "bar_b_no_invented_measurements": true
+  },
+  "notes": "Other Grok shut down by Tristan 2026-08-05. Expanded charter: Sprint2 EM, PCB+firmware, Blender realism, Excel \u22659/10 universal, Bar A residual, Bar B max software-honest (asks/freshness) not homologation."
+}

@@ -1,0 +1,5 @@
+[discipline] boundary   -> PROCEED
+[discipline] finish council -> seats ['grok45', 'minimax_m3', 'sol']
+
+[discipline] FINISH BLOCKED:
+  - seats blocking with no recorded rejection: grok45, minimax_m3, sol — fix the finding, or record it in advice_rejected with a reason in out/formula-e-front-mgu-20260729-1432/_discipline/fe-sprint2-takeover-2026-08-05-finish-council.json

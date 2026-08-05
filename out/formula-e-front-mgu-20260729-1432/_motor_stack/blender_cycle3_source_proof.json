@@ -1,0 +1,12 @@
+{
+  "schema": "forgeos.motor_stack.blender_cycle3_source_proof/v1",
+  "ok": true,
+  "fails": [],
+  "ship_ok": false,
+  "files": {
+    "forge_blender_lib": "/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/scripts/blender-templates/forge_blender_lib.py",
+    "build_universal_scene": "/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/scripts/blender-universal/build_universal_scene.py",
+    "bom_physical_properties": "/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/scripts/lib/bom_physical_properties.py",
+    "morphology_note": "/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/formula-e-front-mgu-20260729-1432/_motor_stack/blender_cycle3_morphology_note.json"
+  }
+}

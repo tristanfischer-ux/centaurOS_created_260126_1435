@@ -1,0 +1,28 @@
+{
+  "schema": "forgeos.fpk.bar_b_register_freshness/v1",
+  "findings": [],
+  "stale_count": 0,
+  "ok": true,
+  "stamped_row_count": 10,
+  "live_row_count": 10,
+  "twin": "/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/formula-e-front-mgu-20260729-1432",
+  "stamped_at": "2026-08-04T12:30:32Z",
+  "live_stamped_at": "2026-08-05T07:53:56Z",
+  "stamped_ship_ok": false,
+  "live_ship_ok": false,
+  "live_artefacts": {
+    "mean_tq": 122.099939,
+    "required_tq": 104.098914,
+    "architecture_duty_tq": 104.098914,
+    "binding_duty_tq": 125.214912,
+    "em_source": "PATH_B_DEC009",
+    "duty_torque_screen_ok": false,
+    "torque_reliable": false,
+    "t_module": 77.61,
+    "coupled_ok": true,
+    "delta_p": 45.0826,
+    "rotor_fos": 2.635,
+    "disposition": "bespoke",
+    "n_boards": 2
+  }
+}

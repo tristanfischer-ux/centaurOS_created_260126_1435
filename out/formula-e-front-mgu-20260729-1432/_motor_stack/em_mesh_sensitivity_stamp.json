@@ -1,0 +1,22 @@
+{
+  "schema": "forgeos.motor_stack.mesh_sensitivity_stamp/v1",
+  "ran_at": "2026-08-05T08:02:53Z",
+  "ship_ok": false,
+  "source_npz": "/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/formula-e-front-mgu-20260729-1432/_motor_stack/fieldplot_pack/oc_full_field.npz",
+  "source_sha16": "884704787cdcda3a",
+  "full_grid_n": 64,
+  "subsample_n": 32,
+  "full": {
+    "b_mean_t": 0.062241533534860026,
+    "lambda_peak_wb": 0.012779977170461344
+  },
+  "subsample_2x": {
+    "b_mean_t": 0.062230692220454284,
+    "lambda_peak_wb": 0.012787890761236542
+  },
+  "relative_lambda_delta": 0.0006192179117102604,
+  "relative_b_mean_delta": 0.00017418135110167354,
+  "pass_lambda_lt_2pct": true,
+  "pass_b_mean_lt_2pct": true,
+  "note": "Spatial subsample proxy for mesh density \u2014 not a full re-mesh. True h-refinement still OPEN if partner requires FEMM re-solve."
+}

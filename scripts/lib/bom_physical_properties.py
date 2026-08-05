@@ -421,13 +421,27 @@ def props_to_blender_dim(props: Mapping[str, Any]) -> Optional[dict[str, Any]]:
 
 
 # PBR roles from material text — universal keyword map (not product-named).
+# Order matters: more-specific patterns first (SiC before steel; carbon fibre
+# before carbon steel; anodised Al before plain aluminium).
 _MATERIAL_PBR: tuple[tuple[re.Pattern[str], tuple[float, float, float], float, float], ...] = (
     (re.compile(r"ndfeb|rare.?earth|permanent\s*magnet|\bmagnet\b", re.I),
      (0.15, 0.16, 0.18), 0.55, 0.35),
     (re.compile(r"electrical\s*steel|laminat|m400|silicon\s*steel", re.I),
      (0.55, 0.52, 0.42), 0.35, 0.45),
+    # SiC power modules / die / MOSFET packages (dark polymer body).
+    (re.compile(r"\bsic\b|silicon\s*carbide|power\s*module|mosfet\s*module", re.I),
+     (0.06, 0.065, 0.075), 0.10, 0.42),
+    # Ceramic DBC / AlN / Al2O3 substrate under PE die.
+    (re.compile(r"\bdbc\b|aln\b|al2o3|ceramic\s*substrate|direct\s*bond", re.I),
+     (0.82, 0.80, 0.74), 0.0, 0.22),
     (re.compile(r"copper|ofhc|etp\b|cu\b|busbar", re.I),
      (0.72, 0.45, 0.18), 0.85, 0.28),
+    # Carbon fibre structure (must beat carbon steel).
+    (re.compile(r"carbon\s*fibre|carbon\s*fiber|cfrp|cf\s*composite", re.I),
+     (0.04, 0.042, 0.048), 0.22, 0.38),
+    # Hard-anodised / black Al before generic aluminium.
+    (re.compile(r"anodis|hard.?coat|black\s*alum|cast\s*alum", re.I),
+     (0.12, 0.125, 0.135), 0.58, 0.42),
     (re.compile(r"aluminium|aluminum|6061|adc12|al\b", re.I),
      (0.72, 0.74, 0.76), 0.70, 0.32),
     (re.compile(r"316|stainless|\bss\b|duplex|cres", re.I),
@@ -546,6 +560,14 @@ def _selftest() -> None:
 
     pbr = material_to_pbr("aluminium alloy housing")
     assert pbr is not None and pbr[1] >= 0.5  # metallic
+
+    # proveCatch (2026-08-05): race-kit materials must resolve distinctly.
+    sic = material_to_pbr("SiC MOSFET power module")
+    assert sic is not None and sic[0][0] < 0.15, sic  # dark package, not steel
+    cf = material_to_pbr("carbon fibre structural spine")
+    assert cf is not None and cf[0][0] < 0.10, cf
+    dbc = material_to_pbr("AlN ceramic DBC substrate")
+    assert dbc is not None and dbc[0][0] > 0.6, dbc  # light ceramic
 
     # proveCatch: mass modifier alone reaches the row
     w = {"modifier_characters": [{"kind": "mass", "value": "11.5 kg"},

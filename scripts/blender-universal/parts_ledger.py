@@ -100,6 +100,11 @@ TYPE_RULES = [
     # INTENT (2026-07-30 Formula-E FPK): a mesh screen is a mechanical pickup/filter
     # insert, not a discrete separator vessel with its own fluid in/out nozzles.
     ("other",      r"\b(?:pickup\s+)?mesh\s+screen\b"),
+    # INTENT (2026-08-05 FE FPK + universal): "Inverter Housing/Cover/Enclosure"
+    # is a structural shell, NOT an electrical power path — must not demand power
+    # in+out (was false Ledger completeness FAIL on INV-4/INV-5). Before electrical.
+    ("other",      r"\binverter\s+(?:housing|cover|enclosure|lid|chassis|case|shell)\b|"
+                   r"\b(?:housing|cover|enclosure|lid|chassis)\s+(?:for\s+)?(?:the\s+)?inverter\b"),
     # INTENT (2026-07-29): traction motor / SiC inverter are ELECTRICAL principals
     # (SLD + panel), not plant `other` → blender+GA litter. Before generic rules.
     ("electrical", r"\btraction\s*(?:ipmsm\s*)?motor\b|\bipmsm\b|motor[-\s]?generator|"
@@ -1214,6 +1219,9 @@ def _electrical_edge_needs(
         r"motor[- ]?protection|\bMPCB\b|earth leakage|\bRCD\b|\bRCBO\b|\bMCB\b|"
         r"\bMCCB\b|circuit\s+breakers?\b|breaker\b|"
         r"cable tray|terminal block|enclosure|junction box|\bgland\b|"
+        # Structural shells typed electrical via a parent noun (Inverter Housing /
+        # Cover / Case) are containment, not power-path nodes — no drawn in+out.
+        r"\b(?:housing|cover|casing|shell|lid|shroud|end\s*bell|bell\s*housing)\b|"
         r"digital\s+control\s+panel|local\s+control\s+panel|operator\s+panel|"
         r"operator\s+deck|front\s+panel|"
         r"\bhmi\b|touchscreen|control\s+panel\b|"

@@ -1,0 +1,69 @@
+{
+  "schema": "forgeos.motor_stack.em_grade_rubric/v2_sprint2",
+  "frozen_at": "2026-08-05T07:42:07Z",
+  "scope": "simulation_and_toolchain_maturity_not_dyno_validation",
+  "ship_ok_independent": true,
+  "layers": {
+    "toolchain_method": {
+      "A-": [
+        "xfemm/femmcli path documented",
+        "mesh sensitivity stamp present with torque/energy delta",
+        "weighted stress torque method cited"
+      ],
+      "cannot_mean": [
+        "hardware correlation"
+      ]
+    },
+    "kit_case_path_b_story": {
+      "A-": [
+        "Path B mean published",
+        "dual bars both shown",
+        "torque_reliable=false explicit",
+        "architecture clear ratio and binding fail ratio both present"
+      ],
+      "cannot_mean": [
+        "duty_torque_screen_ok without dyno policy"
+      ]
+    },
+    "map_mtpa_depth": {
+      "A-": [
+        "FOC-matched map spine or dense@kit-angle consistency card",
+        "MTPA/locus card with provenance hash",
+        "metric dictionary one headline rule"
+      ],
+      "B+": [
+        "hybrid map only without FOC spine"
+      ]
+    },
+    "voltage_fw": {
+      "A-": [
+        "multi-witness lambda with pure-FE attempt documented",
+        "FW envelope vs usable bus at DEC-009 speed",
+        "no silent use of out-of-band FE lambda as sole absolute"
+      ],
+      "B+": [
+        "airgap-B analytical only without FW envelope"
+      ]
+    },
+    "partner_field_viz": {
+      "A-": [
+        "OC+loaded |B| plots",
+        "how-to-read",
+        "optional rotor GIF labeled SIM-ONLY"
+      ],
+      "gif_grade_weight": 0
+    },
+    "release_homologation": {
+      "A-_readiness": [
+        "internal EM layers scored",
+        "OPEN items listed",
+        "ship_ok false"
+      ],
+      "cannot_mean": [
+        "homologated",
+        "ship_ok true"
+      ]
+    }
+  },
+  "rescore_rule": "Award A- only if every A- bullet has a cited artefact path from this sprint or prior with hash. No pre-committed grades."
+}

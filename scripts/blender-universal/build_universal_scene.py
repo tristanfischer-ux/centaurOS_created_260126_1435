@@ -14129,6 +14129,7 @@ _FPK_SHELL_OFF_PREFIXES = (
     "u_se_td_motor_housing",
     "u_se_td_coolant_jacket",
     "u_se_td_jacket_band",
+    "u_se_td_housing_machine_band",
     "u_se_td_end_bell_",
     "u_se_td_motor_cover",
     "u_se_td_gearbox_cover",
@@ -15229,6 +15230,16 @@ def _selftest_instrument_mesh_keep_prefixes() -> None:
         "HV connector family helper must include HVIL + braid boot")
     assert "form_dims" in _src_hv, (
         "HV connector must accept form-rule dimensions (current/creepage)")
+    assert "safety_collar" in _src_hv and "hazard_band" in _src_hv, (
+        "HV connector must carry IEC safety orange collar + hazard band")
+    assert "pin_0" in _src_hv, (
+        "HV connector must expose dual main power pins (not a single pipe)")
+    _src_lv = _insp_td.getsource(_fpk_place_lv_connector)
+    assert "pin_" in _src_lv and "boot" in _src_lv and "flange" in _src_lv, (
+        "LV connector must be multipin + boot + flange (not a plain box)")
+    _src_sic = _insp_td.getsource(_fpk_place_sic_inverter_stack)
+    assert "dbc" in _src_sic and "tab_" in _src_sic, (
+        "SiC stack must show ceramic DBC substrate + copper terminal tabs")
     _src_cast = _insp_td.getsource(_fpk_place_cast_language_cues)
     assert "gasket_lip" in _src_cast and "cast_rib" in _src_cast, (
         "cast-language helper must place gasket lips + ribs")
@@ -15236,17 +15247,27 @@ def _selftest_instrument_mesh_keep_prefixes() -> None:
         "cast-language helper must consume EduFormRule counts")
     assert "cast_rib_cam" in _src_cast, (
         "cast ribs must face the service-face camera (−Y), not only +Y")
+    assert "_foot" in _src_cast, (
+        "cast ribs must be T-section (web + foot), not flat slabs alone")
     _src_pe = _insp_td.getsource(_fpk_place_pe_volume_density)
     assert "pe_module" in _src_pe and "pe_busbar" in _src_pe, (
         "PE density helper must place module bricks + busbar cues")
     assert "form_rule" in _src_pe, (
         "PE helper must place module_count from physics, not decorative extras")
     assert _traction_drive_exterior_keep_visible("u_se_td_cast_rib_cam_0")
+    assert _traction_drive_exterior_keep_visible("u_se_td_housing_machine_band")
+    assert _traction_drive_exterior_keep_visible("u_se_td_lv_connector")
+    assert _traction_drive_exterior_keep_visible("u_se_td_hv_connector_safety_collar")
     # proveCatch (2026-07-30): vehicle route endpoint spheres remain in the scene
     # for route-audit, but are concept anchors — never required exterior product skin.
     assert not _traction_drive_exterior_keep_visible("u_se_td_vehicle_hv")
     assert not _traction_drive_exterior_keep_visible("u_se_td_pe_module_0"), (
         "PE module bricks are cutaway/ghost only on closed exterior")
+    # proveCatch (2026-08-05): race-kit palette helper must be wired in.
+    assert "make_powertrain_role_mat" in _src_td, (
+        "traction materials must prefer make_powertrain_role_mat (universal roles)")
+    assert "_fpk_place_lv_connector" in _src_td, (
+        "LV multipin connector family must be placed (not a plain box)")
     # proveCatch (2026-07-31): solid fl.add_cyl housings cannot be "sectioned" into
     # a readable cutaway — half-plugs still occlude guts. Open views must SHELL-OFF
     # skins and expose the concentric story; closed 04–07 keep full opaque skin.
@@ -19682,38 +19703,88 @@ def _fpk_place_mcu_shelf(name, center_mm, size_mm, mat, story_mod, MO):
         )
 
 
-def _fpk_place_sic_inverter_stack(name, center_mm, size_mm, mat, story_mod, MO):
-    """Compound SiC inverter — carrier + three power-module bricks (not one slab)."""
+def _fpk_place_sic_inverter_stack(name, center_mm, size_mm, mat, story_mod, MO,
+                                  mat_ceramic=None, mat_copper=None, mat_fast=None):
+    """Compound SiC inverter — carrier + ceramic DBC + module packages + Cu tabs.
+
+    INTENT (2026-08-05 race-kit realism, universal): a single dark slab reads as
+    industrial brick. A SiC PE stage is carrier plate → ceramic DBC substrate →
+    moulded module packages with copper terminal tabs. Public EDU photos =
+    TRAINING CHECK only — never STEP paste.
+    """
     cx, cy, cz = center_mm
     w, d, h = size_mm
+    mat_cer = mat_ceramic or mat
+    mat_cu = mat_copper or mat
+    mat_ft = mat_fast or mat
+    # Carrier base plate (aluminium / polymer tray).
     fl.add_box(
         name,
-        (cx * fl.MM, cy * fl.MM, (cz - h * 0.18) * fl.MM),
-        (w * fl.MM, d * fl.MM, max(3.0, h * 0.28) * fl.MM),
+        (cx * fl.MM, cy * fl.MM, (cz - h * 0.22) * fl.MM),
+        (w * fl.MM, d * fl.MM, max(2.5, h * 0.22) * fl.MM),
         mat,
         module=story_mod,
         module_objects=MO,
     )
-    mod_w = w * 0.28
-    mod_h = max(4.0, h * 0.55)
+    # Ceramic DBC substrate — light off-white plate under the modules.
+    fl.add_box(
+        f"{name}_dbc",
+        (cx * fl.MM, cy * fl.MM, (cz - h * 0.02) * fl.MM),
+        (w * 0.92 * fl.MM, d * 0.82 * fl.MM, max(1.2, h * 0.12) * fl.MM),
+        mat_cer,
+        module=story_mod,
+        module_objects=MO,
+    )
+    mod_w = w * 0.26
+    mod_h = max(4.0, h * 0.48)
     for mi, mx in enumerate((-0.32, 0.0, 0.32)):
+        mx_mm = cx + w * mx
+        # Moulded SiC module package body.
         fl.add_box(
             f"{name}_mod_{mi}",
-            ((cx + w * mx) * fl.MM, cy * fl.MM, (cz + h * 0.12) * fl.MM),
-            (mod_w * fl.MM, d * 0.78 * fl.MM, mod_h * fl.MM),
+            (mx_mm * fl.MM, cy * fl.MM, (cz + h * 0.18) * fl.MM),
+            (mod_w * fl.MM, d * 0.70 * fl.MM, mod_h * fl.MM),
             mat,
             module=story_mod,
             module_objects=MO,
         )
+        # Copper power terminal tabs (±Y of each package — bus land cues).
+        for ti, ty in enumerate((-0.38, 0.38)):
+            fl.add_box(
+                f"{name}_mod_{mi}_tab_{ti}",
+                (mx_mm * fl.MM, (cy + d * ty) * fl.MM, (cz + h * 0.22) * fl.MM),
+                (mod_w * 0.55 * fl.MM, max(2.0, d * 0.08) * fl.MM, max(1.5, mod_h * 0.35) * fl.MM),
+                mat_cu,
+                module=story_mod,
+                module_objects=MO,
+            )
+        # Corner clamp fasteners on each module (TIM clamp grammar).
+        for fi, (fx, fy) in enumerate(((-0.35, -0.30), (0.35, 0.30))):
+            fl.add_cyl(
+                f"{name}_mod_{mi}_clamp_{fi}",
+                ((mx_mm + mod_w * fx) * fl.MM, (cy + d * 0.55 * fy) * fl.MM,
+                 (cz + h * 0.18 + mod_h * 0.55) * fl.MM),
+                1.1 * fl.MM,
+                2.4 * fl.MM,
+                mat_ft,
+                module=story_mod,
+                module_objects=MO,
+                vertices=10,
+            )
 
 
 def _fpk_place_hv_connector(name, center_mm, size_mm, mat_body, mat_steel, story_mod, MO,
-                            mat_rubber=None, mat_braid=None, form_dims=None):
+                            mat_rubber=None, mat_braid=None, form_dims=None,
+                            mat_safety=None, mat_fast=None):
     """Compound HV DC connector family — sized from hv_interface requirement.
 
     INTENT: shell / pin / HVIL / braid dims come from `edu_form_grammar`
     (current density + creepage), not hardcoded cosmetic pegs. Public EDU
     photos = TRAINING CHECK only.
+
+    Race-kit language (2026-08-05, universal): flange face + bolt circle,
+    IEC high-voltage safety orange collar, dual main pins + HVIL, braid
+    collar + boot — not a plain brown box with a pipe.
     """
     cx, cy, cz = center_mm
     fd = form_dims or {}
@@ -19726,6 +19797,33 @@ def _fpk_place_hv_connector(name, center_mm, size_mm, mat_body, mat_steel, story
     boot_len = float(fd.get("braid_boot_len_mm", 26.0))
     mat_r = mat_rubber or mat_body
     mat_b = mat_braid or mat_steel
+    mat_or = mat_safety or mat_body
+    mat_ft = mat_fast or mat_steel
+    rot_out = (1.5707963, 0.0, 0.0)  # cylinder +Z → −Y
+    # Mount flange plate (bolts to inverter service face).
+    fl.add_box(
+        f"{name}_flange",
+        (cx * fl.MM, (cy + d * 0.12) * fl.MM, cz * fl.MM),
+        (w * 1.18 * fl.MM, max(3.0, d * 0.18) * fl.MM, h * 1.18 * fl.MM),
+        mat_steel,
+        module=story_mod,
+        module_objects=MO,
+    )
+    for bi, (bx, bz) in enumerate((
+        (-0.40, -0.40), (0.40, -0.40), (-0.40, 0.40), (0.40, 0.40),
+    )):
+        fl.add_cyl(
+            f"{name}_flange_bolt_{bi}",
+            ((cx + w * bx) * fl.MM, (cy + d * 0.22) * fl.MM, (cz + h * bz) * fl.MM),
+            1.5 * fl.MM,
+            4.0 * fl.MM,
+            mat_ft,
+            module=story_mod,
+            module_objects=MO,
+            rotation=rot_out,
+            vertices=10,
+        )
+    # Main shell body (dark polymer / painted metal).
     fl.add_box(
         name,
         (cx * fl.MM, cy * fl.MM, cz * fl.MM),
@@ -19734,6 +19832,7 @@ def _fpk_place_hv_connector(name, center_mm, size_mm, mat_body, mat_steel, story
         module=story_mod,
         module_objects=MO,
     )
+    # Key flat / polarisation land on the mate face.
     fl.add_box(
         f"{name}_key_flat",
         (cx * fl.MM, (cy - d * 0.28) * fl.MM, (cz + h * 0.18) * fl.MM),
@@ -19742,26 +19841,53 @@ def _fpk_place_hv_connector(name, center_mm, size_mm, mat_body, mat_steel, story
         module=story_mod,
         module_objects=MO,
     )
+    # IEC HV safety orange collar — the race connector signature.
+    fl.add_cyl(
+        f"{name}_safety_collar",
+        (cx * fl.MM, (cy - d * 0.30) * fl.MM, cz * fl.MM),
+        (max(collar_od, pin_d * 1.6) * 0.55) * fl.MM,
+        6.0 * fl.MM,
+        mat_or,
+        module=story_mod,
+        module_objects=MO,
+        rotation=rot_out,
+        vertices=28,
+    )
+    # Dual main power pins (HV+ / HV−) — not a single pipe.
+    pin_span = max(pin_d * 0.55, w * 0.18)
+    for pi, px in enumerate((-pin_span * 0.5, pin_span * 0.5)):
+        fl.add_cyl(
+            f"{name}_pin_{pi}",
+            ((cx + px) * fl.MM, (cy - d * 0.42) * fl.MM, cz * fl.MM),
+            (pin_d * 0.38) * fl.MM,
+            max(12.0, d * 0.50) * fl.MM,
+            mat_steel,
+            module=story_mod,
+            module_objects=MO,
+            rotation=rot_out,
+            vertices=20,
+        )
+    # Legacy single-barrel name kept for authenticity joins / older manifests.
     fl.add_cyl(
         f"{name}_barrel",
-        (cx * fl.MM, (cy - d * 0.38) * fl.MM, cz * fl.MM),
-        (pin_d * 0.55) * fl.MM,
-        max(14.0, d * 0.58) * fl.MM,
+        (cx * fl.MM, (cy - d * 0.38) * fl.MM, (cz + h * 0.22) * fl.MM),
+        (pin_d * 0.28) * fl.MM,
+        max(10.0, d * 0.42) * fl.MM,
         mat_steel,
         module=story_mod,
         module_objects=MO,
-        rotation=(1.5707963, 0.0, 0.0),
-        vertices=24,
+        rotation=rot_out,
+        vertices=18,
     )
     fl.add_cyl(
         f"{name}_hvil",
-        ((cx + w * 0.28) * fl.MM, (cy - d * 0.42) * fl.MM, (cz - h * 0.12) * fl.MM),
+        ((cx + w * 0.28) * fl.MM, (cy - d * 0.42) * fl.MM, (cz - h * 0.18) * fl.MM),
         hvil_d * fl.MM,
         10.0 * fl.MM,
         mat_steel,
         module=story_mod,
         module_objects=MO,
-        rotation=(1.5707963, 0.0, 0.0),
+        rotation=rot_out,
         vertices=16,
     )
     fl.add_cyl(
@@ -19772,7 +19898,19 @@ def _fpk_place_hv_connector(name, center_mm, size_mm, mat_body, mat_steel, story
         mat_b,
         module=story_mod,
         module_objects=MO,
-        rotation=(1.5707963, 0.0, 0.0),
+        rotation=rot_out,
+        vertices=24,
+    )
+    # Orange hazard band on the braid collar — kit language, not OEM paste.
+    fl.add_cyl(
+        f"{name}_hazard_band",
+        (cx * fl.MM, (cy - d * 0.55 - 10.0) * fl.MM, cz * fl.MM),
+        (collar_od * 0.52) * fl.MM,
+        2.5 * fl.MM,
+        mat_or,
+        module=story_mod,
+        module_objects=MO,
+        rotation=rot_out,
         vertices=24,
     )
     fl.add_cyl(
@@ -19783,8 +19921,89 @@ def _fpk_place_hv_connector(name, center_mm, size_mm, mat_body, mat_steel, story
         mat_r,
         module=story_mod,
         module_objects=MO,
-        rotation=(1.5707963, 0.0, 0.0),
+        rotation=rot_out,
         vertices=24,
+    )
+
+
+def _fpk_place_lv_connector(name, center_mm, size_mm, mat_body, mat_steel, story_mod, MO,
+                            mat_rubber=None, mat_fast=None):
+    """Autosport multipin LV/CAN connector — not a plain brown box.
+
+    INTENT (universal cable/connector kit language, 2026-08-05): shell +
+    key flat + pin-face grid + strain-relief boot + flange bolts. Dims are
+    concept morphology (XYZ OPEN); public Deutsch/Amphenol photos = TRAINING
+    CHECK only.
+    """
+    cx, cy, cz = center_mm
+    w, d, h = size_mm
+    mat_r = mat_rubber or mat_body
+    mat_ft = mat_fast or mat_steel
+    rot_out = (1.5707963, 0.0, 0.0)
+    fl.add_box(
+        f"{name}_flange",
+        (cx * fl.MM, (cy + d * 0.15) * fl.MM, cz * fl.MM),
+        (w * 1.15 * fl.MM, max(2.5, d * 0.16) * fl.MM, h * 1.15 * fl.MM),
+        mat_steel,
+        module=story_mod,
+        module_objects=MO,
+    )
+    for bi, (bx, bz) in enumerate(((-0.38, -0.38), (0.38, 0.38))):
+        fl.add_cyl(
+            f"{name}_flange_bolt_{bi}",
+            ((cx + w * bx) * fl.MM, (cy + d * 0.22) * fl.MM, (cz + h * bz) * fl.MM),
+            1.2 * fl.MM,
+            3.5 * fl.MM,
+            mat_ft,
+            module=story_mod,
+            module_objects=MO,
+            rotation=rot_out,
+            vertices=10,
+        )
+    fl.add_box(
+        name,
+        (cx * fl.MM, cy * fl.MM, cz * fl.MM),
+        (w * fl.MM, d * 0.60 * fl.MM, h * fl.MM),
+        mat_body,
+        module=story_mod,
+        module_objects=MO,
+    )
+    fl.add_box(
+        f"{name}_key_flat",
+        (cx * fl.MM, (cy - d * 0.28) * fl.MM, (cz + h * 0.22) * fl.MM),
+        (w * 0.55 * fl.MM, max(2.5, d * 0.14) * fl.MM, h * 0.22 * fl.MM),
+        mat_body,
+        module=story_mod,
+        module_objects=MO,
+    )
+    # Pin-face grid (2×3) — multipin language, not a sealed blank face.
+    pin_r = max(0.7, min(w, h) * 0.06)
+    for pi, (px, pz) in enumerate((
+        (-0.28, -0.22), (0.0, -0.22), (0.28, -0.22),
+        (-0.28, 0.18), (0.0, 0.18), (0.28, 0.18),
+    )):
+        fl.add_cyl(
+            f"{name}_pin_{pi}",
+            ((cx + w * px) * fl.MM, (cy - d * 0.38) * fl.MM, (cz + h * pz) * fl.MM),
+            pin_r * fl.MM,
+            max(4.0, d * 0.28) * fl.MM,
+            mat_steel,
+            module=story_mod,
+            module_objects=MO,
+            rotation=rot_out,
+            vertices=10,
+        )
+    # Strain-relief boot stub toward vehicle loom.
+    fl.add_cyl(
+        f"{name}_boot",
+        (cx * fl.MM, (cy - d * 0.55 - 10.0) * fl.MM, cz * fl.MM),
+        (min(w, h) * 0.28) * fl.MM,
+        18.0 * fl.MM,
+        mat_r,
+        module=story_mod,
+        module_objects=MO,
+        rotation=rot_out,
+        vertices=20,
     )
 
 
@@ -19851,6 +20070,7 @@ def _fpk_place_cast_language_cues(
             rotation=rot_along_x,
         )
     # Longitudinal stiffening ribs — count from unsupported cast span rule.
+    # T-section (web + foot) reads as cast housing language, not flat slabs.
     span = max(motor_len * 0.85, 1.0)
     for ri in range(rib_n):
         fx = x_motor - span * 0.5 + (ri + 0.5) * (span / rib_n)
@@ -19859,6 +20079,19 @@ def _fpk_place_cast_language_cues(
                 f"u_se_td_cast_rib_{side}_{ri}",
                 _mm3((fx, y_motor + sy * (motor_od * 0.50 + rib_rad * 0.15), z_motor)),
                 _mm3((rib_t, rib_rad, motor_od * rib_h_frac)),
+                mat_alum,
+                module=story_mod,
+                module_objects=MO,
+            )
+            # Foot pad where rib meets the barrel OD.
+            fl.add_box(
+                f"u_se_td_cast_rib_{side}_{ri}_foot",
+                _mm3((
+                    fx,
+                    y_motor + sy * (motor_od * 0.50 + rib_rad * 0.02),
+                    z_motor,
+                )),
+                _mm3((rib_t * 2.2, max(2.5, rib_rad * 0.28), motor_od * rib_h_frac * 0.55)),
                 mat_alum,
                 module=story_mod,
                 module_objects=MO,
@@ -20084,12 +20317,17 @@ def _fpk_place_coolant_qd_pair(
     barb_od = min(stem_od * 1.22, hose_od * 0.88)  # ridges under hose bore
     # Local −Y stack from housing outward (y decreases).
     rot_out = (1.5707963, 0.0, 0.0)  # cylinder +Z → world −Y
-    mat_collar = fl.make_mat(
-        "m_se_td_qd_collar", (0.12, 0.42, 0.78), metallic=0.35, roughness=0.32
-    )
-    mat_barb = fl.make_mat(
-        "m_se_td_qd_barb", (0.55, 0.56, 0.58), metallic=0.82, roughness=0.28
-    )
+    _pt = getattr(fl, "make_powertrain_role_mat", None)
+    if callable(_pt):
+        mat_collar = _pt("coolant_qd_collar", "m_se_td_qd_collar")
+        mat_barb = _pt("steel_machined", "m_se_td_qd_barb")
+    else:
+        mat_collar = fl.make_mat(
+            "m_se_td_qd_collar", (0.12, 0.42, 0.78), metallic=0.35, roughness=0.32
+        )
+        mat_barb = fl.make_mat(
+            "m_se_td_qd_barb", (0.55, 0.56, 0.58), metallic=0.82, roughness=0.28
+        )
 
     for i, name in enumerate(("u_se_td_coolant_in", "u_se_td_coolant_out")):
         px = x_motor + (i - 0.5) * float(spacing_mm)
@@ -20913,26 +21151,47 @@ def _place_traction_drive_pack_layout(W, D, H, base_z, t, story_mod, MO):
         print(f"[univ][sealed] EDU form rule unavailable: {_edu_exc}")
         _edu_form = None
 
-    # Charcoal structural case — washed-out white brick (0811 mean L≈209) came
-    # from mid-grey alum under softbox. Keep body dark for render_washed_out.
-    # INTENT (2026-07-29 Lucid-gold bar): slightly more metallic / lower roughness
-    # so softbox reads machined race case, not clay mid-grey.
-    mat_cf = fl.make_mat("m_se_td_cf", (0.055, 0.058, 0.062), metallic=0.22, roughness=0.48)
-    mat_alum = fl.make_mat("m_se_td_alum", (0.08, 0.085, 0.095), metallic=0.62, roughness=0.38)
-    mat_steel = fl.make_mat("m_se_td_steel", (0.18, 0.19, 0.21), metallic=0.88, roughness=0.26)
+    # Race-kit role palette (universal make_powertrain_role_mat) — hard-anodised
+    # cast Al, carbon structure, SiC packages, HV safety orange. Washed-out white
+    # brick (0811 mean L≈209) came from mid-grey alum under softbox; near-black
+    # clay (cycle-2 exterior) came from every mesh sharing one charcoal. Roles
+    # differentiate so softbox reads machined race hardware, not one material.
+    _pt = getattr(fl, "make_powertrain_role_mat", None)
+    if callable(_pt):
+        mat_cf = _pt("carbon_structure", "m_se_td_cf")
+        mat_alum = _pt("cast_al_housing", "m_se_td_alum")
+        mat_alum_mach = _pt("machined_al", "m_se_td_alum_mach")
+        mat_steel = _pt("steel_machined", "m_se_td_steel")
+        mat_sic = _pt("sic_module_body", "m_se_td_sic")
+        mat_ceramic = _pt("ceramic_dbc", "m_se_td_ceramic")
+        mat_port = _pt("coolant_port_body", "m_se_td_port")
+        mat_hv = _pt("hv_shell_dark", "m_se_td_hv")
+        mat_hv_orange = _pt("hv_safety_orange", "m_se_td_hv_orange")
+        mat_rubber = _pt("rubber_boot", "m_se_td_rubber")
+        mat_fast = _pt("steel_fastener", "m_se_td_fast")
+        mat_braid = _pt("braid_shield", "m_se_td_braid")
+        mat_copper = _pt("copper_bus", "m_se_td_cu")
+    else:
+        mat_cf = fl.make_mat("m_se_td_cf", (0.055, 0.058, 0.062), metallic=0.22, roughness=0.48)
+        mat_alum = fl.make_mat("m_se_td_alum", (0.08, 0.085, 0.095), metallic=0.62, roughness=0.38)
+        mat_alum_mach = fl.make_mat("m_se_td_alum_mach", (0.42, 0.44, 0.47), metallic=0.85, roughness=0.32)
+        mat_steel = fl.make_mat("m_se_td_steel", (0.18, 0.19, 0.21), metallic=0.88, roughness=0.26)
+        mat_sic = fl.make_mat("m_se_td_sic", (0.045, 0.048, 0.055), metallic=0.40, roughness=0.42)
+        mat_ceramic = fl.make_mat("m_se_td_ceramic", (0.82, 0.80, 0.74), metallic=0.0, roughness=0.22)
+        mat_port = fl.make_mat("m_se_td_port", (0.55, 0.18, 0.08), metallic=0.35, roughness=0.38)
+        mat_hv = fl.make_mat("m_se_td_hv", (0.10, 0.07, 0.05), metallic=0.40, roughness=0.40)
+        mat_hv_orange = fl.make_mat("m_se_td_hv_orange", (0.92, 0.38, 0.06), metallic=0.05, roughness=0.48)
+        mat_rubber = fl.make_mat("m_se_td_rubber", (0.018, 0.017, 0.016), metallic=0.05, roughness=0.62)
+        mat_fast = fl.make_mat("m_se_td_fast", (0.12, 0.12, 0.13), metallic=0.90, roughness=0.28)
+        mat_braid = fl.make_mat("m_se_td_braid", (0.42, 0.40, 0.32), metallic=0.75, roughness=0.35)
+        mat_copper = fl.make_mat("m_se_td_cu", fl._to_linear((0.72, 0.42, 0.16)),
+                                 metallic=0.80, roughness=0.35)
     # INTENT (2026-08-01 SIGHT): pack-scale m=0.6 mm teeth vanish into dark
     # steel under softbox. Gears keep a lighter, slightly rougher metal so
     # involute flanks catch light — still steel, not a decorative paint.
     mat_gear = fl.make_mat(
         "m_se_td_gear", (0.42, 0.44, 0.47), metallic=0.82, roughness=0.38,
     )
-    mat_sic = fl.make_mat("m_se_td_sic", (0.045, 0.048, 0.055), metallic=0.40, roughness=0.42)
-    mat_port = fl.make_mat("m_se_td_port", (0.55, 0.18, 0.08), metallic=0.35, roughness=0.38)
-    # DECISION (2026-07-29 JLR SIGHT): HV connector is dark Amphenol-style orange/black
-    # — bright toy-red brick failed the Lucid-gold training check on 04-product-exterior.
-    mat_hv = fl.make_mat("m_se_td_hv", (0.10, 0.07, 0.05), metallic=0.40, roughness=0.40)
-    mat_rubber = fl.make_mat("m_se_td_rubber", (0.018, 0.017, 0.016), metallic=0.05, roughness=0.62)
-    mat_fast = fl.make_mat("m_se_td_fast", (0.12, 0.12, 0.13), metallic=0.90, roughness=0.28)
     mat_pcb = fl.make_mat(
         "m_se_td_pcb",
         fl._to_linear((0.22, 0.52, 0.28)),
@@ -20957,8 +21216,6 @@ def _place_traction_drive_pack_layout(W, D, H, base_z, t, story_mod, MO):
     ]
     mat_bus = fl.make_mat("m_se_td_bus", fl._to_linear((0.85, 0.45, 0.12)),
                          metallic=0.70, roughness=0.32)
-    mat_copper = fl.make_mat("m_se_td_cu", fl._to_linear((0.72, 0.42, 0.16)),
-                            metallic=0.80, roughness=0.35)
     # INTENT: magnet / oil materials for ontology FFF sub-components (cutaway).
     mat_magnet = fl.make_mat("m_se_td_magnet", fl._to_linear((0.35, 0.12, 0.10)),
                              metallic=0.55, roughness=0.40)
@@ -21112,6 +21369,19 @@ def _place_traction_drive_pack_layout(W, D, H, base_z, t, story_mod, MO):
         rotation=rot_along_x,
         vertices=_cyl_v,
     )
+    # Machined land band mid-barrel — lighter brushed Al so cast body ≠ clay
+    # monochrome (race housing language: cast skin + machined lands).
+    fl.add_cyl(
+        "u_se_td_housing_machine_band",
+        _mm3((x_motor, y_motor, z_motor)),
+        (motor_od * 0.5 + 0.8) * fl.MM,
+        motor_len * 0.18 * fl.MM,
+        mat_alum_mach,
+        module=story_mod,
+        module_objects=MO,
+        rotation=rot_along_x,
+        vertices=_cyl_v,
+    )
     # End bells — flange rings so the barrel reads as a cast motor case, not a
     # smooth infinite cylinder (FE gold training check: end faces + bearing caps).
     bell_r = motor_od * 0.5 + 4.0
@@ -21122,10 +21392,22 @@ def _place_traction_drive_pack_layout(W, D, H, base_z, t, story_mod, MO):
             _mm3((x_motor + bx * (motor_len * 0.5 - bell_len * 0.35), y_motor, z_motor)),
             bell_r * fl.MM,
             bell_len * fl.MM,
-            mat_alum,
+            mat_alum_mach,
             module=story_mod,
             module_objects=MO,
             rotation=rot_along_x,
+        )
+        # Machined face land on each end bell (lighter ring — bearing land cue).
+        fl.add_cyl(
+            f"u_se_td_end_bell_face_{bi}",
+            _mm3((x_motor + bx * (motor_len * 0.5 + 0.5), y_motor, z_motor)),
+            (bell_r * 0.72) * fl.MM,
+            2.5 * fl.MM,
+            mat_alum_mach,
+            module=story_mod,
+            module_objects=MO,
+            rotation=rot_along_x,
+            vertices=64,
         )
     # Jacket band — circumferential cooling-channel cue mid-barrel.
     fl.add_cyl(
@@ -21207,6 +21489,9 @@ def _place_traction_drive_pack_layout(W, D, H, base_z, t, story_mod, MO):
         mat_sic,
         story_mod,
         MO,
+        mat_ceramic=mat_ceramic,
+        mat_copper=mat_copper,
+        mat_fast=mat_fast,
     )
     # Cold-plate lip on inverter top — ribbed compound (P6 mesh authenticity).
     _fpk_place_ribbed_coldplate(
@@ -21323,7 +21608,7 @@ def _place_traction_drive_pack_layout(W, D, H, base_z, t, story_mod, MO):
     if _edu_form is not None:
         _edu_emitted_req_ids.append(_edu_form.coolant_ports.requirement_id)
     # HV connector family — dims from hv_interface (I, V → pin/shell/HVIL/braid).
-    mat_braid = fl.make_mat("m_se_td_braid", (0.42, 0.40, 0.32), metallic=0.75, roughness=0.35)
+    # mat_braid / mat_hv_orange already set in race-kit palette above.
     _hv_dims = (_edu_form.hv_connector.dimensions_mm if _edu_form else {})
     _fpk_place_hv_connector(
         "u_se_td_hv_connector",
@@ -21340,6 +21625,8 @@ def _place_traction_drive_pack_layout(W, D, H, base_z, t, story_mod, MO):
         mat_rubber=mat_rubber,
         mat_braid=mat_braid,
         form_dims=_hv_dims,
+        mat_safety=mat_hv_orange,
+        mat_fast=mat_fast,
     )
     if _edu_form is not None:
         _edu_emitted_req_ids.append(_edu_form.hv_connector.requirement_id)
@@ -21355,6 +21642,18 @@ def _place_traction_drive_pack_layout(W, D, H, base_z, t, story_mod, MO):
         module_objects=MO,
         rotation=(1.5707963, 0.0, 0.0),
         vertices=24,
+    )
+    # Orange hazard ring on the extended loom boot (kit language continuity).
+    fl.add_cyl(
+        "u_se_td_hv_cable_boot_hazard",
+        _mm3((x_motor - inv_w * 0.32, y_inv - inv_d * 0.55 - 40.0, inv_z + 2.0)),
+        10.2 * fl.MM,
+        3.0 * fl.MM,
+        mat_hv_orange,
+        module=story_mod,
+        module_objects=MO,
+        rotation=(1.5707963, 0.0, 0.0),
+        vertices=20,
     )
     # Legacy hood cue kept as viz_only keying land (public Amphenol-style face).
     fl.add_box(
@@ -21411,10 +21710,20 @@ def _place_traction_drive_pack_layout(W, D, H, base_z, t, story_mod, MO):
                 module=story_mod,
                 module_objects=MO,
             )
+    # Nameplate with raised border — machined land + plate (not a blank steel sticker).
+    _np = (x_motor + motor_len * 0.18, y_motor - motor_od * 0.52, z_motor + motor_od * 0.22)
+    fl.add_box(
+        "u_se_td_nameplate_border",
+        _mm3(_np),
+        _mm3((46.0, 1.6, 22.0)),
+        mat_alum_mach,
+        module=story_mod,
+        module_objects=MO,
+    )
     fl.add_box(
         "u_se_td_nameplate",
-        _mm3((x_motor + motor_len * 0.18, y_motor - motor_od * 0.52, z_motor + motor_od * 0.22)),
-        _mm3((42.0, 2.0, 18.0)),
+        _mm3((_np[0], _np[1] - 0.6, _np[2])),
+        _mm3((40.0, 1.8, 16.0)),
         mat_steel,
         module=story_mod,
         module_objects=MO,
@@ -21431,19 +21740,22 @@ def _place_traction_drive_pack_layout(W, D, H, base_z, t, story_mod, MO):
         rotation=rot_along_x,
         vertices=64,
     )
-    # INTENT (race-hardened service face): LV signal connector + chassis ground
-    # stud + oil breather on casing — bay-forced / use-physics, not OEM CAD paste.
-    fl.add_box(
+    # INTENT (race-hardened service face): multipin LV/CAN connector family +
+    # chassis ground stud + oil breather — bay-forced / use-physics, not OEM paste.
+    _fpk_place_lv_connector(
         "u_se_td_lv_connector",
-        _mm3((x_motor + inv_w * 0.28, y_inv - inv_d * 0.55, inv_z - inv_h * 0.15)),
-        _mm3((28.0, 18.0, 16.0)),
+        (x_motor + inv_w * 0.28, y_inv - inv_d * 0.55, inv_z - inv_h * 0.15),
+        (28.0, 18.0, 16.0),
         mat_hv,
-        module=story_mod,
-        module_objects=MO,
+        mat_steel,
+        story_mod,
+        MO,
+        mat_rubber=mat_rubber,
+        mat_fast=mat_fast,
     )
     fl.add_cyl(
         "u_se_td_lv_harness_boot",
-        _mm3((x_motor + inv_w * 0.28, y_inv - inv_d * 0.55 - 18.0, inv_z - inv_h * 0.15)),
+        _mm3((x_motor + inv_w * 0.28, y_inv - inv_d * 0.55 - 28.0, inv_z - inv_h * 0.15)),
         5.0 * fl.MM,
         24.0 * fl.MM,
         mat_rubber,

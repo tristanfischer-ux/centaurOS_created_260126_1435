@@ -1,0 +1,17 @@
+[discipline] plan ref   -> resolves to JLR-FE-FRONT-FPK-BAR-A-BAR-B-CLOSEOUT-TRACKER-2026-07-31.md
+[discipline] plan fit   -> out/formula-e-front-mgu-20260729-1432/_discipline/fe-sprint2-takeover-2026-08-05-plan-fit.json
+[discipline] capability -> exit 0
+[discipline] calc guard -> exit 0
+      intent: Commit already-produced Sprint2 EM package, PCB draft-not-fab banner, Bar B executable asks, Blender cycle-3 morphology source. ship_ok false.
+       [STRONG] 26.13  scripts/motor-stack/prove_cycle3_race_kit_morphology.py
+                proveCatch: cycle-3 race-kit morphology is present in source (no Blender).
+       [STRONG] 19.93  scripts/lib/p_stage_discipline.py
+                P-STAGE DISCIPLINE DRIVER — the loop, as one command instead of a memory.
+       [STRONG] 19.93  scripts/motor-stack/render_phase_e_partner_pack.py
+                Phase E — partner-gated ask pack (W5.*) + voltage-screen honesty tighten.
+       [STRONG] 18.32  scripts/blender-universal/deterministic_layout.py
+[discipline] start council -> reused recorded panel (answering advice must not re-bill the seats)
+[discipline] start council -> seats ['grok45', 'minimax_m3', 'sol'] BLOCKING: grok45, minimax_m3, sol
+
+[discipline] START BLOCKED:
+  - start council seats blocking with no recorded rejection: grok45, minimax_m3, sol — read out/formula-e-front-mgu-20260729-1432/_discipline/fe-sprint2-takeover-2026-08-05-start-council.json, then either change the approach or add an advice_rejected entry with a reason, and re-run start

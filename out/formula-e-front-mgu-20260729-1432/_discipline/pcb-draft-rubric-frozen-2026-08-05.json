@@ -1,0 +1,28 @@
+{
+  "schema": "forgeos.pcb.draft_review_rubric/v1",
+  "frozen_at": "2026-08-05T07:42:07Z",
+  "axes": {
+    "draft_review_readiness": {
+      "A-": [
+        "DRC 0 both boards under recorded kicad version",
+        "required_channel_counts match implemented",
+        "banner NOT skim-misreadable as fab-ready",
+        "firmware honesty sheet present",
+        "fitness >= 8.0 under same scorecard formula OR explicit findings closed that raise workbook fitness"
+      ],
+      "B+": [
+        "DRC 0 + channels match + fitness 7.5-7.9 + honest banners"
+      ]
+    },
+    "fabrication_readiness": {
+      "F_until": [
+        "supplier Gerbers OR explicit fab package release with stackup approval"
+      ],
+      "always": [
+        "NOT_FABRICATION_READY=true",
+        "forgeDraftOnly=true"
+      ]
+    }
+  },
+  "label_on_grade_card": "PCB draft-review readiness \u2014 NOT fabrication readiness"
+}

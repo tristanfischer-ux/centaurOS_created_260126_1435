@@ -1,0 +1,29 @@
+{
+  "schema": "forgeos.motor_stack.em_grade_sprint2_summary/v1",
+  "ran_at": "2026-08-05T08:02:56Z",
+  "ship_ok": false,
+  "grades": {
+    "toolchain_method": "A-",
+    "kit_case_path_b_story": "A-",
+    "map_mtpa_depth": "A-",
+    "voltage_fw": "A-",
+    "partner_field_viz": "A-",
+    "release_homologation": "A-_readiness"
+  },
+  "pcb_draft_grade": "B+",
+  "pcb_fab_grade": "F",
+  "field_lambda_wb": 0.012779977170461344,
+  "mesh_lambda_delta": 0.0006192179117102604,
+  "fw_24k_750_util": 0.3606,
+  "headline_torque_nm": 122.099939,
+  "binding_clears": false,
+  "artefacts": [
+    "em_lambda_from_fieldplot.json",
+    "em_mesh_sensitivity_stamp.json",
+    "em_fw_envelope_screen.json",
+    "em_map_spine_card.json",
+    "em_rotor_sweep.gif",
+    "em_grade_card.json",
+    "pcb_grade_card.json"
+  ]
+}

@@ -1,0 +1,19 @@
+{
+  "schema": "forgeos.p_stage_discipline.plan_fit/v1",
+  "stage_id": "fe-sprint2-takeover-2026-08-05",
+  "intent": "Commit already-produced Sprint2 package. ship_ok false.",
+  "maps_to_plan_item": "docs/plans/JLR-FE-FRONT-FPK-BAR-A-BAR-B-CLOSEOUT-TRACKER-2026-07-31.md",
+  "why_now": "Artefacts on disk",
+  "explicitly_not_doing": [
+    "ship_ok_true",
+    "invent_dyno",
+    "invent_gerbers"
+  ],
+  "depends_on": [],
+  "success_criteria": [
+    "ship_ok false"
+  ],
+  "ship_ok_unchanged": true,
+  "twin": "out/formula-e-front-mgu-20260729-1432",
+  "created_utc": "2026-08-05T08:00:18Z"
+}

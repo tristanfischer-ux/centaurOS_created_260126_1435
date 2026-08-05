@@ -1,0 +1,10 @@
+{
+  "schema": "forgeos.motor_stack.rotor_sweep_gif/v1",
+  "ran_at": "2026-08-05T07:45:43Z",
+  "path": "/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/formula-e-front-mgu-20260729-1432/_motor_stack/em_rotor_sweep.gif",
+  "n_frames": 36,
+  "synthetic_from_summary": false,
+  "grade_weight": 0,
+  "label": "SIM-ONLY",
+  "ship_ok": false
+}

@@ -1,0 +1,121 @@
+{
+  "schema": "forgeos.motor_stack.em_map_spine_card/v1",
+  "ran_at": "2026-08-05T08:02:53Z",
+  "ship_ok": false,
+  "headline_rule": "kit_case_position_sweep_mean is the only headline torque",
+  "kit_case_spine": {
+    "mean_abs_T_nm": 122.099939,
+    "current_angle_electrical_deg": -30.0,
+    "n_rotor_positions": 37,
+    "source": "em_fia_front_kit_case_PATH_B_DEC009",
+    "foc_excitation_tracking": true,
+    "torque_reliable": false,
+    "duty_torque_screen_ok": false
+  },
+  "dense_mtpa_secondary": {
+    "n_points": 99,
+    "angles_sampled": 11,
+    "best_angle_mean": {
+      "current_angle_electrical_deg": -20.0,
+      "mean_abs_T_nm": 55.714801397196204,
+      "max_abs_T_nm": 88.12276829326333,
+      "n": 9
+    },
+    "dense_at_kit_angle": {
+      "current_angle_electrical_deg": -30.0,
+      "mean_abs_T_nm": 53.23611752928102,
+      "max_abs_T_nm": 92.71031881531543,
+      "n": 9
+    },
+    "mean_gap_vs_kit_case_nm": -68.86382147071899,
+    "source": "em_fia_mtpa_screen_PATH_B_DENSE"
+  },
+  "hybrid_map_secondary": {
+    "total_screen_points": 1488,
+    "peak_nm": 106.865172,
+    "source": "em_fia_torque_map_screen.json"
+  },
+  "mtpa_locus_mean_abs_T": [
+    {
+      "current_angle_electrical_deg": -70.0,
+      "mean_abs_T_nm": 49.483653348249696,
+      "max_abs_T_nm": 102.8614502037264,
+      "n": 9
+    },
+    {
+      "current_angle_electrical_deg": -65.0,
+      "mean_abs_T_nm": 49.7171048552891,
+      "max_abs_T_nm": 101.8054925539701,
+      "n": 9
+    },
+    {
+      "current_angle_electrical_deg": -60.0,
+      "mean_abs_T_nm": 49.43229975014531,
+      "max_abs_T_nm": 105.4904996173093,
+      "n": 9
+    },
+    {
+      "current_angle_electrical_deg": -55.0,
+      "mean_abs_T_nm": 48.68674585939929,
+      "max_abs_T_nm": 106.8651721679554,
+      "n": 9
+    },
+    {
+      "current_angle_electrical_deg": -50.0,
+      "mean_abs_T_nm": 48.00699083510476,
+      "max_abs_T_nm": 105.1102456629361,
+      "n": 9
+    },
+    {
+      "current_angle_electrical_deg": -45.0,
+      "mean_abs_T_nm": 47.634403028551105,
+      "max_abs_T_nm": 101.0675328815801,
+      "n": 9
+    },
+    {
+      "current_angle_electrical_deg": -40.0,
+      "mean_abs_T_nm": 49.54183046783195,
+      "max_abs_T_nm": 95.63784494992551,
+      "n": 9
+    },
+    {
+      "current_angle_electrical_deg": -35.0,
+      "mean_abs_T_nm": 51.366872648724126,
+      "max_abs_T_nm": 93.11466706721015,
+      "n": 9
+    },
+    {
+      "current_angle_electrical_deg": -30.0,
+      "mean_abs_T_nm": 53.23611752928102,
+      "max_abs_T_nm": 92.71031881531543,
+      "n": 9
+    },
+    {
+      "current_angle_electrical_deg": -25.0,
+      "mean_abs_T_nm": 54.94230758145187,
+      "max_abs_T_nm": 90.83793710926571,
+      "n": 9
+    },
+    {
+      "current_angle_electrical_deg": -20.0,
+      "mean_abs_T_nm": 55.714801397196204,
+      "max_abs_T_nm": 88.12276829326333,
+      "n": 9
+    }
+  ],
+  "dual_bars": {
+    "architecture_duty_nm": 104.098914,
+    "architecture_clear_ratio": 1.1729,
+    "architecture_clears": true,
+    "binding_ledger_nm": 125.2,
+    "binding_clear_ratio": 0.9752,
+    "binding_clears": false,
+    "note": "Never collapse architecture and binding into one green tick."
+  },
+  "consistency": {
+    "tension_documented": true,
+    "gap_note": "Kit-case Path B uses a 37-point / 1.25\u00b0 mechanical rotor sweep at fixed commanded current angle -30\u00b0 elec. with FOC-style excitation that tracks the rotor (see em_fia_front_kit_case.run_rotor_position_sweep). Mean |T| = 122.10 N\u00b7m over that sweep. Dense MTPA samples only 9 positions over 0\u201345\u00b0 mech at the same commanded angle label, with phase excitation angle = command + pole-pairs\u00d7\u03b8_mech (em_fia_mtpa_screen excitation_tracking). At -30\u00b0 the dense mean |T| = 53.24 N\u00b7m (min 20.54, max 92.71). These are NOT interchangeable headlines. The HEADLINE torque story is the kit-case position-sweep mean. Dense peak on the full grid (106.87 N\u00b7m) and dense best-angle mean (55.71 N\u00b7m @ -20\u00b0) are secondary map metrics."
+  },
+  "artefact_hash16": "05d069ceb273ea0a",
+  "release_statement": "Map spine: FOC kit-case is headline; dense/hybrid are secondary. Not a full \u03bb(i_d,i_q) MTPA schedule. ship_ok false."
+}

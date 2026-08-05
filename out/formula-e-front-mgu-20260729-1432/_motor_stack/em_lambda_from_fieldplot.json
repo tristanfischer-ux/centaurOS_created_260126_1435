@@ -1,0 +1,21 @@
+{
+  "schema": "forgeos.motor_stack.lambda_from_fieldplot/v1",
+  "source_npz": "/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/formula-e-front-mgu-20260729-1432/_motor_stack/fieldplot_pack/oc_full_field.npz",
+  "source_sha16": "884704787cdcda3a",
+  "airgap_r_mm": 76.0,
+  "ring_halfwidth_mm": 1.5,
+  "stack_mm": 130.0,
+  "poles": 8,
+  "turns_per_phase_assumed": 14.0,
+  "kw": 0.96,
+  "n_ring_samples": 140,
+  "b_mean_t": 0.062241533534860026,
+  "b_rms_t": 0.08665008349209617,
+  "b_p95_t": 0.16305661334591776,
+  "b_fund_est_t": 0.12254172325528345,
+  "pole_area_m2": 0.0077597338543667896,
+  "phi_pole_wb": 0.0009508911585164691,
+  "lambda_peak_wb": 0.012779977170461344,
+  "method": "airgap_ring_B_rms_sqrt2_times_kw_N_phi",
+  "note": "Field-grid \u03bb witness from FEMM |B| npz. Distinct from FEMM circuit phase-flux linkage (often under-reported). Cross-check against airgap-B analytical and torque-implied witnesses."
+}

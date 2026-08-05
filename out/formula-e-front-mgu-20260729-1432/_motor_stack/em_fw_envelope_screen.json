@@ -1,0 +1,249 @@
+{
+  "schema": "forgeos.motor_stack.fw_envelope_screen/v1",
+  "ran_at": "2026-08-05T08:02:53Z",
+  "ship_ok": false,
+  "lambda_oc_phase_peak_abs_wb": 0.012779977170461344,
+  "lambda_source": "fieldplot_airgap_ring_B_rms",
+  "dec_009_speed_rpm": 24000,
+  "dec_008_duty": "intermittent_24s_per_100s",
+  "rows": [
+    {
+      "speed_rpm": 12000,
+      "felec_hz": 800.0,
+      "e_ll_rms_v": 78.68,
+      "buses": {
+        "vdc_600": {
+          "usable_ll_rms_v": 349.05,
+          "bemf_ll_rms_v": 78.68,
+          "util": 0.2254,
+          "within_usable": true,
+          "fw_indicated": false
+        },
+        "vdc_750": {
+          "usable_ll_rms_v": 436.32,
+          "bemf_ll_rms_v": 78.68,
+          "util": 0.1803,
+          "within_usable": true,
+          "fw_indicated": false
+        },
+        "vdc_900": {
+          "usable_ll_rms_v": 523.58,
+          "bemf_ll_rms_v": 78.68,
+          "util": 0.1503,
+          "within_usable": true,
+          "fw_indicated": false
+        }
+      }
+    },
+    {
+      "speed_rpm": 15000,
+      "felec_hz": 1000.0,
+      "e_ll_rms_v": 98.35,
+      "buses": {
+        "vdc_600": {
+          "usable_ll_rms_v": 349.05,
+          "bemf_ll_rms_v": 98.35,
+          "util": 0.2818,
+          "within_usable": true,
+          "fw_indicated": false
+        },
+        "vdc_750": {
+          "usable_ll_rms_v": 436.32,
+          "bemf_ll_rms_v": 98.35,
+          "util": 0.2254,
+          "within_usable": true,
+          "fw_indicated": false
+        },
+        "vdc_900": {
+          "usable_ll_rms_v": 523.58,
+          "bemf_ll_rms_v": 98.35,
+          "util": 0.1878,
+          "within_usable": true,
+          "fw_indicated": false
+        }
+      }
+    },
+    {
+      "speed_rpm": 18000,
+      "felec_hz": 1200.0,
+      "e_ll_rms_v": 118.01,
+      "buses": {
+        "vdc_600": {
+          "usable_ll_rms_v": 349.05,
+          "bemf_ll_rms_v": 118.01,
+          "util": 0.3381,
+          "within_usable": true,
+          "fw_indicated": false
+        },
+        "vdc_750": {
+          "usable_ll_rms_v": 436.32,
+          "bemf_ll_rms_v": 118.01,
+          "util": 0.2705,
+          "within_usable": true,
+          "fw_indicated": false
+        },
+        "vdc_900": {
+          "usable_ll_rms_v": 523.58,
+          "bemf_ll_rms_v": 118.01,
+          "util": 0.2254,
+          "within_usable": true,
+          "fw_indicated": false
+        }
+      }
+    },
+    {
+      "speed_rpm": 19500,
+      "felec_hz": 1300.0,
+      "e_ll_rms_v": 127.85,
+      "buses": {
+        "vdc_600": {
+          "usable_ll_rms_v": 349.05,
+          "bemf_ll_rms_v": 127.85,
+          "util": 0.3663,
+          "within_usable": true,
+          "fw_indicated": false
+        },
+        "vdc_750": {
+          "usable_ll_rms_v": 436.32,
+          "bemf_ll_rms_v": 127.85,
+          "util": 0.293,
+          "within_usable": true,
+          "fw_indicated": false
+        },
+        "vdc_900": {
+          "usable_ll_rms_v": 523.58,
+          "bemf_ll_rms_v": 127.85,
+          "util": 0.2442,
+          "within_usable": true,
+          "fw_indicated": false
+        }
+      }
+    },
+    {
+      "speed_rpm": 21000,
+      "felec_hz": 1400.0,
+      "e_ll_rms_v": 137.68,
+      "buses": {
+        "vdc_600": {
+          "usable_ll_rms_v": 349.05,
+          "bemf_ll_rms_v": 137.68,
+          "util": 0.3945,
+          "within_usable": true,
+          "fw_indicated": false
+        },
+        "vdc_750": {
+          "usable_ll_rms_v": 436.32,
+          "bemf_ll_rms_v": 137.68,
+          "util": 0.3156,
+          "within_usable": true,
+          "fw_indicated": false
+        },
+        "vdc_900": {
+          "usable_ll_rms_v": 523.58,
+          "bemf_ll_rms_v": 137.68,
+          "util": 0.263,
+          "within_usable": true,
+          "fw_indicated": false
+        }
+      }
+    },
+    {
+      "speed_rpm": 24000,
+      "felec_hz": 1600.0,
+      "e_ll_rms_v": 157.35,
+      "buses": {
+        "vdc_600": {
+          "usable_ll_rms_v": 349.05,
+          "bemf_ll_rms_v": 157.35,
+          "util": 0.4508,
+          "within_usable": true,
+          "fw_indicated": false
+        },
+        "vdc_750": {
+          "usable_ll_rms_v": 436.32,
+          "bemf_ll_rms_v": 157.35,
+          "util": 0.3606,
+          "within_usable": true,
+          "fw_indicated": false
+        },
+        "vdc_900": {
+          "usable_ll_rms_v": 523.58,
+          "bemf_ll_rms_v": 157.35,
+          "util": 0.3005,
+          "within_usable": true,
+          "fw_indicated": false
+        }
+      }
+    },
+    {
+      "speed_rpm": 27000,
+      "felec_hz": 1800.0,
+      "e_ll_rms_v": 177.02,
+      "buses": {
+        "vdc_600": {
+          "usable_ll_rms_v": 349.05,
+          "bemf_ll_rms_v": 177.02,
+          "util": 0.5072,
+          "within_usable": true,
+          "fw_indicated": false
+        },
+        "vdc_750": {
+          "usable_ll_rms_v": 436.32,
+          "bemf_ll_rms_v": 177.02,
+          "util": 0.4057,
+          "within_usable": true,
+          "fw_indicated": false
+        },
+        "vdc_900": {
+          "usable_ll_rms_v": 523.58,
+          "bemf_ll_rms_v": 177.02,
+          "util": 0.3381,
+          "within_usable": true,
+          "fw_indicated": false
+        }
+      }
+    },
+    {
+      "speed_rpm": 30000,
+      "felec_hz": 2000.0,
+      "e_ll_rms_v": 196.69,
+      "buses": {
+        "vdc_600": {
+          "usable_ll_rms_v": 349.05,
+          "bemf_ll_rms_v": 196.69,
+          "util": 0.5635,
+          "within_usable": true,
+          "fw_indicated": false
+        },
+        "vdc_750": {
+          "usable_ll_rms_v": 436.32,
+          "bemf_ll_rms_v": 196.69,
+          "util": 0.4508,
+          "within_usable": true,
+          "fw_indicated": false
+        },
+        "vdc_900": {
+          "usable_ll_rms_v": 523.58,
+          "bemf_ll_rms_v": 196.69,
+          "util": 0.3757,
+          "within_usable": true,
+          "fw_indicated": false
+        }
+      }
+    }
+  ],
+  "approx_base_speed_rpm_at_750v_oc_bemf": 30000,
+  "at_24000_750v": {
+    "usable_ll_rms_v": 436.32,
+    "bemf_ll_rms_v": 157.35,
+    "util": 0.3606,
+    "within_usable": true,
+    "fw_indicated": false
+  },
+  "explicitly_not_claimed": [
+    "Loaded Rs/Ld/Lq voltage drop",
+    "Closed-loop FW current schedule",
+    "Dyno correlation"
+  ],
+  "release_statement": "OC back-EMF FW indication envelope vs usable bus. ship_ok false. Not a homologation FW map."
+}

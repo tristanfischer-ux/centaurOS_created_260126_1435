@@ -82,27 +82,102 @@ def open_stages(twin_dir: Path, max_age_h: float = DEFAULT_MAX_AGE_H,
         closed = finish.is_file() and finish.stat().st_mtime >= start.stat().st_mtime
         if not closed and age_h <= max_age_h:
             out.append({"stage_id": stage, "age_h": round(age_h, 2),
-                        "has_plan_fit": (disc / f"{stage}-plan-fit.json").is_file()})
+                        "has_plan_fit": (disc / f"{stage}-plan-fit.json").is_file(),
+                        "council_is_real": _council_is_real(start)})
     return out
+
+
+def _council_is_real(panel: Path) -> bool:
+    """Does this start-council file contain an actual answered review?
+
+    ⭐⭐ EXISTENCE IS NOT CONTENT (Sol, start council 2026-08-05). The first
+    version authorised a stage on FILENAMES AND MTIMES alone and never opened
+    the JSON — so an empty `{}` minted an EARNED pass. My own selftest wrote
+    exactly that and passed, which is the letter-versus-substance family this
+    guard exists to prevent, reproduced inside the guard. A checkout or a
+    `touch` would have been enough to manufacture authorisation.
+
+    Deliberately shallow: this asks whether a panel HAPPENED and was answered,
+    not whether the answers were good. p_stage_discipline.finish already owns
+    the deep check, and duplicating it here would give two implementations of
+    one rule — the other family this repo keeps paying for.
+    """
+    try:
+        doc = json.loads(panel.read_text(encoding="utf-8"))
+    except Exception:  # noqa: BLE001 — unparseable is not a real council
+        return False
+    if not isinstance(doc, dict):
+        return False
+    seats = doc.get("seats")
+    if not isinstance(seats, dict) or not seats:
+        return False
+    # Every blocking seat must have been answered somewhere.
+    # A council whose blocking_seats is a string, a number or a dict is malformed,
+    # not authorising — and must fail closed rather than raise inside a writer
+    # (Sol, finish council 2026-08-05).
+    raw_blocking = doc.get("blocking_seats") or []
+    if not isinstance(raw_blocking, (list, tuple, set)):
+        return False
+    blocking = [s for s in raw_blocking if isinstance(s, str)]
+    if len(blocking) != len(raw_blocking):
+        return False
+    if blocking:
+        answered = {e.get("seat") for bucket in ("advice_taken", "advice_rejected")
+                    for e in (doc.get(bucket) or []) if isinstance(e, dict)}
+        if not set(blocking).issubset(answered):
+            return False
+    return True
 
 
 def evaluate(stages: list[dict], writer: str, override: bool) -> dict:
     """Pure decision: may this writer proceed?"""
-    usable = [s for s in stages if s["has_plan_fit"]]
-    if override:
-        return {"schema": SCHEMA, "allowed": True, "reason": "override",
-                "writer": writer, "open_stages": usable}
+    usable = [s for s in stages
+              if s["has_plan_fit"] and s.get("council_is_real")]
+    # ⭐⭐ AN OVERRIDE BUYS PASSAGE, NEVER THE GREEN FLAG (2026-08-05, fixing my
+    # own defect). The first version returned `allowed: True, reason: "override"`
+    # — the SAME shape a genuinely open stage returns, differing only in a string
+    # nobody downstream reads. So a consumer branching on `allowed` could not
+    # distinguish "a challenged stage authorised this" from "somebody set an env
+    # var". Grok Build's equivalent gets this right: its `--force` lets Path B
+    # run but NEVER sets `path_b_fe_coherent`, so the escape hatch cannot mint
+    # the flag that means verified.
+    #
+    # `allowed` now means EARNED. An override sets `overridden` instead, leaves
+    # `allowed` False, and carries `earned: False` so no consumer can read it as
+    # clean by accident. The caller still proceeds — assert_stage_open does not
+    # raise on an override — but the RESULT tells the truth about why.
+    # ⭐ ONE SHAPE FOR EVERY OUTCOME (Sol). The previous version put
+    # `partial_stages` only on refusals, so a consumer deserialising into a
+    # fixed schema saw the contract change with the verdict — the same defect I
+    # fixed in check_detached_geometry's abstain path and then rebuilt here.
+    # `may_proceed` is the field a caller should gate on; `allowed` means EARNED
+    # and is deliberately narrower, so no caller has to know the rule
+    # "allowed or overridden".
+    def _verdict(allowed, overridden, reason):
+        return {"schema": SCHEMA, "allowed": allowed, "overridden": overridden,
+                "earned": allowed, "may_proceed": allowed or overridden,
+                "reason": reason, "writer": writer,
+                "open_stages": usable if allowed else [],
+                "partial_stages": partial_now}
+
+    partial_now = [s for s in stages
+                   if not (s["has_plan_fit"] and s.get("council_is_real"))]
+    # ⭐ EARNED WINS OVER OVERRIDE (Sol, finish council 2026-08-05). I had the
+    # override tested FIRST, so a globally-set TWIN_WRITE_GUARD=off downgraded a
+    # genuinely earned pass into an override scar and reported open_stages: []
+    # — false stage reporting, and it would have written a misleading scar line
+    # for work that was properly authorised. An override is a fallback for when
+    # there is no earned pass, never a replacement for one.
     if usable:
-        return {"schema": SCHEMA, "allowed": True, "reason": "open stage",
-                "writer": writer, "open_stages": usable}
+        return _verdict(True, False, "open stage with an answered start council")
+    if override:
+        return _verdict(False, True, "override — proceeds, but not an earned pass")
     # A start council with no plan-fit is not a started stage — plan-fit is what
     # refuses when no open plan item is cited, so skipping it skips the question
     # "should this be done at all".
-    partial = [s for s in stages if not s["has_plan_fit"]]
-    return {"schema": SCHEMA, "allowed": False,
-            "reason": ("start council present but no plan-fit" if partial
-                       else "no open stage"),
-            "writer": writer, "open_stages": [], "partial_stages": partial}
+    return _verdict(False, False,
+                    ("a stage exists but its start council is empty or unanswered, "
+                     "or it has no plan-fit" if partial_now else "no open stage"))
 
 
 def assert_stage_open(twin_dir: str | Path, writer: str,
@@ -126,7 +201,7 @@ def assert_stage_open(twin_dir: str | Path, writer: str,
             }) + "\n")
         return verdict
 
-    if not verdict["allowed"]:
+    if not verdict["allowed"] and not verdict.get("overridden"):
         raise TwinWriteRefused(
             f"REFUSED: {writer} tried to write {twin.name} with {verdict['reason']}.\n"
             f"  A twin write needs a stage that has been started AND challenged.\n"
@@ -148,11 +223,27 @@ def _selftest() -> int:
         if not cond:
             failures.append(f"{name}: {why}")
 
-    def twin(**files) -> Path:
+    # ⭐ FIXTURES MUST BE REALISTIC, OR THEY TEST A WORLD THAT DOES NOT EXIST.
+    # These wrote `{}` for every artefact, which passed the old filename-only
+    # check and would now (correctly) fail the content check. A fixture that
+    # cannot occur in production proves nothing about production — the same
+    # "clean fixture" anti-pattern that let `dossier_audit` compare one key to
+    # itself and then walked into the live Excel as Target==Achieved==PASS.
+    REAL_COUNCIL = json.dumps({
+        "schema": "forgeos.p_stage_discipline.council/v1",
+        "seats": {"sol": {"seat": "sol", "ok": True},
+                  "grok45": {"seat": "grok45", "ok": True}},
+        "blocking_seats": ["sol"],
+        "advice_taken": [{"seat": "sol", "point": "a real recorded point",
+                          "action": "a real recorded action long enough to count"}],
+        "advice_rejected": [],
+    })
+
+    def twin(_council: str = REAL_COUNCIL, **files) -> Path:
         d = Path(tempfile.mkdtemp()); (d / "_discipline").mkdir()
         for n, age_h in files.items():
             p = d / "_discipline" / n
-            p.write_text("{}")
+            p.write_text(_council if "council" in n else "{}")
             t = time.time() - age_h * 3600
             os.utime(p, (t, t))
         return d
@@ -186,6 +277,34 @@ def _selftest() -> int:
 
     # A start council with no plan-fit is not a started stage: plan-fit is the
     # part that refuses when no open plan item is cited.
+    # ⭐ proveCatch on the defect Sol found: an empty council must NOT authorise.
+    empty = twin("{}", **{"s-plan-fit.json": 1, "s-start-council.json": 1})
+    ck("empty_council_does_not_authorise",
+       not evaluate(open_stages(empty), "w", False)["allowed"],
+       "a start-council file containing {} minted an EARNED pass — existence is "
+       "not content")
+    unanswered = twin(json.dumps({"seats": {"sol": {}}, "blocking_seats": ["sol"],
+                                  "advice_taken": [], "advice_rejected": []}),
+                      **{"s-plan-fit.json": 1, "s-start-council.json": 1})
+    ck("unanswered_blocking_seat_does_not_authorise",
+       not evaluate(open_stages(unanswered), "w", False)["allowed"],
+       "a council with an unanswered blocking seat authorised a write")
+
+    ck("earned_beats_a_global_override",
+       evaluate(open_stages(live), "w", True)["allowed"] is True,
+       "a globally-set override downgraded a genuinely earned pass into a scar")
+    for bad in ('{"seats":{"sol":{}},"blocking_seats":"sol"}',
+                '{"seats":{"sol":{}},"blocking_seats":5}',
+                '{"seats":{"sol":{}},"blocking_seats":{"a":1}}'):
+        b = twin(bad, **{"s-plan-fit.json": 1, "s-start-council.json": 1})
+        try:
+            ok = not evaluate(open_stages(b), "w", False)["allowed"]
+        except Exception as exc:  # noqa: BLE001
+            ok = False
+            print(f"    (raised: {type(exc).__name__})")
+        ck(f"malformed_blocking_seats_fails_closed[{bad[28:44]}]", ok,
+           "a malformed blocking_seats authorised a write or raised inside a writer")
+
     ck("start_without_plan_fit_refuses",
        not evaluate(open_stages(twin(**{"s-start-council.json": 1})), "w", False)["allowed"],
        "a start council with no plan-fit counted as an open stage")
@@ -215,6 +334,26 @@ def _selftest() -> int:
     log = scarred / "_discipline" / "guard-overrides.jsonl"
     ck("override_leaves_a_scar", log.is_file() and "selftest" in log.read_text(),
        "an override left no record on the twin")
+
+    # ⭐ AND IT MUST NOT LOOK LIKE AN EARNED PASS.
+    ov = evaluate(open_stages(scarred), "w", True)
+    ck("override.is_not_allowed", ov["allowed"] is False,
+       "an override returned allowed=True — indistinguishable from a real stage")
+    ck("override.is_marked_overridden", ov["overridden"] is True,
+       "an override was not marked as such")
+    ck("override.is_not_earned", ov["earned"] is False,
+       "an override claimed an earned pass")
+    earned = evaluate(open_stages(live), "w", False)
+    ck("earned_pass_is_distinguishable",
+       earned["allowed"] is True and earned["earned"] is True
+       and earned["overridden"] is False,
+       "a genuinely open stage is not distinguishable from an override")
+    ck("refusal_carries_the_same_fields",
+       all(k in evaluate([], "w", False) for k in
+           ("allowed", "overridden", "earned", "may_proceed", "partial_stages",
+            "open_stages", "reason")),
+       "a refusal omits fields the other verdicts provide, so the result shape "
+       "changes with the outcome")
 
     for line in failures:
         print(f"  - {line}")

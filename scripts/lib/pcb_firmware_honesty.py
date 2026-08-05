@@ -153,8 +153,12 @@ def _selftest() -> int:
     forbidden = forbidden_functional_claim(c)
     if "UNPROVEN IN HARDWARE" not in banner:
         print("FAIL banner missing UNPROVEN IN HARDWARE"); bad += 1
+    elif "NOT FABRICATION READY" not in banner and not banner.startswith("DRAFT"):
+        print(f"FAIL banner must declare draft/not-fab, got {banner!r}"); bad += 1
+    elif banner.startswith("FAB-READY"):
+        print(f"FAIL banner must not lead with FAB-READY (skim risk), got {banner!r}"); bad += 1
     else:
-        print("PASS banner is FAB-READY — UNPROVEN IN HARDWARE")
+        print("PASS banner is draft-not-fab + UNPROVEN IN HARDWARE")
     s3 = firmware_status_string(3, True, c)
     if s3 != c["status"]["tier3"]:
         print(f"FAIL tier3 status drift: {s3!r}"); bad += 1

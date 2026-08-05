@@ -386,8 +386,13 @@ _MAT_KIND_PRESETS = {
     "rubber":          {"metallic": 0.0,  "roughness": 0.92},
     "glass":           {"metallic": 0.0,  "roughness": 0.05, "alpha": 0.25, "ior": 1.45},
     "led_emissive":    {"metallic": 0.0,  "roughness": 0.5, "emission_strength": 2.0},
-    "carbon_fibre":    {"metallic": 0.2,  "roughness": 0.45, "clearcoat": 0.3},
-    "anodised_alu":    {"metallic": 0.65, "roughness": 0.42},
+    "carbon_fibre":    {"metallic": 0.22, "roughness": 0.38, "clearcoat": 0.45},
+    "anodised_alu":    {"metallic": 0.72, "roughness": 0.36, "clearcoat": 0.12},
+    "cast_aluminium":  {"metallic": 0.55, "roughness": 0.48, "clearcoat": 0.05},
+    "sic_module":      {"metallic": 0.08, "roughness": 0.42, "clearcoat": 0.15},
+    "ceramic_dbc":     {"metallic": 0.0,  "roughness": 0.22, "clearcoat": 0.35},
+    "hv_safety":       {"metallic": 0.05, "roughness": 0.48, "clearcoat": 0.25},
+    "braid_shield":    {"metallic": 0.78, "roughness": 0.42},
     "concrete":        {"metallic": 0.0,  "roughness": 0.88},
     "pcb":             {"metallic": 0.0,  "roughness": 0.6},
 }
@@ -527,6 +532,58 @@ def make_instrument_cad_mat(family: str, name: str | None = None):
             nm, _to_linear((0.62, 0.64, 0.68)), metallic=0.7, roughness=0.38,
             kind="brushed_alu")
     return make_mat(nm, _to_linear((0.45, 0.46, 0.48)), metallic=0.2, roughness=0.5)
+
+
+# Role → (sRGB base colour, kind) for traction / e-axle / power-electronics kits.
+# Universal noun roles — NOT product-named (reusable for any EDU / inverter pack).
+_POWERTRAIN_ROLE_SPEC = {
+    # Dark hard-anodised cast housing — race case, not mid-grey clay appliance.
+    "cast_al_housing":   ((0.10, 0.105, 0.115), "cast_aluminium"),
+    # Brighter machined lands / faces / nameplate borders (contrast vs cast body).
+    "machined_al":       ((0.42, 0.44, 0.47), "brushed_alu"),
+    # Anodised structural alum (cold plates, shelves, end rings).
+    "anodised_al":       ((0.18, 0.19, 0.21), "anodised_alu"),
+    # Carbon-fibre structural spine / gasket lands (dark with clearcoat sheen).
+    "carbon_structure":  ((0.04, 0.042, 0.048), "carbon_fibre"),
+    # SiC power-module moulded package (black polymer with slight gloss).
+    "sic_module_body":   ((0.06, 0.065, 0.075), "sic_module"),
+    # Ceramic DBC / AlN substrate under die (off-white ceramic).
+    "ceramic_dbc":       ((0.82, 0.80, 0.74), "ceramic_dbc"),
+    # Steel: gears, bolts, pin barrels, clamps.
+    "steel_machined":    ((0.28, 0.29, 0.32), "polished_steel"),
+    "steel_fastener":    ((0.14, 0.14, 0.15), "polished_steel"),
+    # Copper bus / tabs.
+    "copper_bus":        ((0.78, 0.48, 0.18), "copper"),
+    # HV connector family — dark shell + IEC safety orange accents.
+    "hv_shell_dark":     ((0.08, 0.06, 0.05), "polymer_glossy"),
+    "hv_safety_orange":  ((0.92, 0.38, 0.06), "hv_safety"),
+    # Rubber boots / hose / O-rings.
+    "rubber_boot":       ((0.03, 0.03, 0.03), "rubber"),
+    # EMI braid / tinned copper braid.
+    "braid_shield":      ((0.48, 0.45, 0.36), "braid_shield"),
+    # Coolant port body (anodised or painted service orange/red).
+    "coolant_port_body": ((0.55, 0.18, 0.08), "anodised_alu"),
+    "coolant_qd_collar": ((0.10, 0.38, 0.78), "polymer_glossy"),
+}
+
+
+def make_powertrain_role_mat(role: str, name: str | None = None):
+    """Role-honest PBR for traction / e-axle / power-electronics kits.
+
+    INTENT (universal, 2026-08-05): sealed EDU product shots must read as race
+    powertrain hardware — hard-anodised cast Al, carbon structure, SiC module
+    packages on ceramic DBC, HV safety orange — not a single charcoal clay.
+
+    Roles are noun-keyed (``cast_al_housing``, ``sic_module_body``, …), never
+    product-named. Unknown roles fall back to neutral mid-grey.
+    """
+    key = str(role or "").strip().lower()
+    nm = name or f"m_pt_{key[:28] or 'generic'}"
+    spec = _POWERTRAIN_ROLE_SPEC.get(key)
+    if not spec:
+        return make_mat(nm, _to_linear((0.40, 0.41, 0.43)), metallic=0.25, roughness=0.5)
+    srgb, kind = spec
+    return make_mat(nm, _to_linear(srgb), kind=kind)
 
 
 class _Palette(dict):
