@@ -1,0 +1,15 @@
+{
+  "ok": true,
+  "broken": false,
+  "defects": [],
+  "images": [
+    {
+      "file": "general-arrangement.png",
+      "ok": true,
+      "broken": false,
+      "defects": [],
+      "error": null
+    }
+  ],
+  "skipped": false
+}

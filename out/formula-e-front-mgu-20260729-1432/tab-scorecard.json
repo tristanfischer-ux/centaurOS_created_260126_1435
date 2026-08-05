@@ -373,21 +373,21 @@
       "status": "PASS",
       "issues": [],
       "fix": "drop orphan terms / define the missing ones in _GLOSSARY",
-      "basis": "glossary contract (every term defined + no orphan terms) \u2014 every rendered term carries a definition 35/35; terms actually used somewhere in the workbook 35/35 \u00b7 score = min over checks of 10 \u00d7 passed/checked",
+      "basis": "glossary contract (every term defined + no orphan terms) \u2014 every rendered term carries a definition 36/36; terms actually used somewhere in the workbook 36/36 \u00b7 score = min over checks of 10 \u00d7 passed/checked",
       "content_score": 10.0,
-      "content_basis": "glossary contract (every term defined + no orphan terms) \u2014 every rendered term carries a definition 35/35; terms actually used somewhere in the workbook 35/35 \u00b7 score = min over checks of 10 \u00d7 passed/checked",
-      "checked": 70,
-      "passed": 70,
+      "content_basis": "glossary contract (every term defined + no orphan terms) \u2014 every rendered term carries a definition 36/36; terms actually used somewhere in the workbook 36/36 \u00b7 score = min over checks of 10 \u00d7 passed/checked",
+      "checked": 72,
+      "passed": 72,
       "components": [
         {
           "check": "every rendered term carries a definition",
-          "passed": 35,
-          "checked": 35
+          "passed": 36,
+          "checked": 36
         },
         {
           "check": "terms actually used somewhere in the workbook",
-          "passed": 35,
-          "checked": 35
+          "passed": 36,
+          "checked": 36
         }
       ]
     },
@@ -603,19 +603,19 @@
       "target": 8,
       "status": "PASS",
       "issues": [
-        "149/149 invariants pass"
+        "147/147 invariants pass"
       ],
       "fix": "fix each failing invariant at source",
-      "basis": "fail-count formula: 10 if 0 FAIL else max(0, 8 \u2212 2 \u00d7 fails) \u2014 deterministic invariants pass 105/105; cell completeness+type contract 291/291 \u00b7 score = min over checks of 10 \u00d7 passed/checked",
+      "basis": "fail-count formula: 10 if 0 FAIL else max(0, 8 \u2212 2 \u00d7 fails) \u2014 deterministic invariants pass 104/104; cell completeness+type contract 291/291 \u00b7 score = min over checks of 10 \u00d7 passed/checked",
       "content_score": 10.0,
-      "content_basis": "fail-count formula: 10 if 0 FAIL else max(0, 8 \u2212 2 \u00d7 fails) \u2014 deterministic invariants pass 105/105; cell completeness+type contract 291/291 \u00b7 score = min over checks of 10 \u00d7 passed/checked",
-      "checked": 396,
-      "passed": 396,
+      "content_basis": "fail-count formula: 10 if 0 FAIL else max(0, 8 \u2212 2 \u00d7 fails) \u2014 deterministic invariants pass 104/104; cell completeness+type contract 291/291 \u00b7 score = min over checks of 10 \u00d7 passed/checked",
+      "checked": 395,
+      "passed": 395,
       "components": [
         {
           "check": "deterministic invariants pass",
-          "passed": 105,
-          "checked": 105
+          "passed": 104,
+          "checked": 104
         },
         {
           "check": "cell completeness+type contract",

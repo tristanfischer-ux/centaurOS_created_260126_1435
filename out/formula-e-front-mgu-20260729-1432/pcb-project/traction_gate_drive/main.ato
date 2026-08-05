@@ -1,8 +1,8 @@
 component Part_gate_driver_board_word:
     designator_prefix = "U"
     footprint = "Package_SO:SOIC-8_3.9x4.9mm_P1.27mm"
-    mpn = "TBD (detailed design) - gate_driver_ic"
-    value = "gate_driver_ic"
+    mpn = "ACPL-336J-500E"
+    value = "ACPL-336J"
     signal VCC ~ pin 1
     signal GND ~ pin 2
     signal IN ~ pin 3
@@ -10,9 +10,9 @@ component Part_gate_driver_board_word:
 
 component Part_isolated_gate_driver_channel_word__1:
     designator_prefix = "U"
-    footprint = "Package_SO:SOIC-8_3.81x9.347mm_P2.54mm"
-    mpn = "TBD (detailed design) - gate_driver_ic"
-    value = "gate_driver_ic"
+    footprint = "Package_SO:SOIC-16W_7.5x10.3mm_P1.27mm"
+    mpn = "ACPL-336J-500E"
+    value = "ACPL-336J"
     signal VCC ~ pin 1
     signal GND ~ pin 2
     signal IN ~ pin 3
@@ -21,9 +21,9 @@ component Part_isolated_gate_driver_channel_word__1:
 
 component Part_isolated_gate_driver_channel_word__2:
     designator_prefix = "U"
-    footprint = "Package_SO:SOIC-8_3.81x9.347mm_P2.54mm"
-    mpn = "TBD (detailed design) - gate_driver_ic"
-    value = "gate_driver_ic"
+    footprint = "Package_SO:SOIC-16W_7.5x10.3mm_P1.27mm"
+    mpn = "ACPL-336J-500E"
+    value = "ACPL-336J"
     signal VCC ~ pin 1
     signal GND ~ pin 2
     signal IN ~ pin 3
@@ -32,9 +32,9 @@ component Part_isolated_gate_driver_channel_word__2:
 
 component Part_isolated_gate_driver_channel_word__3:
     designator_prefix = "U"
-    footprint = "Package_SO:SOIC-8_3.81x9.347mm_P2.54mm"
-    mpn = "TBD (detailed design) - gate_driver_ic"
-    value = "gate_driver_ic"
+    footprint = "Package_SO:SOIC-16W_7.5x10.3mm_P1.27mm"
+    mpn = "ACPL-336J-500E"
+    value = "ACPL-336J"
     signal VCC ~ pin 1
     signal GND ~ pin 2
     signal IN ~ pin 3
@@ -43,9 +43,9 @@ component Part_isolated_gate_driver_channel_word__3:
 
 component Part_isolated_gate_driver_channel_word__4:
     designator_prefix = "U"
-    footprint = "Package_SO:SOIC-8_3.81x9.347mm_P2.54mm"
-    mpn = "TBD (detailed design) - gate_driver_ic"
-    value = "gate_driver_ic"
+    footprint = "Package_SO:SOIC-16W_7.5x10.3mm_P1.27mm"
+    mpn = "ACPL-336J-500E"
+    value = "ACPL-336J"
     signal VCC ~ pin 1
     signal GND ~ pin 2
     signal IN ~ pin 3
@@ -54,9 +54,9 @@ component Part_isolated_gate_driver_channel_word__4:
 
 component Part_isolated_gate_driver_channel_word__5:
     designator_prefix = "U"
-    footprint = "Package_SO:SOIC-8_3.81x9.347mm_P2.54mm"
-    mpn = "TBD (detailed design) - gate_driver_ic"
-    value = "gate_driver_ic"
+    footprint = "Package_SO:SOIC-16W_7.5x10.3mm_P1.27mm"
+    mpn = "ACPL-336J-500E"
+    value = "ACPL-336J"
     signal VCC ~ pin 1
     signal GND ~ pin 2
     signal IN ~ pin 3
@@ -65,9 +65,9 @@ component Part_isolated_gate_driver_channel_word__5:
 
 component Part_isolated_gate_driver_channel_word__6:
     designator_prefix = "U"
-    footprint = "Package_SO:SOIC-8_3.81x9.347mm_P2.54mm"
-    mpn = "TBD (detailed design) - gate_driver_ic"
-    value = "gate_driver_ic"
+    footprint = "Package_SO:SOIC-16W_7.5x10.3mm_P1.27mm"
+    mpn = "ACPL-336J-500E"
+    value = "ACPL-336J"
     signal VCC ~ pin 1
     signal GND ~ pin 2
     signal IN ~ pin 3
@@ -76,8 +76,8 @@ component Part_isolated_gate_driver_channel_word__6:
 
 component Part_desat_protection_channel_word__1:
     designator_prefix = "U"
-    footprint = "Package_SO:SOIC-8_3.81x9.347mm_P2.54mm"
-    mpn = "TBD (detailed design) - sensor_ic"
+    footprint = "Package_SO:SOIC-16W_7.5x10.3mm_P1.27mm"
+    mpn = "LM393DT"
     value = "sensor_ic"
     signal VCC ~ pin 1
     signal GND ~ pin 2
@@ -86,8 +86,8 @@ component Part_desat_protection_channel_word__1:
 
 component Part_desat_protection_channel_word__2:
     designator_prefix = "U"
-    footprint = "Package_SO:SOIC-8_3.81x9.347mm_P2.54mm"
-    mpn = "TBD (detailed design) - sensor_ic"
+    footprint = "Package_SO:SOIC-16W_7.5x10.3mm_P1.27mm"
+    mpn = "LM393DT"
     value = "sensor_ic"
     signal VCC ~ pin 1
     signal GND ~ pin 2
@@ -96,8 +96,8 @@ component Part_desat_protection_channel_word__2:
 
 component Part_desat_protection_channel_word__3:
     designator_prefix = "U"
-    footprint = "Package_SO:SOIC-8_3.81x9.347mm_P2.54mm"
-    mpn = "TBD (detailed design) - sensor_ic"
+    footprint = "Package_SO:SOIC-16W_7.5x10.3mm_P1.27mm"
+    mpn = "LM393DT"
     value = "sensor_ic"
     signal VCC ~ pin 1
     signal GND ~ pin 2
@@ -106,8 +106,8 @@ component Part_desat_protection_channel_word__3:
 
 component Part_desat_protection_channel_word__4:
     designator_prefix = "U"
-    footprint = "Package_SO:SOIC-8_3.81x9.347mm_P2.54mm"
-    mpn = "TBD (detailed design) - sensor_ic"
+    footprint = "Package_SO:SOIC-16W_7.5x10.3mm_P1.27mm"
+    mpn = "LM393DT"
     value = "sensor_ic"
     signal VCC ~ pin 1
     signal GND ~ pin 2
@@ -116,8 +116,8 @@ component Part_desat_protection_channel_word__4:
 
 component Part_desat_protection_channel_word__5:
     designator_prefix = "U"
-    footprint = "Package_SO:SOIC-8_3.81x9.347mm_P2.54mm"
-    mpn = "TBD (detailed design) - sensor_ic"
+    footprint = "Package_SO:SOIC-16W_7.5x10.3mm_P1.27mm"
+    mpn = "LM393DT"
     value = "sensor_ic"
     signal VCC ~ pin 1
     signal GND ~ pin 2
@@ -126,8 +126,8 @@ component Part_desat_protection_channel_word__5:
 
 component Part_desat_protection_channel_word__6:
     designator_prefix = "U"
-    footprint = "Package_SO:SOIC-8_3.81x9.347mm_P2.54mm"
-    mpn = "TBD (detailed design) - sensor_ic"
+    footprint = "Package_SO:SOIC-16W_7.5x10.3mm_P1.27mm"
+    mpn = "LM393DT"
     value = "sensor_ic"
     signal VCC ~ pin 1
     signal GND ~ pin 2

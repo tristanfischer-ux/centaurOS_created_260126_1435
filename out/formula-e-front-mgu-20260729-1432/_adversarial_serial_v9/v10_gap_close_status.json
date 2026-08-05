@@ -1,0 +1,42 @@
+{
+  "schema": "fe_front_v10_gap_close/v1",
+  "ran_at": "2026-08-05T16:58:21.597633+00:00",
+  "ship_ok": false,
+  "pcb": {
+    "draft_grade": "A",
+    "fitness": 9.1,
+    "tiers": {
+      "mpn_package": 26,
+      "mpn_symbol_footprint": 29,
+      "mpn_package_only": 5
+    },
+    "fab": "PROTOTYPE_PACKAGE"
+  },
+  "ga": {
+    "sheets": [
+      "general-arrangement.png",
+      "ga-detail-interfaces.png",
+      "ga-detail-section.png"
+    ],
+    "detail_index": "drawings/GA-DETAIL-INDEX.md"
+  },
+  "blender": {
+    "hero_bytes": 14399040,
+    "ghost_bytes": 14875206,
+    "exploded_bytes": 14267968,
+    "pe_note": "film-cap bank densified + bus laminate + gate-drive IC packs in morphology"
+  },
+  "tabs": {
+    "Calculations": 9.8,
+    "BoM": 9.5,
+    "Verification": 9.4,
+    "Overview": 10,
+    "Drawings": 9,
+    "fail_tabs": [
+      "Executive Summary",
+      "Quality & Audit"
+    ],
+    "min_score": 4.0
+  },
+  "deterministic_fails": []
+}

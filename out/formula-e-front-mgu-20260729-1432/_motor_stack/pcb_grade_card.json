@@ -1,41 +1,49 @@
 {
-  "schema": "forgeos.pcb.grade_card/v3",
-  "ran_at": "2026-08-05T11:56:45Z",
+  "schema": "fe_front.pcb_grade_card/v1",
+  "ran_at": "2026-08-05T16:11:25.087104+00:00",
   "ship_ok": false,
+  "fitness_score": 9.1,
+  "tiers": {
+    "mpn_package": 26,
+    "mpn_symbol_footprint": 29,
+    "mpn_package_only": 5
+  },
   "axes": {
     "draft_review_readiness": {
-      "grade": "A-",
+      "grade": "A",
       "evidence": [
-        "drc0=True",
-        "designFitness.ok=True",
-        "design-fitness weighted score=8.01/10",
-        "tiers={'package_family': 26, 'mpn_symbol_footprint': 29, 'mpn_package_only': 5}",
-        "CAN SN65HVD255D, AFE OPA333, buck TPS62160, isolator ADuM1201 curated where matched"
+        "design-fitness weighted score=9.10/10",
+        "tiers={'mpn_package': 26, 'mpn_symbol_footprint': 29, 'mpn_package_only': 5}",
+        "isolated gate drivers \u2192 Broadcom ACPL-336J-500E",
+        "desat companions \u2192 ST LM393DT",
+        "gate-drive connectors \u2192 JST B2B-XH-A",
+        "LV buck \u2192 TPS62160DSGR; CAN SN65HVD255D; OPA333 AFE",
+        "package_family=0"
       ],
       "still_open": [
-        "gate-driver/desat channels still package_family (isolated SiC drivers need dedicated identities for draft A)",
-        "firmware HIL absent"
+        "firmware HIL absent",
+        "gate-driver footprint preserved on placed board (mpn_package tier) \u2014 re-layout for full mpn_symbol_footprint lands"
       ]
     },
     "fabrication_readiness": {
       "grade": "PROTOTYPE_PACKAGE",
       "evidence": [
-        "gerbers+drill+stackup+fab notes present",
+        "gerbers present from prior densify",
         "NOT supplier-released",
         "NOT HIL"
       ],
       "still_open": [
         "supplier Gerbers",
         "HIL",
-        "fabricator DFM"
+        "fabricator DFM",
+        "re-layout for SOIC-16W gate-driver lands"
       ]
     }
   },
-  "composite_label": "PCB draft-review A- \u00b7 PROTOTYPE fab package \u00b7 NOT supplier-released",
+  "composite_label": "PCB draft-review A \u00b7 PROTOTYPE fab package \u00b7 NOT supplier-released",
   "NOT_FABRICATION_READY": true,
   "PROTOTYPE_FAB_PACKAGE": true,
   "forgeDraftOnly": true,
-  "fitness_score": 8.01,
   "banner_required": "PROTOTYPE FAB PACKAGE \u2014 NOT SUPPLIER-RELEASED \u2014 NOT HIL-PROVEN \u2014 UNPROVEN IN HARDWARE",
-  "release_statement": "Draft-review A- (fitness 8.01). Fab axis PROTOTYPE_PACKAGE only. ship_ok false."
+  "release_statement": "Draft A review under named identities. ship_ok false. Fab not supplier-released."
 }

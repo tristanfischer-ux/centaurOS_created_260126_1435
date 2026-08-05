@@ -20178,15 +20178,35 @@ def _fpk_place_pe_volume_density(
             module=story_mod,
             module_objects=MO,
         )
-    # Film DC-link caps: axial film cylinders (not decorative bricks) — one
-    # bank per phase leg. Volumes are concept morphology from the twin envelope;
-    # no MPN is claimed.
-    for ci in range(max(1, n)):
-        cx = x_inv - inv_w * 0.28 + ci * (inv_w * 0.56 / max(1, n))
-        cy = y_inv + inv_d * 0.30
-        cz = inv_z - inv_h * 0.02
-        r = max(4.0, min(inv_w, inv_d) * 0.07)
-        h_cap = max(12.0, inv_h * 0.62)
+    # Film DC-link bank: two rows of axial film cylinders (not decorative bricks).
+    # Count tracks phase legs (n) with a second row for visual density — concept
+    # morphology from the twin envelope; no MPN is claimed.
+    n_cap = max(3, n * 2)
+    # Laminated bus plate under the film bank (PE power plane cue).
+    fl.add_box(
+        "u_se_td_pe_bus_laminate",
+        _mm3((x_inv - inv_w * 0.02, y_inv + inv_d * 0.28, inv_z - inv_h * 0.12)),
+        _mm3((inv_w * 0.72, inv_d * 0.22, max(2.0, inv_h * 0.08))),
+        mat_bus,
+        module=story_mod,
+        module_objects=MO,
+    )
+    fl.add_box(
+        "u_se_td_pe_bus_laminate_ins",
+        _mm3((x_inv - inv_w * 0.02, y_inv + inv_d * 0.28, inv_z - inv_h * 0.06)),
+        _mm3((inv_w * 0.70, inv_d * 0.20, 1.2)),
+        mat_alum,
+        module=story_mod,
+        module_objects=MO,
+    )
+    for ci in range(n_cap):
+        row = ci // max(1, n)
+        col = ci % max(1, n)
+        cx = x_inv - inv_w * 0.30 + col * (inv_w * 0.60 / max(1, n - 1 if n > 1 else 1))
+        cy = y_inv + inv_d * (0.22 + row * 0.16)
+        cz = inv_z - inv_h * 0.02 + row * inv_h * 0.06
+        r = max(4.5, min(inv_w, inv_d) * 0.075)
+        h_cap = max(14.0, inv_h * 0.68)
         # Horizontal film cylinder along X (can-style metalised film look).
         fl.add_cyl(
             f"u_se_td_pe_filmcap_{ci}",
@@ -20196,7 +20216,7 @@ def _fpk_place_pe_volume_density(
             mat_cap,
             module=story_mod,
             module_objects=MO,
-            vertices=16,
+            vertices=18,
             rotation=(0.0, 1.5707963, 0.0),
         )
         # End-cap discs (darker bus lands).
@@ -20205,13 +20225,23 @@ def _fpk_place_pe_volume_density(
                 f"u_se_td_pe_filmcap_{ci}_end_{ei}",
                 _mm3((cx + h_cap * ex * 0.5, cy, cz)),
                 (r * 1.05) * fl.MM,
-                max(1.5, r * 0.25) * fl.MM,
+                max(1.5, r * 0.28) * fl.MM,
                 mat_bus,
                 module=story_mod,
                 module_objects=MO,
                 vertices=12,
                 rotation=(0.0, 1.5707963, 0.0),
             )
+        # Terminal tab stub toward PE modules (connectivity cue).
+        fl.add_box(
+            f"u_se_td_pe_filmcap_{ci}_tab",
+            _mm3((cx, cy - r * 1.15, cz)),
+            _mm3((max(3.0, h_cap * 0.12), max(2.0, r * 0.45), max(1.2, r * 0.35))),
+            mat_bus,
+            module=story_mod,
+            module_objects=MO,
+        )
+    # Gate-drive flex ribbon + small gate-drive IC packages on PE shelf edge.
     fl.add_box(
         "u_se_td_pe_gd_flex",
         _mm3((x_inv, y_inv - inv_d * 0.05, inv_z + inv_h * 0.35)),
@@ -20220,6 +20250,15 @@ def _fpk_place_pe_volume_density(
         module=story_mod,
         module_objects=MO,
     )
+    for gi, gx in enumerate((-0.28, 0.0, 0.28)):
+        fl.add_box(
+            f"u_se_td_pe_gd_ic_{gi}",
+            _mm3((x_inv + inv_w * gx, y_inv - inv_d * 0.18, inv_z + inv_h * 0.28)),
+            _mm3((max(8.0, inv_w * 0.12), max(5.0, inv_d * 0.08), max(2.0, inv_h * 0.12))),
+            mat_sic,
+            module=story_mod,
+            module_objects=MO,
+        )
 
 
 def _fpk_draw_principal_vehicle_routes(

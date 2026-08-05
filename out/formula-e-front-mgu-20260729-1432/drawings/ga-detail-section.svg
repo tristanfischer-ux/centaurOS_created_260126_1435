@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1800" height="1200" viewBox="0 0 1800 1200">
+<title>FE Front — Axial section story</title>
+<rect width="100%" height="100%" fill="#fafafa"/>
+<style>
+  .t { font-family: Helvetica, Arial, sans-serif; fill: #111; }
+  .h { font-size: 18px; font-weight: 700; }
+  .s { font-size: 11px; }
+  .xs { font-size: 9px; fill: #333; }
+  .dim { font-size: 10px; fill: #0a3d91; }
+  .warn { fill: #a30; font-size: 10px; }
+  .box { fill: none; stroke: #1a1a1a; stroke-width: 1.4; }
+  .cyl { fill: #e8eef5; stroke: #1a1a1a; stroke-width: 1.3; }
+  .pe { fill: #dfe8d8; stroke: #1a1a1a; stroke-width: 1.2; }
+  .hv { fill: #ff8c00; stroke: #333; stroke-width: 1; }
+  .cool { fill: #c8e0f0; stroke: #1a4a6a; stroke-width: 1; }
+  .axis { stroke: #888; stroke-dasharray: 4 3; stroke-width: 0.8; }
+  .leader { stroke: #0a3d91; stroke-width: 0.9; }
+</style>
+<text x="40" y="36" class="t h">SECTION A–A — axial stack (Blender-informed story)</text>
+<text x="40" y="58" class="t s">Active stack L_stk=130 mm (DEC-009) · concentric planetary nest · PE above</text>
+<circle cx="420" cy="480" r="280" fill="#c8d0d8" stroke="#222" stroke-width="1.2"/>
+<circle cx="420" cy="480" r="230" fill="#e8eef5" stroke="#222" stroke-width="1.2"/>
+<circle cx="420" cy="480" r="180" fill="#d4a574" stroke="#222" stroke-width="1.2"/>
+<circle cx="420" cy="480" r="130" fill="#bbb" stroke="#222" stroke-width="1.2"/>
+<circle cx="420" cy="480" r="80" fill="#999" stroke="#222" stroke-width="1.2"/>
+<circle cx="420" cy="480" r="30" fill="#444" stroke="#222" stroke-width="1.2"/>
+<line x1="616.0" y1="284.0" x2="780" y2="240" class="leader"/>
+<text x="785" y="244" class="t xs">housing / end-bell</text>
+<line x1="581.0" y1="319.0" x2="780" y2="268" class="leader"/>
+<text x="785" y="272" class="t xs">stator laminations</text>
+<line x1="546.0" y1="354.0" x2="780" y2="296" class="leader"/>
+<text x="785" y="300" class="t xs">copper windings</text>
+<line x1="511.0" y1="389.0" x2="780" y2="324" class="leader"/>
+<text x="785" y="328" class="t xs">rotor barrel</text>
+<line x1="476.0" y1="424.0" x2="780" y2="352" class="leader"/>
+<text x="785" y="356" class="t xs">gear nest / sun</text>
+<line x1="441.0" y1="459.0" x2="780" y2="380" class="leader"/>
+<text x="785" y="384" class="t xs">shaft</text>
+<rect x="220" y="120" width="400" height="50" class="pe"/>
+<text x="230" y="150" class="t xs">PE: SiC modules (×3) + film-cap bank + laminated bus</text>
+<text x="40" y="1150" class="t xs">Architecture blockers remain OPEN (planetary FoS / EM torque bars) — ship_ok=false</text>
+
+<!-- standard title block fields for set consistency -->
+<text x="40" y="1980" font-family="Helvetica" font-size="9" font-weight="bold">DRAWING No.</text>
+<text x="130" y="1980" font-family="Helvetica" font-size="9.5">FF-GA-DET-001</text>
+<text x="40" y="1995" font-family="Helvetica" font-size="9" font-weight="bold">REV</text>
+<text x="130" y="1995" font-family="Helvetica" font-size="9.5">P1</text>
+<text x="200" y="1995" font-family="Helvetica" font-size="9" font-weight="bold">DATE</text>
+<text x="250" y="1995" font-family="Helvetica" font-size="9.5">2026-08-05</text>
+<text x="400" y="1995" font-family="Helvetica" font-size="9" font-weight="bold">SCALE</text>
+<text x="460" y="1995" font-family="Helvetica" font-size="9.5">1:5 (@ A1)</text>
+
+</svg>

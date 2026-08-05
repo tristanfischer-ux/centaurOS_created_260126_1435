@@ -1,0 +1,26 @@
+{
+ "schema": "a1-print/v1",
+ "drawing": "ga",
+ "title": "General Arrangement",
+ "svg": "general-arrangement.svg",
+ "svg_px": [
+  1080.0,
+  1106.0
+ ],
+ "min_font_px": 6.05,
+ "grid": [
+  1,
+  1
+ ],
+ "sheets": 1,
+ "mm_per_px": 0.5009,
+ "min_text_mm": 3.03,
+ "min_text_bar_mm": 2.5,
+ "meets_bar": true,
+ "page": "A1 landscape 841x594 mm",
+ "pdf_ok": true,
+ "pdf_error": null,
+ "pdfs": [
+  "ga-A1.pdf"
+ ]
+}

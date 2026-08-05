@@ -180,6 +180,55 @@ const CANDIDATE_RULES: readonly CandidateRule[] = [
     pinoutEvidence: 'SOIC-8 CAN: TXD/GND/VCC/RXD/CANL/CANH/S/… per SN65HVD255D; local KiCad symbol SN65HVD255D',
   },
   {
+    // INTENT (FE front 2026-08-05 v10): gate-drive channel output connectors.
+    roleTest: /gate[_ -]?drive[_ -]?output[_ -]?connector|gate[_ -]?driver[_ -]?output[_ -]?connector/i,
+    functionClass: 'connector',
+    manufacturer: 'JST',
+    partNumber: 'B2B-XH-A',
+    footprint: {
+      library: 'Connector_JST',
+      footprint: 'JST_XH_B2B-XH-A_1x02_P2.50mm_Vertical',
+    },
+    symbol: { library: 'Connector_Generic', symbol: 'Conn_01x02' },
+    ratings: { voltageV: 250, currentA: 3 },
+    packageEvidence: 'JST XH B2B-XH-A: 1x02 2.50 mm vertical header',
+    referenceEvidence: 'JST XH series; KiCad Connector_JST:JST_XH_B2B-XH-A_1x02_P2.50mm_Vertical',
+    pinoutEvidence: '2-pin XH header; local KiCad Conn_01x02',
+  },
+  {
+    // INTENT (FE front 2026-08-05 v10): isolated SiC gate-drive channels were stuck at
+    // package_family SOIC drafts. Broadcom ACPL-336J is a real 2.5 A gate-drive
+    // optocoupler with DESAT + UVLO in SOIC-16W — KiCad Driver_FET:ACPL-336J.
+    // Prefer this over DRV8876 (brushed-DC motor) for isolated_gate_driver_channel.
+    roleTest:
+      /isolated[_ -]?gate[_ -]?driver(?:[_ -]?channel)?|sic[_ -]?gate[_ -]?driver|gate[_ -]?drive[_ -]?optocoupler|acpl[_ -]?336|(?:^|[_ -])gate[_ -]?driver(?:[_ -]?ic|[_ -]?board|[_ -]?channel)?(?:$|[_ -])/i,
+    excludedRoleTest: /(?:stir|pump|brushed[_ -]?dc|heater)[_ -]?(?:channel|driver)|motor[_ -]?driver|desat[_ -]?protection|led[_ -]?driver|stepper/i,
+    functionClass: 'gate_driver_ic',
+    manufacturer: 'Broadcom',
+    partNumber: 'ACPL-336J-500E',
+    footprint: { library: 'Package_SO', footprint: 'SOIC-16W_7.5x10.3mm_P1.27mm' },
+    symbol: { library: 'Driver_FET', symbol: 'ACPL-336J' },
+    ratings: { voltageV: 30, currentA: 2.5 },
+    packageEvidence: 'Broadcom ACPL-336J: 2.5 A gate-drive optocoupler, DESAT, Miller clamp, SOIC-16W',
+    referenceEvidence: 'Broadcom ACPL-336J datasheet AV02-4391EN; KiCad Driver_FET:ACPL-336J + Package_SO:SOIC-16W_7.5x10.3mm_P1.27mm',
+    pinoutEvidence: 'SOIC-16W isolated gate driver with DESAT/FAULT/UVLO pins per Broadcom datasheet; local KiCad symbol ACPL-336J',
+  },
+  {
+    // INTENT: discrete desat-protection channel companion (threshold / latch side).
+    // When densify emits desat_protection_channel_word separately from the gate driver.
+    roleTest: /desat(?:uration)?[_ -]?(?:protection|sense|detector)[_ -]?channel|desat[_ -]?comparator/i,
+    excludedRoleTest: /isolated[_ -]?gate[_ -]?driver|gate[_ -]?drive[_ -]?optocoupler/i,
+    functionClass: 'sensor_ic',
+    manufacturer: 'STMicroelectronics',
+    partNumber: 'LM393DT',
+    footprint: { library: 'Package_SO', footprint: 'SOIC-8_3.9x4.9mm_P1.27mm' },
+    symbol: { library: 'Comparator', symbol: 'LM393' },
+    ratings: { voltageV: 36 },
+    packageEvidence: 'ST LM393DT: dual differential comparator, SOIC-8',
+    referenceEvidence: 'ST LM393 datasheet; DESAT threshold comparator companion for SiC gate-drive networks; forge-truth LM393DT',
+    pinoutEvidence: 'SOIC-8 dual comparator; KiCad Comparator:LM393 + Package_SO:SOIC-8_3.9x4.9mm_P1.27mm',
+  },
+  {
     // INTENT: phase current sense AFE — zero-drift op-amp path (not SOIC generic).
     roleTest: /current[_ -]?sense[_ -]?front[_ -]?end|phase[_ -]?current[_ -]?(?:afe|front[_ -]?end)/i,
     functionClass: 'op_amp',
@@ -203,13 +252,14 @@ const CANDIDATE_RULES: readonly CandidateRule[] = [
     partNumber: 'TPS62160DSGR',
     footprint: {
       library: 'Package_SON',
-      footprint: 'WSON-8-1EP_2x2mm_P0.5mm_EP0.9x1.6mm',
+      // Match the KiCad symbol's embedded footprint id (ThermalVias variant).
+      footprint: 'WSON-8-1EP_2x2mm_P0.5mm_EP0.9x1.6mm_ThermalVias',
     },
     symbol: { library: 'Regulator_Switching', symbol: 'TPS62160DSG' },
     ratings: { voltageV: 17, currentA: 1.0 },
     packageEvidence: 'TI TPS62160DSGR: 1 A step-down converter in 8-pin WSON (DSG)',
-    referenceEvidence: 'TI TPS62160 datasheet SLVSAM4; KiCad Regulator_Switching family + Package_SON WSON-8 (LV rail screening identity)',
-    pinoutEvidence: 'TI DSG-8 TPS62160 pinout; local symbol TPS62160DSG when present',
+    referenceEvidence: 'TI TPS62160 datasheet SLVSAM4; KiCad Regulator_Switching:TPS62160DSG + Package_SON WSON-8 ThermalVias',
+    pinoutEvidence: 'TI DSG-8 TPS62160 pinout; local symbol TPS62160DSG',
   },
   {
     // INTENT: precision_adc is the same 16-bit delta-sigma role as optical ADC —

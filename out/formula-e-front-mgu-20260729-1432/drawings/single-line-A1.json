@@ -1,0 +1,26 @@
+{
+ "schema": "a1-print/v1",
+ "drawing": "single-line",
+ "title": "Single-Line Electrical Diagram",
+ "svg": "single-line-diagram.svg",
+ "svg_px": [
+  1060.0,
+  664.0
+ ],
+ "min_font_px": 8.5,
+ "grid": [
+  1,
+  1
+ ],
+ "sheets": 1,
+ "mm_per_px": 0.75566,
+ "min_text_mm": 6.42,
+ "min_text_bar_mm": 2.5,
+ "meets_bar": true,
+ "page": "A1 landscape 841x594 mm",
+ "pdf_ok": true,
+ "pdf_error": null,
+ "pdfs": [
+  "single-line-A1.pdf"
+ ]
+}

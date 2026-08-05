@@ -1,0 +1,14 @@
+{
+  "ok": true,
+  "broken": true,
+  "defects": [
+    "A large, solid, dome-like metallic structure is prominently featured on the right side of the assembly in the 3D render, but it is entirely missing from all views in the 2D drawing."
+  ],
+  "images": [
+    "08-product-ghost-shell.png",
+    "general-arrangement.png"
+  ],
+  "model": "google/gemini-3.1-pro-preview",
+  "error": null,
+  "skipped": false
+}
