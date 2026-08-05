@@ -1,0 +1,83 @@
+[Format]      =  1
+[Frequency]   =  0
+[Precision]   =  1e-08
+[MinAngle]    =  30
+[Depth]       =  130
+[LengthUnits] =  millimeters
+[ProblemType] =  planar
+[Coordinates] =  cartesian
+[PrevSoln]    = ""
+[PrevType]    =  0
+[Comment]     =  ""
+[PointProps]  =  0
+[BdryProps]   = 2
+  <BeginBdry>
+    <BdryType> = 1
+    <Tset> = 0
+    <qs> = 0
+    <beta> = 0
+    <h> = 0
+    <Tinf> = 0
+    <BdryName> = "adiabatic"
+  <EndBdry>
+  <BeginBdry>
+    <BdryType> = 2
+    <Tset> = 0
+    <qs> = 0
+    <beta> = 0
+    <h> = 2352.8146000000002
+    <Tinf> = 60
+    <BdryName> = "jacket_conv"
+  <EndBdry>
+[BlockProps]  = 3
+  <BeginBlock>
+    <Kx> = 28
+    <Ky> = 28
+    <Kt> = 0
+    <qv> = 5814465.2999999998
+    <BlockName> = "tooth"
+    <TKPoints> = 0
+  <EndBlock>
+  <BeginBlock>
+    <Kx> = 28
+    <Ky> = 28
+    <Kt> = 0
+    <qv> = 7907764.2000000002
+    <BlockName> = "yoke"
+    <TKPoints> = 0
+  <EndBlock>
+  <BeginBlock>
+    <Kx> = 28
+    <Ky> = 28
+    <Kt> = 0
+    <qv> = 0
+    <BlockName> = "jacket_wall"
+    <TKPoints> = 0
+  <EndBlock>
+[ConductorProps]  = 0
+[NumPoints] = 8
+46.700000000000003	-5	0	0	0
+55.929758999999997	-5	0	0	0
+65.576911999999993	-5	0	0	0
+67.576911999999993	-5	0	0	0
+67.576911999999993	5	0	0	0
+65.576911999999993	5	0	0	0
+55.929758999999997	5	0	0	0
+46.700000000000003	5	0	0	0
+[NumSegments] = 10
+0	1	-1	0	0	0	0
+1	2	-1	1	0	0	0
+2	3	-1	0	0	0	0
+3	4	-1	2	0	0	0
+4	5	-1	0	0	0	0
+5	6	-1	1	0	0	0
+6	7	-1	0	0	0	0
+7	0	-1	1	0	0	0
+1	6	-1	0	0	0	0
+2	5	-1	0	0	0	0
+[NumArcSegments] = 0
+[NumHoles] = 0
+[NumBlockLabels] = 3
+51.314879500000004	0	1	-1	0	0
+60.753335499999991	0	2	-1	0	0
+66.576911999999993	0	3	-1	0	0

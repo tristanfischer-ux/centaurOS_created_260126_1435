@@ -1,0 +1,116 @@
+{
+  "schema": "forgeos.motor_stack.em_grade_card/v2",
+  "ran_at": "2026-08-05T08:02:56Z",
+  "sprint": 2,
+  "ship_ok": false,
+  "objective": "evidence-first A\u2212 where artefacts exist; never pre-commit grades",
+  "objective_met_internal": true,
+  "layers": {
+    "toolchain_method": {
+      "grade": "A-",
+      "was": "A-",
+      "evidence": [
+        "mesh stamp relative_lambda_delta=0.0006192179117102604 (spatial subsample proxy)",
+        "xfemm Path B + weighted-stress torque"
+      ],
+      "still_open": [
+        "true FEMM multi-mesh h-refinement (current stamp decimates one solved grid)"
+      ],
+      "artefacts": [
+        "em_mesh_sensitivity_stamp.json"
+      ]
+    },
+    "kit_case_path_b_story": {
+      "grade": "A-",
+      "was": "A-",
+      "evidence": [
+        "headline=122.100",
+        "arch ratio=1.1729 clear=True",
+        "bind ratio=0.9752 clear=False",
+        "torque_reliable=false"
+      ],
+      "still_open": [
+        "torque_reliable / dyno"
+      ],
+      "artefacts": [
+        "em_op_identity_card.json"
+      ]
+    },
+    "map_mtpa_depth": {
+      "grade": "A-",
+      "was": "B+",
+      "evidence": [
+        "locus angles=11",
+        "gap kit vs dense@angle=-68.86382147071899",
+        "headline rule frozen"
+      ],
+      "still_open": [
+        "true MTPA from \u03bb(i_d,i_q) FE inductance map"
+      ],
+      "artefacts": [
+        "em_map_spine_card.json"
+      ]
+    },
+    "voltage_fw": {
+      "grade": "A-",
+      "was": "B+",
+      "evidence": [
+        "fieldplot \u03bb=0.01278 Wb sane=True",
+        "circle \u03bb source=fieldplot_airgap_ring_B_rms",
+        "FW rows=8",
+        "24k@750 util=0.3606 within=True",
+        "turns_per_phase_assumed=14.0"
+      ],
+      "still_open": [
+        "loaded Rs/L IQ voltage circle",
+        "full FE circuit \u03bb scale reconciliation if out of band",
+        "true FEMM h-refinement mesh (current stamp is spatial subsample proxy)"
+      ],
+      "artefacts": [
+        "em_lambda_from_fieldplot.json",
+        "em_fw_envelope_screen.json",
+        "path_b_voltage_fe_circle_screen.json"
+      ]
+    },
+    "partner_field_viz": {
+      "grade": "A-",
+      "was": "A-",
+      "evidence": [
+        "fieldplot pack present",
+        "rotor GIF grade_weight=0 path=/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/formula-e-front-mgu-20260729-1432/_motor_stack/em_rotor_sweep.gif"
+      ],
+      "still_open": [],
+      "artefacts": [
+        "em_rotor_sweep.gif"
+      ],
+      "note": "GIF is SIM-ONLY and carries zero grade weight."
+    },
+    "release_homologation": {
+      "grade": "A-_readiness",
+      "was": "B+_readiness",
+      "evidence": [
+        "Sprint 2 evidence package present",
+        "ship_ok still false by design",
+        "binding miss 0.975\u00d7 published",
+        "OPEN: dyno, ICD, Gerbers, HIL"
+      ],
+      "still_open": [
+        "S-EM-TRUTH dyno \u2192 torque_reliable",
+        "homologation >1/10"
+      ],
+      "note": "A-_readiness \u2260 permission to ship."
+    }
+  },
+  "headline_torque_nm": 122.099939,
+  "dual_bars": {
+    "architecture_duty_nm": 104.098914,
+    "architecture_clear_ratio": 1.1729,
+    "architecture_clears": true,
+    "binding_ledger_nm": 125.2,
+    "binding_clear_ratio": 0.9752,
+    "binding_clears": false,
+    "note": "Never collapse architecture and binding into one green tick."
+  },
+  "torque_reliable": false,
+  "release_statement": "Sprint 2 EM grade card. ship_ok false. Binding torque still fails (0.9752). Homologation partner-gated."
+}

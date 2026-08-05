@@ -1,0 +1,255 @@
+{
+  "ran_at": "2026-08-05T08:34:37Z",
+  "ship_ok": false,
+  "r2": {
+    "schema": "forgeos.multiphysics.r2_stator_temperature_field/v1",
+    "ran_at": "2026-08-05T08:34:37Z",
+    "ship_ok": false,
+    "method": "1D_radial_finite_volume_axisymmetric_stator",
+    "sources_w_m3": {
+      "tooth": 5814465.281297517,
+      "yoke": 7907764.246511755,
+      "copper": null,
+      "copper_status": "GAP \u2014 slot volume not derived without inventing fill factor",
+      "rotor_iron": null,
+      "rotor_status": "GAP \u2014 rotor iron loss not separately resolved"
+    },
+    "geometry_m": {
+      "r_bore": 0.0467,
+      "r_slot_bottom": 0.055929759270060934,
+      "r_yoke_outer": 0.06557691157454681,
+      "r_jacket": 0.06757691157454682,
+      "stack_depth": 0.13,
+      "volumes_from_mass": true
+    },
+    "boundary": {
+      "bore": "adiabatic (screening)",
+      "jacket": "convection Tinf=60.0C h=2352.8 from R_iron_to_jacket=0.0077",
+      "note": "HTC/R screening \u2014 Bar B flow bench still required"
+    },
+    "energy_balance": {
+      "Q_in_w": 6035.1,
+      "Q_out_w": 6029.360374685902,
+      "relative_mismatch": 0.0009510406313232096
+    },
+    "probes_c": {
+      "tooth_mid": 148.6294260080199,
+      "yoke_mid": 131.1592347268866,
+      "jacket_outer": 106.42607488508143,
+      "winding_proxy_near_tooth": 148.6294260080199,
+      "magnet_proxy_bore": 150.63299416850845
+    },
+    "lptn_compare": {
+      "lptn_winding_c": 86.82,
+      "lptn_magnet_c": 99.4,
+      "delta_winding_proxy_minus_lptn_k": 61.8094260080199,
+      "delta_magnet_proxy_minus_lptn_k": 51.23299416850844,
+      "note": "Field is radial iron continuum; LPTN is two-source network with copper. Copper GAP here means field should run hotter than full LPTN if copper cooled separately \u2014 interpret deltas carefully."
+    },
+    "yoke_vs_tooth": {
+      "q_yoke_over_q_tooth": 1.3600157304141838,
+      "T_yoke_minus_T_tooth_k": -17.470191281133282
+    },
+    "figure": "/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/formula-e-front-mgu-20260729-1432/_motor_stack/multiphysics/r2_stator_temperature_field.png",
+    "honest_limits": [
+      "radial continuum \u2014 no circumferential slotting",
+      "no axial gradients / end-winding",
+      "copper and rotor GAP not zero",
+      "screening Steinmetz losses",
+      "jacket R=0.0077 assumed"
+    ]
+  },
+  "r3": {
+    "schema": "forgeos.multiphysics.r3_pyvista/v1",
+    "ran_at": "2026-08-05T08:34:38Z",
+    "ship_ok": false,
+    "figure": "/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/formula-e-front-mgu-20260729-1432/_motor_stack/multiphysics/r3_pyvista_temperature_cutaway.png",
+    "jack_pack": "/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/formula-e-front-mgu-20260729-1432/_motor_stack/jack_em_pack/45-multiphysics-thermal-field.png",
+    "labels_on_image": true,
+    "not_cht": true,
+    "not_axial": true
+  },
+  "r4": {
+    "schema": "forgeos.multiphysics.r4_thermal_stress/v1",
+    "ran_at": "2026-08-05T08:34:38Z",
+    "ship_ok": false,
+    "calculix_docker": {
+      "image": "forgeos/calculix:2.21-arm64",
+      "available": true,
+      "note": "image present"
+    },
+    "centrifugal_baseline": {
+      "source": "/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/formula-e-front-mgu-20260729-1432/_motor_stack/rotor_fos_screening_card.json",
+      "rotor_fos_screening": 2.635,
+      "rpm": 24000,
+      "note": "Existing CalculiX centrifugal screen \u2014 thermal ADDS to this"
+    },
+    "thermal_stress_oom_screen": {
+      "method": "sigma = E * alpha * (T_yoke - T_coolant) order-of-magnitude",
+      "E_pa": 200000000000.0,
+      "alpha_per_k": 1.2e-05,
+      "delta_T_k": 71.15923472688661,
+      "sigma_th_mpa": 170.78216334452787,
+      "not_coupled_fe": true,
+      "note": "OOM screen only. Full *COUPLED TEMPERATURE-DISPLACEMENT not executed in this pass if mesh export path not wired; Docker image availability recorded."
+    },
+    "status": "PARTIAL_SMOKE_OK_PLUS_OOM_THERMAL",
+    "honest_limits": [
+      "not full coupled CCX mesh from twin CAD",
+      "thermal stress OOM superposes on centrifugal FoS \u2014 do not quote either alone as release"
+    ],
+    "calculix_smoke": {
+      "returncode": 0,
+      "tail": "CALCULIX_RUNTIME=docker\nCALCULIX_IMAGE=forgeos/calculix:2.21-arm64\nCALCULIX_MAX_ABS_DISPLACEMENT_MM=0.00483982\nCALCULIX_MAX_ABS_STRESS_MPA=8\nCALCULIX_RESULT_DATABASE_BYTES=3684\nCALCULIX_SMOKE_PASS: displacement and stress fields verified\n"
+    },
+    "figure": "/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/formula-e-front-mgu-20260729-1432/_motor_stack/multiphysics/r4_thermal_stress_screen.png"
+  },
+  "r5": {
+    "schema": "forgeos.multiphysics.r5_material_swap/v1",
+    "ran_at": "2026-08-05T08:34:39Z",
+    "ship_ok": false,
+    "base": {
+      "grade": "M400-50A",
+      "iron_loss_w": 6035.1,
+      "tooth_loss_w": 2249.4,
+      "yoke_loss_w": 3785.7,
+      "kh": 0.032222,
+      "ke": 0.00011686090273147389
+    },
+    "alternative": {
+      "grade": "M270-35A",
+      "status": "GAP",
+      "reason": "machine_lamination has no grade-coeff API used here"
+    },
+    "loss_ratio_alt_over_base": null,
+    "thermal_implication": "No scaled alternative loss \u2014 thermal delta not estimated.",
+    "stress_implication": "Lower loss \u2192 lower thermal stress OOM; centrifugal FoS unchanged at same rpm.",
+    "honest_limits": [
+      "screening Steinmetz \u2014 not measured loss",
+      "no full re-mesh or re-solve of EM B for the alternative grade"
+    ],
+    "figure": "/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/formula-e-front-mgu-20260729-1432/_motor_stack/multiphysics/r5_material_swap.png"
+  },
+  "r6": {
+    "schema": "forgeos.multiphysics.capability_index/v1",
+    "ran_at": "2026-08-05T08:34:39Z",
+    "ship_ok": false,
+    "purpose": "Answer: what can this engine analyse for Jack / Tristan",
+    "rows": [
+      {
+        "analysis": "EM magnetostatics + rotor sweep (Path B)",
+        "tool": "FEMM femmcli / xfemm path",
+        "last_ran": "2026-08-04/05 Sprint1\u20132",
+        "status": "RAN",
+        "honest_limit": "2-D planar; torque_reliable=false until dyno",
+        "artefact": "_motor_stack/em_fia_front_kit_case_PATH_B_DEC009.json"
+      },
+      {
+        "analysis": "EM grade / voltage / map (Sprint 2)",
+        "tool": "em_grade_sprint2.py",
+        "last_ran": "see twin",
+        "status": "RAN",
+        "honest_limit": "mesh stamp is spatial subsample proxy",
+        "artefact": "_motor_stack/em_grade_card.json"
+      },
+      {
+        "analysis": "R1 known-answer conduction",
+        "tool": "numpy FD (+ FEMM heat attempt)",
+        "last_ran": "2026-08-05T08:34:39Z",
+        "status": "FAIL",
+        "honest_limit": "FEMM heat BC assignment CANNOT (segfault)",
+        "artefact": "multiphysics/r1_known_answer.json"
+      },
+      {
+        "analysis": "R2 stator temperature field",
+        "tool": "radial FD + twin iron-loss densities",
+        "last_ran": "2026-08-05T08:34:39Z",
+        "status": "RAN",
+        "honest_limit": "radial only; copper/rotor GAP; HTC screening",
+        "artefact": "multiphysics/r2_stator_temperature_field.json"
+      },
+      {
+        "analysis": "R3 thermal visualisation",
+        "tool": "PyVista 0.48",
+        "last_ran": "2026-08-05T08:34:39Z",
+        "status": "RAN",
+        "honest_limit": "not CHT; not axial",
+        "artefact": "multiphysics/r3_pyvista.json"
+      },
+      {
+        "analysis": "R4 thermal + centrifugal stress",
+        "tool": "CalculiX Docker + OOM thermal",
+        "last_ran": "2026-08-05T08:34:39Z",
+        "status": "PARTIAL_SMOKE_OK_PLUS_OOM_THERMAL",
+        "honest_limit": "OOM thermal unless full coupled mesh wired",
+        "artefact": "multiphysics/r4_thermal_stress.json"
+      },
+      {
+        "analysis": "R5 material grade swap",
+        "tool": "machine_lamination + screening scale",
+        "last_ran": "2026-08-05T08:34:39Z",
+        "status": "RAN",
+        "honest_limit": "no re-solved B for alt grade",
+        "artefact": "multiphysics/r5_material_swap.json"
+      },
+      {
+        "analysis": "LPTN / coolant network",
+        "tool": "CoolProp + analytical_fia_cooling_*",
+        "last_ran": "prior campaign",
+        "status": "RAN",
+        "honest_limit": "few-node network; not field",
+        "artefact": "_motor_stack/analytical_fia_cooling_thermal_screen.json"
+      },
+      {
+        "analysis": "Centrifugal rotor FoS",
+        "tool": "CalculiX (existing screen)",
+        "last_ran": "prior",
+        "status": "RAN",
+        "honest_limit": "centrifugal only until R4 thermal add",
+        "artefact": "_motor_stack/rotor_fos_screening_card.json"
+      },
+      {
+        "analysis": "OpenFOAM jacket / cold plate",
+        "tool": "OpenFOAM scripts present",
+        "last_ran": "scripted; runtime env dependent",
+        "status": "AVAILABLE_SCRIPT",
+        "honest_limit": "not full helical CHT; Bar B flow bench still open",
+        "artefact": "scripts/motor-stack/openfoam_fia_*.py"
+      },
+      {
+        "analysis": "ROSS rotordynamics",
+        "tool": "ross_fia_front_kit_case.py",
+        "last_ran": "optional \u2014 not executed this pass",
+        "status": "AVAILABLE_SCRIPT_DEFERRED",
+        "honest_limit": "beam model PARTIAL; needs Tristan go-ahead for product use",
+        "artefact": "scripts/motor-stack/ross_fia_front_kit_case.py"
+      },
+      {
+        "analysis": "Elmer multiphysics",
+        "tool": "\u2014",
+        "last_ran": "\u2014",
+        "status": "WILL_NOT_INSTALL",
+        "honest_limit": "duplicates FEMM+CalculiX+PyVista stack",
+        "artefact": null
+      },
+      {
+        "analysis": "ParaView GUI",
+        "tool": "/opt/homebrew/bin/paraview",
+        "last_ran": "installed; headless via PyVista",
+        "status": "AVAILABLE",
+        "honest_limit": "interactive exploration; pack uses PyVista",
+        "artefact": null
+      },
+      {
+        "analysis": "gmsh",
+        "tool": "/opt/homebrew/bin/gmsh",
+        "last_ran": "installed unused this pass",
+        "status": "AVAILABLE",
+        "honest_limit": "mesh generation for future CCX full models",
+        "artefact": null
+      }
+    ],
+    "headline": "EM Path B + Sprint 2 grades available; thermal field Path A (R1) proven by FD; FEMM heat module currently broken on BC set; visual thermal field for stator radial model; stress OOM + existing centrifugal FoS; no ship_ok.",
+    "figure": "/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/formula-e-front-mgu-20260729-1432/_motor_stack/multiphysics/r6_capability_index.png"
+  }
+}

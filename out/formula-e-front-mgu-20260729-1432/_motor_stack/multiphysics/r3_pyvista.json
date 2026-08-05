@@ -1,0 +1,10 @@
+{
+  "schema": "forgeos.multiphysics.r3_pyvista/v1",
+  "ran_at": "2026-08-05T08:34:38Z",
+  "ship_ok": false,
+  "figure": "/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/formula-e-front-mgu-20260729-1432/_motor_stack/multiphysics/r3_pyvista_temperature_cutaway.png",
+  "jack_pack": "/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/formula-e-front-mgu-20260729-1432/_motor_stack/jack_em_pack/45-multiphysics-thermal-field.png",
+  "labels_on_image": true,
+  "not_cht": true,
+  "not_axial": true
+}

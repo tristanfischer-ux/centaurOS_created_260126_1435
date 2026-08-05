@@ -1,0 +1,81 @@
+{
+  "schema": "forgeos.fpk.stabilize_fe_front_honesty/v1",
+  "applied_at": "2026-08-04T11:37:02Z",
+  "twin": "/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/formula-e-front-mgu-20260729-1432",
+  "actions": [
+    "binding_duty_shaft_torque_nm=125.214912 (conservative_rebalanced_reference_not_architecture_power_bar)",
+    "architecture_duty_shaft_torque_nm=104.098914",
+    "last_sign_consistent_kit_case_fe_mean_nm=122.099939 from _motor_stack/em_fia_front_kit_case_PATH_B_DEC009.json (duty_clear=false)",
+    "mgu_fe_shaft_torque_nm relabelled product=133.854741",
+    "dec_009_baseline_reference repaired magnet=6.0x22.5 active=97.58",
+    "DEC-009 residual_risk updated (FE SIGHT dual-bar)",
+    "state.decisionRegister synced from file"
+  ],
+  "binding_duty_shaft_torque_nm": 125.214912,
+  "architecture_duty_shaft_torque_nm": 104.098914,
+  "option_screen_product_nm": 133.854741,
+  "last_sign_consistent_kit_case_fe_mean_nm": 122.099939,
+  "last_coherent_kit_case_fe_mean_nm": 122.099939,
+  "fe_mean_source": "_motor_stack/em_fia_front_kit_case_PATH_B_DEC009.json",
+  "fe_mean_duty_clear": false,
+  "fe_mean_torque_reliable": false,
+  "ratio_vs_architecture_duty": 1.172922313099251,
+  "ratio_vs_conservative_binding": 0.9751229869490305,
+  "path_b_adopted": true,
+  "rebalanced": {
+    "path": "_motor_stack/em_fia_front_kit_case_REBALANCED.json",
+    "active_length_mm": 97.58,
+    "magnet_thickness_mm": 6.0,
+    "magnet_length_mm": 22.5,
+    "max_rotor_speed_rpm": 19500.0,
+    "phase_current_design_a": 477.0,
+    "torque_magnitude_mean_nm": 81.558081,
+    "required_shaft_torque_nm": 125.214912,
+    "torque_reliable": false,
+    "duty_torque_screen_ok": false,
+    "mean_torque_vs_required_ratio": 0.651345,
+    "sign_reversals": 0,
+    "torque_sign_consistent": true,
+    "torque_magnitude_min_nm": 55.961,
+    "torque_magnitude_max_nm": 97.637594,
+    "fail_reasons": [
+      "torque_reliable=false",
+      "mean_ratio=0.6513<1.0"
+    ],
+    "schema_paths_tried": [
+      "works_in_kit_context",
+      "loaded_point",
+      "analytical_duty_check",
+      "rotor_position_sweep.summary"
+    ]
+  },
+  "path_b": {
+    "path": "_motor_stack/em_fia_front_kit_case_PATH_B_DEC009.json",
+    "active_length_mm": 130.0,
+    "magnet_thickness_mm": 6.0,
+    "magnet_length_mm": 22.5,
+    "max_rotor_speed_rpm": 24000.0,
+    "phase_current_design_a": 535.0,
+    "torque_magnitude_mean_nm": 122.099939,
+    "required_shaft_torque_nm": 104.098914,
+    "torque_reliable": false,
+    "duty_torque_screen_ok": false,
+    "mean_torque_vs_required_ratio": 1.172922,
+    "sign_reversals": 0,
+    "torque_sign_consistent": true,
+    "torque_magnitude_min_nm": 84.967287,
+    "torque_magnitude_max_nm": 145.231484,
+    "fail_reasons": [
+      "torque_reliable=false"
+    ],
+    "coherent": true
+  },
+  "ship_ok": false,
+  "not_done": [
+    "torque_reliable / dyno-map close",
+    "Bar A FE close / ship_ok",
+    "MemPalace rewrite",
+    "edit em_fia_front_kit_case.py to force torque_reliable",
+    "retire conservative binding 125.2 without DEC"
+  ]
+}

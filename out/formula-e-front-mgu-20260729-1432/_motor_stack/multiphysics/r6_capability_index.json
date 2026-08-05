@@ -1,0 +1,109 @@
+{
+  "schema": "forgeos.multiphysics.capability_index/v2",
+  "ran_at": "2026-08-05T09:06:28Z",
+  "ship_ok": false,
+  "headline": "FEMM heat-flow is LIVE (R1 pass, R2 field). CalculiX thermal-gradient stress RAN. ROSS shows first critical ~22.9k under operating 24k (margin\u00d70.96) with assumed bearings. ship_ok false. Bar B OPEN.",
+  "rows": [
+    {
+      "status": "RAN",
+      "analysis": "EM Path B kit-case FE (122.1 N\u00b7m)",
+      "tool": "FEMM femmcli",
+      "honest_limit": "2-D planar; torque_reliable=false"
+    },
+    {
+      "status": "RAN",
+      "analysis": "EM Sprint 2 grade card",
+      "tool": "em_grade_sprint2.py",
+      "honest_limit": "mesh stamp still spatial-proxy open"
+    },
+    {
+      "status": "RAN_PASS",
+      "analysis": "R1 known-answer heat",
+      "tool": "FEMM heat + FD crosscheck",
+      "honest_limit": "max |err|\u22480.004 K; 6-arg setsegmentprop required"
+    },
+    {
+      "status": "RAN",
+      "analysis": "R2 stator temperature field",
+      "tool": "FEMM heat-flow",
+      "honest_limit": "radial strip; copper/rotor GAP; screening HTC"
+    },
+    {
+      "status": "RAN",
+      "analysis": "R3 thermal visualisation",
+      "tool": "PyVista",
+      "honest_limit": "not CHT; not axial"
+    },
+    {
+      "status": "RAN",
+      "analysis": "R4 centrif + thermal gradient stress",
+      "tool": "CalculiX Docker",
+      "honest_limit": "coarse ring; \u0394\u224825 MPa from T gradient; not release FoS"
+    },
+    {
+      "status": "RAN",
+      "analysis": "R5 material swap M400\u2192M270",
+      "tool": "machine_lamination.py",
+      "honest_limit": "fixed B probes; ~0.52\u00d7 iron loss at 24k f"
+    },
+    {
+      "status": "RAN",
+      "analysis": "R6 capability index",
+      "tool": "this pack",
+      "honest_limit": "living document"
+    },
+    {
+      "status": "PARTIAL",
+      "analysis": "ROSS critical speeds",
+      "tool": "ross 2.3.0",
+      "honest_limit": "first crit 22922 vs 24k; margin\u00d70.96; assumed bearings"
+    },
+    {
+      "status": "RAN",
+      "analysis": "LPTN / coolant network",
+      "tool": "CoolProp + analytical screens",
+      "honest_limit": "few-node; not field"
+    },
+    {
+      "status": "RAN",
+      "analysis": "Centrifugal rotor FoS @19.5k",
+      "tool": "CalculiX prior",
+      "honest_limit": "FoS\u22482.635 screening"
+    },
+    {
+      "status": "AVAILABLE_SCRIPT",
+      "analysis": "OpenFOAM jacket/cold-plate",
+      "tool": "openfoam_fia_*.py",
+      "honest_limit": "not full helical CHT"
+    },
+    {
+      "status": "AVAILABLE",
+      "analysis": "ParaView GUI",
+      "tool": "/opt/homebrew/bin/paraview",
+      "honest_limit": "interactive; packs use PyVista"
+    },
+    {
+      "status": "AVAILABLE",
+      "analysis": "gmsh",
+      "tool": "/opt/homebrew/bin/gmsh",
+      "honest_limit": "mesh gen for deeper CCX"
+    },
+    {
+      "status": "WILL_NOT",
+      "analysis": "Elmer multiphysics",
+      "tool": "\u2014",
+      "honest_limit": "duplicates stack \u2014 do not install"
+    }
+  ],
+  "jack_previews": [
+    "45-multiphysics-thermal-field.png",
+    "46-multiphysics-capability-index.png",
+    "47-r1-known-answer-conduction.png",
+    "48-r2-stator-temperature-field.png",
+    "48b-r2-femm-stator-heat.png",
+    "49-r4-thermal-stress-screen.png",
+    "50-r5-material-swap.png",
+    "51-ross-critical-speeds.png",
+    "00-COVERING-NOTE-FOR-JACK.md"
+  ]
+}

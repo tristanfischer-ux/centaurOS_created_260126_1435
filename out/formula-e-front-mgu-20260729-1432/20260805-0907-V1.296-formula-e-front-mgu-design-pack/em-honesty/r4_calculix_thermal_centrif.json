@@ -1,0 +1,28 @@
+{
+  "schema": "forgeos.multiphysics.r4_calculix_thermal_centrif/v2",
+  "ran_at": "2026-08-05T09:05:37Z",
+  "ship_ok": false,
+  "rpm": 24000.0,
+  "T_ref_c": 20.0,
+  "T_field": "FEMM R2 radial samples mapped to ring nodes",
+  "centrif_only": {
+    "ok": true,
+    "max_von_mises_mpa": 215.02860925417545,
+    "n": 144
+  },
+  "centrif_plus_thermal_gradient": {
+    "ok": true,
+    "max_von_mises_mpa": 240.0161919602836,
+    "n": 144
+  },
+  "delta_vm_mpa": 24.987582706108157,
+  "assumed_yield_mpa": 355.0,
+  "status": "RAN",
+  "honest_limits": [
+    "coarse C3D8 quarter ring",
+    "stator-field T mapped onto rotor ring as screening proxy",
+    "not laminate/magnet-pocket mesh",
+    "not release FoS"
+  ],
+  "figure": "/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/formula-e-front-mgu-20260729-1432/_motor_stack/multiphysics/r4_calculix_thermal_centrif.png"
+}

@@ -1,0 +1,61 @@
+{
+  "schema": "forgeos.multiphysics.r5_material_swap/v2",
+  "ship_ok": false,
+  "method": "machine_lamination.steinmetz_from_lamination at fixed B probes",
+  "B_tooth_t": 1.799410316060748,
+  "B_yoke_t": 2.103596059622518,
+  "base_at_dec009_hz": {
+    "grade": "M400-50A",
+    "kh": 0.032222378800803336,
+    "ke": 0.00011686090273147389,
+    "alpha": 1.8,
+    "tooth_loss_w": 3306.0064421259603,
+    "yoke_loss_w": 5568.333148807261,
+    "iron_loss_w": 8874.339590933221,
+    "frequency_hz": 1600.0,
+    "spec": {
+      "thickness_m": 0.0005,
+      "density": 7650.0,
+      "designation": "M400-50A"
+    }
+  },
+  "alt_at_dec009_hz": {
+    "grade": "M270-35A",
+    "kh": 0.022922379929605167,
+    "ke": 5.7261842338422205e-05,
+    "alpha": 1.8,
+    "tooth_loss_w": 1717.1887984168127,
+    "yoke_loss_w": 2887.888843634736,
+    "iron_loss_w": 4605.0776420515485,
+    "frequency_hz": 1600.0,
+    "spec": {
+      "thickness_m": 0.00035,
+      "density": 7650.0,
+      "designation": "M270-35A"
+    }
+  },
+  "base_at_file_hz_crosscheck": {
+    "grade": "M400-50A",
+    "kh": 0.032222378800803336,
+    "ke": 0.00011686090273147389,
+    "alpha": 1.8,
+    "tooth_loss_w": 2249.400662141133,
+    "yoke_loss_w": 3785.665318044864,
+    "iron_loss_w": 6035.0659801859965,
+    "frequency_hz": 1300.0,
+    "spec": {
+      "thickness_m": 0.0005,
+      "density": 7650.0,
+      "designation": "M400-50A"
+    }
+  },
+  "twin_artefact_iron_loss_w": 6035.1,
+  "loss_ratio_alt_over_base": 0.5189206019067026,
+  "thermal_implication": "Iron loss scales ~0.519\u00d7 at same B; temperature rise vs jacket roughly tracks if R fixed (re-run R2 with scaled q for field).",
+  "stress_implication": "Lower iron loss lowers thermal stress OOM; centrifugal FoS at 24k unchanged.",
+  "honest_limits": [
+    "B probes held fixed \u2014 no re-solved magnetics for alt grade",
+    "screening Steinmetz from grade designation",
+    "not measured loss"
+  ]
+}

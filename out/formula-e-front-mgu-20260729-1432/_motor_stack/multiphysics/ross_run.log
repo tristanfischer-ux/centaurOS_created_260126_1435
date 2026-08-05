@@ -1,0 +1,2 @@
+FIA front-kit rotor-dynamics screen: first critical ≈ 22,922.4 rpm (382.04 Hz) vs operating 24,000 rpm (margin ×0.96; need ≥×1.20 for subcritical screen). Band is NOT clear of the operating speed under assumed bearings. Model: Ø105.9 mm shaft × 140.5 mm span, Ø139.4×130.0 mm rotor disk. Bearing identity, modal/dyno correlation remain OPEN; ship_ok is false.
+Artefact: /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/formula-e-front-mgu-20260729-1432/_motor_stack/ross_fia_front_kit_case.json

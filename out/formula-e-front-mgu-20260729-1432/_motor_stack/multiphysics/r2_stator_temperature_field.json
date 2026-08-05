@@ -1,0 +1,58 @@
+{
+  "schema": "forgeos.multiphysics.r2_stator_temperature_field/v1",
+  "ran_at": "2026-08-05T08:34:37Z",
+  "ship_ok": false,
+  "method": "1D_radial_finite_volume_axisymmetric_stator",
+  "sources_w_m3": {
+    "tooth": 5814465.281297517,
+    "yoke": 7907764.246511755,
+    "copper": null,
+    "copper_status": "GAP \u2014 slot volume not derived without inventing fill factor",
+    "rotor_iron": null,
+    "rotor_status": "GAP \u2014 rotor iron loss not separately resolved"
+  },
+  "geometry_m": {
+    "r_bore": 0.0467,
+    "r_slot_bottom": 0.055929759270060934,
+    "r_yoke_outer": 0.06557691157454681,
+    "r_jacket": 0.06757691157454682,
+    "stack_depth": 0.13,
+    "volumes_from_mass": true
+  },
+  "boundary": {
+    "bore": "adiabatic (screening)",
+    "jacket": "convection Tinf=60.0C h=2352.8 from R_iron_to_jacket=0.0077",
+    "note": "HTC/R screening \u2014 Bar B flow bench still required"
+  },
+  "energy_balance": {
+    "Q_in_w": 6035.1,
+    "Q_out_w": 6029.360374685902,
+    "relative_mismatch": 0.0009510406313232096
+  },
+  "probes_c": {
+    "tooth_mid": 148.6294260080199,
+    "yoke_mid": 131.1592347268866,
+    "jacket_outer": 106.42607488508143,
+    "winding_proxy_near_tooth": 148.6294260080199,
+    "magnet_proxy_bore": 150.63299416850845
+  },
+  "lptn_compare": {
+    "lptn_winding_c": 86.82,
+    "lptn_magnet_c": 99.4,
+    "delta_winding_proxy_minus_lptn_k": 61.8094260080199,
+    "delta_magnet_proxy_minus_lptn_k": 51.23299416850844,
+    "note": "Field is radial iron continuum; LPTN is two-source network with copper. Copper GAP here means field should run hotter than full LPTN if copper cooled separately \u2014 interpret deltas carefully."
+  },
+  "yoke_vs_tooth": {
+    "q_yoke_over_q_tooth": 1.3600157304141838,
+    "T_yoke_minus_T_tooth_k": -17.470191281133282
+  },
+  "figure": "/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/formula-e-front-mgu-20260729-1432/_motor_stack/multiphysics/r2_stator_temperature_field.png",
+  "honest_limits": [
+    "radial continuum \u2014 no circumferential slotting",
+    "no axial gradients / end-winding",
+    "copper and rotor GAP not zero",
+    "screening Steinmetz losses",
+    "jacket R=0.0077 assumed"
+  ]
+}

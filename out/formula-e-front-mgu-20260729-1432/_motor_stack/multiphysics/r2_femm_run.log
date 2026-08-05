@@ -1,0 +1,6 @@
+FEASolver::LoadProblemFile
+Warning: [frequency] is not an allowed parameter for heat flow problems!
+Conjugate Gradient Solver
+PROBE tooth=162.781 yoke=143.615 jacket=115.233 bore=164.991
+FEMM_R2_OK
+No errors

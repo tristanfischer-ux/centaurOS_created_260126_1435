@@ -1,0 +1,7 @@
+{
+  "lptn_winding_c": 86.82,
+  "lptn_magnet_c": 99.4,
+  "delta_winding_proxy_minus_lptn_k": 61.8094260080199,
+  "delta_magnet_proxy_minus_lptn_k": 51.23299416850844,
+  "note": "Field is radial iron continuum; LPTN is two-source network with copper. Copper GAP here means field should run hotter than full LPTN if copper cooled separately \u2014 interpret deltas carefully."
+}

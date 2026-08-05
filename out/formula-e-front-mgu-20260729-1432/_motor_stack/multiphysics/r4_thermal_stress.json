@@ -1,0 +1,35 @@
+{
+  "schema": "forgeos.multiphysics.r4_thermal_stress/v1",
+  "ran_at": "2026-08-05T08:34:38Z",
+  "ship_ok": false,
+  "calculix_docker": {
+    "image": "forgeos/calculix:2.21-arm64",
+    "available": true,
+    "note": "image present"
+  },
+  "centrifugal_baseline": {
+    "source": "/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/formula-e-front-mgu-20260729-1432/_motor_stack/rotor_fos_screening_card.json",
+    "rotor_fos_screening": 2.635,
+    "rpm": 24000,
+    "note": "Existing CalculiX centrifugal screen \u2014 thermal ADDS to this"
+  },
+  "thermal_stress_oom_screen": {
+    "method": "sigma = E * alpha * (T_yoke - T_coolant) order-of-magnitude",
+    "E_pa": 200000000000.0,
+    "alpha_per_k": 1.2e-05,
+    "delta_T_k": 71.15923472688661,
+    "sigma_th_mpa": 170.78216334452787,
+    "not_coupled_fe": true,
+    "note": "OOM screen only. Full *COUPLED TEMPERATURE-DISPLACEMENT not executed in this pass if mesh export path not wired; Docker image availability recorded."
+  },
+  "status": "PARTIAL_SMOKE_OK_PLUS_OOM_THERMAL",
+  "honest_limits": [
+    "not full coupled CCX mesh from twin CAD",
+    "thermal stress OOM superposes on centrifugal FoS \u2014 do not quote either alone as release"
+  ],
+  "calculix_smoke": {
+    "returncode": 0,
+    "tail": "CALCULIX_RUNTIME=docker\nCALCULIX_IMAGE=forgeos/calculix:2.21-arm64\nCALCULIX_MAX_ABS_DISPLACEMENT_MM=0.00483982\nCALCULIX_MAX_ABS_STRESS_MPA=8\nCALCULIX_RESULT_DATABASE_BYTES=3684\nCALCULIX_SMOKE_PASS: displacement and stress fields verified\n"
+  },
+  "figure": "/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/formula-e-front-mgu-20260729-1432/_motor_stack/multiphysics/r4_thermal_stress_screen.png"
+}

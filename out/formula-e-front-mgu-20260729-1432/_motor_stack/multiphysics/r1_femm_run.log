@@ -1,0 +1,5 @@
+FEASolver::LoadProblemFile
+Warning: [frequency] is not an allowed parameter for heat flow problems!
+Conjugate Gradient Solver
+FEMM_HEAT_R1_OK
+No errors
