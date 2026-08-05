@@ -963,13 +963,13 @@
           "instanceName": "hv_lv_isolation_barrier_word",
           "nameHuman": "Draft HV/LV signal isolation barrier",
           "characterId": "hv_lv_isolation_barrier",
-          "manufacturer": null,
-          "partNumber": null,
+          "manufacturer": "Analog Devices",
+          "partNumber": "ADUM1201ARZ-RL7",
           "footprint": {
             "library": "Package_SO",
-            "footprint": "SOIC-8_3.81x9.347mm_P2.54mm"
+            "footprint": "SOIC-8_3.9x4.9mm_P1.27mm"
           },
-          "resolutionTier": "package_family",
+          "resolutionTier": "mpn_symbol_footprint",
           "quantityInDesign": 1
         },
         {

@@ -1,0 +1,52 @@
+{
+  "schema": "forgeos.fpk.inverter_dc_link_honesty/v1",
+  "ran_at": "2026-08-05T11:56:45Z",
+  "ship_ok": false,
+  "status": "PARTIAL_CONCEPT_PACKAGE",
+  "headline": "SiC MCU packaging screen OK under seeds; DC-link is a sensitivity envelope \u2014 no capacitor MPN selected; ESL not measured; double-pulse OPEN.",
+  "inverter": {
+    "power_kw": 250,
+    "v_dc": 750,
+    "efficiency_seed": 0.98766,
+    "dissipated_kw": 4.318,
+    "sic_module_count_seed": 3,
+    "mcu_box_mm": [
+      235.3,
+      139.6,
+      28.0
+    ],
+    "mass_kg_seed": 8.2,
+    "esl_nominal_nh": 6.39,
+    "esl_status": "analytical laminated-bus seed \u2014 NOT measured",
+    "module_mpn_status": "OPEN \u2014 partner ask"
+  },
+  "dc_link_provisional_design_point": {
+    "note": "Mid-row of twin sensitivity table \u2014 provisional only",
+    "case": {
+      "f_sw_khz": 12.0,
+      "dv_frac": 0.02,
+      "c_min_uF": 294.7,
+      "energy_j": 82.89,
+      "volume_cm3_band": {
+        "low": 55.3,
+        "nom": 82.9,
+        "high": 165.8
+      }
+    },
+    "envelope_c_min_uF": {
+      "min": 70.7,
+      "max": 884.2
+    },
+    "volume_cm3_band": {
+      "min": 19.9,
+      "max": 248.7
+    }
+  },
+  "explicitly_not_claimed": [
+    "selected film capacitor MPN",
+    "measured ESL / double-pulse energy",
+    "supplier SiC module STEP",
+    "ship_ok / homologation"
+  ],
+  "adversarial_response": "Council FATAL on fantasy continuous winding/module temps and packaging greenwash: this card keeps PARTIAL and OPEN lists explicit. Blender film-cap cylinders are morphology cues, not selected parts."
+}

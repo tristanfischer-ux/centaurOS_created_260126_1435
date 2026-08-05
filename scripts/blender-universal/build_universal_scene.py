@@ -20178,20 +20178,40 @@ def _fpk_place_pe_volume_density(
             module=story_mod,
             module_objects=MO,
         )
-    # Film caps: one bank per phase leg (same N as modules).
+    # Film DC-link caps: axial film cylinders (not decorative bricks) — one
+    # bank per phase leg. Volumes are concept morphology from the twin envelope;
+    # no MPN is claimed.
     for ci in range(max(1, n)):
-        fl.add_box(
+        cx = x_inv - inv_w * 0.28 + ci * (inv_w * 0.56 / max(1, n))
+        cy = y_inv + inv_d * 0.30
+        cz = inv_z - inv_h * 0.02
+        r = max(4.0, min(inv_w, inv_d) * 0.07)
+        h_cap = max(12.0, inv_h * 0.62)
+        # Horizontal film cylinder along X (can-style metalised film look).
+        fl.add_cyl(
             f"u_se_td_pe_filmcap_{ci}",
-            _mm3((
-                x_inv - inv_w * 0.30 + ci * (inv_w * 0.60 / max(1, n)),
-                y_inv + inv_d * 0.32,
-                inv_z - inv_h * 0.05,
-            )),
-            _mm3((inv_w * 0.12, inv_d * 0.14, inv_h * 0.55)),
+            _mm3((cx, cy, cz)),
+            r * fl.MM,
+            h_cap * fl.MM,
             mat_cap,
             module=story_mod,
             module_objects=MO,
+            vertices=16,
+            rotation=(0.0, 1.5707963, 0.0),
         )
+        # End-cap discs (darker bus lands).
+        for ei, ex in enumerate((-0.52, 0.52)):
+            fl.add_cyl(
+                f"u_se_td_pe_filmcap_{ci}_end_{ei}",
+                _mm3((cx + h_cap * ex * 0.5, cy, cz)),
+                (r * 1.05) * fl.MM,
+                max(1.5, r * 0.25) * fl.MM,
+                mat_bus,
+                module=story_mod,
+                module_objects=MO,
+                vertices=12,
+                rotation=(0.0, 1.5707963, 0.0),
+            )
     fl.add_box(
         "u_se_td_pe_gd_flex",
         _mm3((x_inv, y_inv - inv_d * 0.05, inv_z + inv_h * 0.35)),

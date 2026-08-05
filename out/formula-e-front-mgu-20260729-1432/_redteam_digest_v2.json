@@ -1,0 +1,2113 @@
+{
+  "built_at": "2026-08-05T11:48:23.171773+00:00",
+  "twin": "/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/formula-e-front-mgu-20260729-1432",
+  "revision": null,
+  "product_class": "formula_e_front_mgu",
+  "ship": {
+    "ship_ok": false,
+    "homologationHonesty": {
+      "verdict": "NOT_HOMOLOGATED",
+      "open_by_design_ids": [
+        "hv_dc_fuse_word",
+        "connector_interlock_pin_word",
+        "ac_phase_busbar_pierce_word",
+        "shield_drain_bond_word",
+        "sic_traction_inverter_word",
+        "inverter_housing_word",
+        "inverter_cover_word",
+        "sic_power_module_stack_word",
+        "gate_driver_board_word",
+        "hv_dc_connector_word",
+        "lv_signal_connector_word",
+        "coolant_port_in_word",
+        "coolant_port_out_word",
+        "oem_inverter_control_board_word",
+        "can_fd_vehicle_interface_word",
+        "hv_interlock_interface_word",
+        "control_harness_set_word",
+        "voltage_sensor_word",
+        "traction_ipmsm_motor_generator_word",
+        "motor_outer_casing_word",
+        "motor_cover_word",
+        "motor_cooling_jacket_word",
+        "stator_laminations_word",
+        "stator_windings_word",
+        "reduction_gear_stage_tool_grounded_word",
+        "permanent_magnet_set_word",
+        "hollow_rotor_barrel_word",
+        "motor_shaft_word",
+        "front_bearing_word",
+        "rear_bearing_word",
+        "front_end_bell_word",
+        "traction_drive_housing_word",
+        "cassette_cover_word",
+        "hv_shield_cover_word",
+        "mounting_ear_set_word",
+        "nameplate_word",
+        "traction_motor_synth_word",
+        "traction_inverter_synth_word",
+        "hv_interlock_loop_word",
+        "phase_overcurrent_trip_word",
+        "inverter_desat_protection_word",
+        "coolant_flow_interlock_word",
+        "isolation_monitor_interface_word",
+        "coolant_hose_set_word",
+        "coolant_expansion_bottle_word"
+      ],
+      "open_by_design_count": 45,
+      "note": "45 of 55 catalogue parts are OPEN BY DESIGN at concept stage: their requirements are specified but the exact part is confirmed at detailed design or on supplier quotation. Declared rather than filled \u2014 inventing a part number would fabricate a supplier decision the design deliberately defers. This dossier does NOT claim homologation.",
+      "items": [
+        {
+          "id": "hv_dc_fuse_word",
+          "name": "Hv DC Fuse",
+          "reason": "Concept design \u2014 catalogue part + exact MPN confirmed at detailed design",
+          "part_number_state": "TBD (detailed design)",
+          "requirements_specified": [
+            "form=Hv DC Fuse \u2014 representative power distribution component",
+            "dimensions=bolted on HV DC busbar link inside cassette",
+            "operating_temp_range=-40 to +125 \u00b0C"
+          ]
+        },
+        {
+          "id": "connector_interlock_pin_word",
+          "name": "Connector Interlock Pin",
+          "reason": "Concept design \u2014 catalogue part + exact MPN confirmed at detailed design",
+          "part_number_state": "TBD (detailed design)",
+          "requirements_specified": [
+            "form=Connector Interlock Pin \u2014 representative power distribution component"
+          ]
+        },
+        {
+          "id": "ac_phase_busbar_pierce_word",
+          "name": "AC Phase Busbar Pierce",
+          "reason": "Concept design \u2014 catalogue part + exact MPN confirmed at detailed design",
+          "part_number_state": "TBD (detailed design)",
+          "requirements_specified": [
+            "form=AC Phase Busbar Pierce \u2014 representative power distribution component",
+            "dimensions=pierce from L1 MCU shelf into L2 stator terminals",
+            "operating_temp_range=-40 to +180 \u00b0C near end-windings"
+          ]
+        },
+        {
+          "id": "shield_drain_bond_word",
+          "name": "Shield Drain Bond",
+          "reason": "Concept design \u2014 catalogue part + exact MPN confirmed at detailed design",
+          "part_number_state": "TBD (detailed design)",
+          "requirements_specified": [
+            "form=Shield Drain Bond \u2014 representative power distribution component"
+          ]
+        },
+        {
+          "id": "sic_traction_inverter_word",
+          "name": "SiC Traction Inverter",
+          "reason": "Concept design \u2014 catalogue part + exact MPN confirmed at detailed design",
+          "part_number_state": "TBD (detailed design)",
+          "requirements_specified": [
+            "form=SiC Traction Inverter \u2014 representative energy conversion transduction component",
+            "rating_primary=350"
+          ]
+        },
+        {
+          "id": "inverter_housing_word",
+          "name": "Inverter Housing",
+          "reason": "Concept design \u2014 catalogue part + exact MPN confirmed at detailed design",
+          "part_number_state": "TBD (detailed design)",
+          "requirements_specified": [
+            "form=Inverter Housing \u2014 representative energy conversion transduction component",
+            "rating_primary=350"
+          ]
+        },
+        {
+          "id": "inverter_cover_word",
+          "name": "Inverter Cover",
+          "reason": "Concept design \u2014 catalogue part + exact MPN confirmed at detailed design",
+          "part_number_state": "TBD (detailed design)",
+          "requirements_specified": [
+            "form=Inverter Cover \u2014 representative energy conversion transduction component",
+            "rating_primary=350"
+          ]
+        },
+        {
+          "id": "sic_power_module_stack_word",
+          "name": "SiC Power Module Stack",
+          "reason": "Concept design \u2014 catalogue part + exact MPN confirmed at detailed design",
+          "part_number_state": "TBD (detailed design)",
+          "requirements_specified": [
+            "form=SiC Power Module Stack \u2014 representative energy conversion transduction component",
+            "rating_primary=477",
+            "dimensions=three-phase stack on MCU cold plate ~154\u00d798 mm class",
+            "operating_temp_range=-40 to +175 \u00b0C Tj"
+          ]
+        },
+        {
+          "id": "gate_driver_board_word",
+          "name": "Gate Driver Board",
+          "reason": "Concept design \u2014 catalogue part + exact MPN confirmed at detailed design",
+          "part_number_state": "TBD (detailed design)",
+          "requirements_specified": [
+            "form=Gate Driver Board \u2014 representative energy conversion transduction component",
+            "rating_primary=gate-drive",
+            "operating_temp_range=-40 to +125 \u00b0C ambient at board"
+          ]
+        },
+        {
+          "id": "hv_dc_connector_word",
+          "name": "Hv DC Connector",
+          "reason": "Concept design \u2014 catalogue part + exact MPN confirmed at detailed design",
+          "part_number_state": "TBD (detailed design)",
+          "requirements_specified": [
+            "form=Hv DC Connector \u2014 representative energy conversion transduction component",
+            "dimensions=faces front-bay HV corridor; within 259 mm depth"
+          ]
+        },
+        {
+          "id": "lv_signal_connector_word",
+          "name": "LV Signal Connector",
+          "reason": "Concept design \u2014 catalogue part + exact MPN confirmed at detailed design",
+          "part_number_state": "TBD (detailed design)",
+          "requirements_specified": [
+            "form=LV Signal Connector \u2014 representative energy conversion transduction component",
+            "dimensions=faces front-bay LV corridor"
+          ]
+        },
+        {
+          "id": "coolant_port_in_word",
+          "name": "Coolant Port In",
+          "reason": "Concept design \u2014 catalogue part + exact MPN confirmed at detailed design",
+          "part_number_state": "TBD (detailed design)",
+          "requirements_specified": [
+            "form=Coolant Port In \u2014 representative energy conversion transduction component",
+            "dimensions=on MCU shelf service face within bay depth"
+          ]
+        },
+        {
+          "id": "coolant_port_out_word",
+          "name": "Coolant Port Out",
+          "reason": "Concept design \u2014 catalogue part + exact MPN confirmed at detailed design",
+          "part_number_state": "TBD (detailed design)",
+          "requirements_specified": [
+            "form=Coolant Port Out \u2014 representative energy conversion transduction component",
+            "dimensions=paired with inlet on front-bay corridor face"
+          ]
+        },
+        {
+          "id": "oem_inverter_control_board_word",
+          "name": "Oem Inverter Control Board",
+          "reason": "Concept design \u2014 catalogue part + exact MPN confirmed at detailed design",
+          "part_number_state": "TBD (detailed design)",
+          "requirements_specified": [
+            "form=Oem Inverter Control Board \u2014 representative control compute communication component",
+            "dimensions=fits L1 shelf beside gate drive",
+            "operating_temp_range=-40 to +105 \u00b0C"
+          ]
+        },
+        {
+          "id": "can_fd_vehicle_interface_word",
+          "name": "Can Fd Vehicle Interface",
+          "reason": "Concept design \u2014 catalogue part + exact MPN confirmed at detailed design",
+          "part_number_state": "TBD (detailed design)",
+          "requirements_specified": [
+            "form=Can Fd Vehicle Interface \u2014 representative control compute communication component",
+            "dimensions=on control board; LV connector exit to bay corridor",
+            "operating_temp_range=-40 to +125 \u00b0C"
+          ]
+        },
+        {
+          "id": "hv_interlock_interface_word",
+          "name": "Hv Interlock Interface",
+          "reason": "Concept design \u2014 catalogue part + exact MPN confirmed at detailed design",
+          "part_number_state": "TBD (detailed design)",
+          "requirements_specified": [
+            "form=Hv Interlock Interface \u2014 representative control compute communication component"
+          ]
+        },
+        {
+          "id": "control_harness_set_word",
+          "name": "Control Harness Set",
+          "reason": "Concept design \u2014 catalogue part + exact MPN confirmed at detailed design",
+          "part_number_state": "TBD (detailed design)",
+          "requirements_specified": [
+            "form=Control Harness Set \u2014 representative control compute communication component"
+          ]
+        },
+        {
+          "id": "voltage_sensor_word",
+          "name": "Voltage Sensor",
+          "reason": "Concept design \u2014 catalogue part + exact MPN confirmed at detailed design",
+          "part_number_state": "TBD (detailed design)",
+          "requirements_specified": [
+            "form=Voltage Sensor \u2014 representative sensing instrumentation component"
+          ]
+        },
+        {
+          "id": "traction_ipmsm_motor_generator_word",
+          "name": "Traction Ipmsm Motor Generator",
+          "reason": "Concept design \u2014 catalogue part + exact MPN confirmed at detailed design",
+          "part_number_state": "TBD (detailed design)",
+          "requirements_specified": [
+            "form=Traction Ipmsm Motor Generator \u2014 representative actuation kinematics component",
+            "rating_primary=350",
+            "operating_temp_range=winding limit 180 \u00b0C; magnet limit 150 \u00b0C; coolant inlet 60 \u00b0C"
+          ]
+        },
+        {
+          "id": "motor_outer_casing_word",
+          "name": "Motor Outer Casing",
+          "reason": "Concept design \u2014 catalogue part + exact MPN confirmed at detailed design",
+          "part_number_state": "TBD (detailed design)",
+          "requirements_specified": [
+            "form=Motor Outer Casing \u2014 representative actuation kinematics component",
+            "rating_primary=350"
+          ]
+        },
+        {
+          "id": "motor_cover_word",
+          "name": "Motor Cover",
+          "reason": "Concept design \u2014 catalogue part + exact MPN confirmed at detailed design",
+          "part_number_state": "TBD (detailed design)",
+          "requirements_specified": [
+            "form=Motor Cover \u2014 representative actuation kinematics component",
+            "rating_primary=350"
+          ]
+        },
+        {
+          "id": "motor_cooling_jacket_word",
+          "name": "Motor Cooling Jacket",
+          "reason": "Concept design \u2014 catalogue part + exact MPN confirmed at detailed design",
+          "part_number_state": "TBD (detailed design)",
+          "requirements_specified": [
+            "form=Motor Cooling Jacket \u2014 representative actuation kinematics component",
+            "rating_primary=350"
+          ]
+        },
+        {
+          "id": "stator_laminations_word",
+          "name": "Stator Laminations",
+          "reason": "Concept design \u2014 catalogue part + exact MPN confirmed at detailed design",
+          "part_number_state": "TBD (detailed design)",
+          "requirements_specified": [
+            "form=Stator Laminations \u2014 representative actuation kinematics component",
+            "dimensions=stack_length 98.33 mm; OD set by bay stator ring",
+            "operating_temp_range=-20 to +180 \u00b0C"
+          ]
+        },
+        {
+          "id": "stator_windings_word",
+          "name": "Stator Windings",
+          "reason": "Concept design \u2014 catalogue part + exact MPN confirmed at detailed design",
+          "part_number_state": "TBD (detailed design)",
+          "requirements_specified": [
+            "form=Stator Windings \u2014 representative actuation kinematics component",
+            "dimensions=end-winding microjet oil cooled; fits stator ID around 122.91 mm airgap rotor",
+            "operating_temp_range=-20 to +180 \u00b0C"
+          ]
+        },
+        {
+          "id": "reduction_gear_stage_tool_grounded_word",
+          "name": "Reduction gear stage",
+          "reason": "Concept design \u2014 catalogue part + exact MPN confirmed at detailed design",
+          "part_number_state": "TBD (detailed design)",
+          "requirements_specified": [
+            "form=Reduction gear stage \u2014 required by the selected engineering tool \"gear-traction-ratio\"; the module generator omitted it",
+            "dimensions=nests inside hollow rotor bore; stack envelope ~98 mm axial with mini-diff",
+            "operating_temp_range=-20 to +150 \u00b0C oil-wetted"
+          ]
+        },
+        {
+          "id": "permanent_magnet_set_word",
+          "name": "Permanent Magnet Set",
+          "reason": "Concept design \u2014 catalogue part + exact MPN confirmed at detailed design",
+          "part_number_state": "TBD (detailed design)",
+          "requirements_specified": [
+            "form=Permanent Magnet Set \u2014 representative actuation kinematics component",
+            "dimensions=buried/surface arc set on 122.91 mm airgap rotor",
+            "operating_temp_range=-40 to +150 \u00b0C"
+          ]
+        },
+        {
+          "id": "hollow_rotor_barrel_word",
+          "name": "Hollow Rotor Barrel",
+          "reason": "Concept design \u2014 catalogue part + exact MPN confirmed at detailed design",
+          "part_number_state": "TBD (detailed design)",
+          "requirements_specified": [
+            "form=Hollow Rotor Barrel \u2014 representative actuation kinematics component",
+            "dimensions=airgap diameter 122.91 mm; stack 98.33 mm; hollow ID for L4 gears",
+            "operating_temp_range=-20 to +150 \u00b0C"
+          ]
+        },
+        {
+          "id": "motor_shaft_word",
+          "name": "Motor Shaft",
+          "reason": "Concept design \u2014 catalogue part + exact MPN confirmed at detailed design",
+          "part_number_state": "TBD (detailed design)",
+          "requirements_specified": [
+            "form=Motor Shaft \u2014 representative actuation kinematics component",
+            "rating_primary=350"
+          ]
+        },
+        {
+          "id": "front_bearing_word",
+          "name": "Front Bearing",
+          "reason": "Concept design \u2014 catalogue part + exact MPN confirmed at detailed design",
+          "part_number_state": "TBD (detailed design)",
+          "requirements_specified": [
+            "form=Front Bearing \u2014 representative actuation kinematics component",
+            "dimensions=fits front end-bell bore of hollow rotor support",
+            "operating_temp_range=-40 to +150 \u00b0C"
+          ]
+        },
+        {
+          "id": "rear_bearing_word",
+          "name": "Rear Bearing",
+          "reason": "Concept design \u2014 catalogue part + exact MPN confirmed at detailed design",
+          "part_number_state": "TBD (detailed design)",
+          "requirements_specified": [
+            "form=Rear Bearing \u2014 representative actuation kinematics component",
+            "operating_temp_range=-40 to +150 \u00b0C"
+          ]
+        },
+        {
+          "id": "front_end_bell_word",
+          "name": "Front End Bell",
+          "reason": "Concept design \u2014 catalogue part + exact MPN confirmed at detailed design",
+          "part_number_state": "TBD (detailed design)",
+          "requirements_specified": [
+            "form=Front End Bell \u2014 representative actuation kinematics component",
+            "dimensions=sets lateral shaft exit within 343 mm width"
+          ]
+        },
+        {
+          "id": "traction_drive_housing_word",
+          "name": "Traction Drive Housing",
+          "reason": "Concept design \u2014 catalogue part + exact MPN confirmed at detailed design",
+          "part_number_state": "TBD (detailed design)",
+          "requirements_specified": [
+            "form=Traction Drive Housing \u2014 representative structure containment component",
+            "dimensions=max 343\u00d7259\u00d7267 mm homologated bay box; enclosure_volume 0.023719 m\u00b3"
+          ]
+        },
+        {
+          "id": "cassette_cover_word",
+          "name": "Cassette Cover",
+          "reason": "Concept design \u2014 catalogue part + exact MPN confirmed at detailed design",
+          "part_number_state": "TBD (detailed design)",
+          "requirements_specified": [
+            "form=Cassette Cover \u2014 representative structure containment component",
+            "dimensions=within 343\u00d7259\u00d7267 mm; no bay apron"
+          ]
+        },
+        {
+          "id": "hv_shield_cover_word",
+          "name": "Hv Shield Cover",
+          "reason": "Concept design \u2014 catalogue part + exact MPN confirmed at detailed design",
+          "part_number_state": "TBD (detailed design)",
+          "requirements_specified": [
+            "form=Hv Shield Cover \u2014 representative structure containment component"
+          ]
+        },
+        {
+          "id": "mounting_ear_set_word",
+          "name": "Mounting Ear Set",
+          "reason": "Concept design \u2014 catalogue part + exact MPN confirmed at detailed design",
+          "part_number_state": "TBD (detailed design)",
+          "requirements_specified": [
+            "form=Mounting Ear Set \u2014 representative structure containment component",
+            "dimensions=ears inside bay keep-out; no apron beyond 343\u00d7259\u00d7267 mm"
+          ]
+        },
+        {
+          "id": "nameplate_word",
+          "name": "Nameplate",
+          "reason": "Concept design \u2014 catalogue part + exact MPN confirmed at detailed design",
+          "part_number_state": "TBD (detailed design)",
+          "requirements_specified": [
+            "form=Nameplate \u2014 representative structure containment component"
+          ]
+        },
+        {
+          "id": "traction_motor_synth_word",
+          "name": "Traction Motor",
+          "reason": "Concept design \u2014 catalogue part + exact MPN confirmed at detailed design",
+          "part_number_state": "TBD (detailed design)",
+          "requirements_specified": [
+            "rating_primary=350",
+            "form=Traction Motor \u2014 principal equipment sized from the engineering contract"
+          ]
+        },
+        {
+          "id": "traction_inverter_synth_word",
+          "name": "Traction Inverter",
+          "reason": "Concept design \u2014 catalogue part + exact MPN confirmed at detailed design",
+          "part_number_state": "TBD (detailed design)",
+          "requirements_specified": [
+            "rating_primary=350",
+            "form=Traction Inverter \u2014 principal equipment sized from the engineering contract"
+          ]
+        },
+        {
+          "id": "hv_interlock_loop_word",
+          "name": "Hv Interlock Loop",
+          "reason": "Concept design \u2014 catalogue part + exact MPN confirmed at detailed design",
+          "part_number_state": "TBD (detailed design)",
+          "requirements_specified": [
+            "form=Hv Interlock Loop \u2014 representative safety protection component",
+            "dimensions=wired through HV shield cover and DC connector"
+          ]
+        },
+        {
+          "id": "phase_overcurrent_trip_word",
+          "name": "Phase Overcurrent Trip",
+          "reason": "Concept design \u2014 catalogue part + exact MPN confirmed at detailed design",
+          "part_number_state": "TBD (detailed design)",
+          "requirements_specified": [
+            "form=Phase Overcurrent Trip \u2014 representative safety protection component",
+            "rating_primary=gate-drive"
+          ]
+        },
+        {
+          "id": "inverter_desat_protection_word",
+          "name": "Inverter Desat Protection",
+          "reason": "Concept design \u2014 catalogue part + exact MPN confirmed at detailed design",
+          "part_number_state": "TBD (detailed design)",
+          "requirements_specified": [
+            "form=Inverter Desat Protection \u2014 representative safety protection component",
+            "rating_primary=gate-drive"
+          ]
+        },
+        {
+          "id": "coolant_flow_interlock_word",
+          "name": "Coolant Flow Interlock",
+          "reason": "Concept design \u2014 catalogue part + exact MPN confirmed at detailed design",
+          "part_number_state": "TBD (detailed design)",
+          "requirements_specified": [
+            "form=Coolant Flow Interlock \u2014 representative safety protection component"
+          ]
+        },
+        {
+          "id": "isolation_monitor_interface_word",
+          "name": "Isolation Monitor Interface",
+          "reason": "Concept design \u2014 catalogue part + exact MPN confirmed at detailed design",
+          "part_number_state": "TBD (detailed design)",
+          "requirements_specified": [
+            "form=Isolation Monitor Interface \u2014 representative safety protection component",
+            "rating_primary=gate-drive"
+          ]
+        },
+        {
+          "id": "coolant_hose_set_word",
+          "name": "Coolant Hose Set",
+          "reason": "Concept design \u2014 catalogue part + exact MPN confirmed at detailed design",
+          "part_number_state": "TBD (detailed design)",
+          "requirements_specified": [
+            "form=Coolant Hose Set \u2014 representative environmental interface component"
+          ]
+        },
+        {
+          "id": "coolant_expansion_bottle_word",
+          "name": "Coolant Expansion Bottle",
+          "reason": "Concept design \u2014 catalogue part + exact MPN confirmed at detailed design",
+          "part_number_state": "TBD (detailed design)",
+          "requirements_specified": [
+            "form=Coolant Expansion Bottle \u2014 representative environmental interface component"
+          ]
+        }
+      ],
+      "derived_by": "scripts/lib/homologation_honesty.py"
+    }
+  },
+  "pcb": {
+    "disposition": "bespoke",
+    "pipeline_ok": true,
+    "supplierGerbers": false,
+    "hilPresent": false,
+    "forgeDraftOnly": true
+  },
+  "interfaceIcd": null,
+  "quantities_seed": {
+    "front_regen_electrical_cap_kw": 250,
+    "max_rotor_speed_rpm": 24000,
+    "dc_bus_voltage_v": 750,
+    "gear_ratio": 8,
+    "inverter_dissipated_kw": 4.318
+  },
+  "independent_arithmetic": {
+    "p_electrical_kw": 250.0,
+    "rpm": 24000.0,
+    "omega_rad_s": 2513.2741,
+    "t_shaft_ideal_nm_at_full_electrical": 99.472,
+    "t_shaft_nm_if_eta_shaft_0_95": 94.498,
+    "overall_ratio_seed": 8.0,
+    "note": "Compare claimed EM loaded torque (~207 N\u00b7m) and required (~125 N\u00b7m) against these first-principles shafts. Mismatch \u2192 FATAL arithmetic."
+  },
+  "motor_multiphysics_slice": {
+    "ship_ok": false,
+    "architectureBlockers": [
+      {
+        "blocker_id": "PLANETARY_STRENGTH_VS_ROTOR_BORE",
+        "domain": "gear_strength.planetary_rotor_nest",
+        "status": "OPEN",
+        "severity": "architecture_hold",
+        "ship_ok": false,
+        "cannot_greenwash": true,
+        "evidence_path": "_motor_stack/iso6336_fia_front_kit_case.json",
+        "minimum_strength_factor": 0.1727,
+        "nest_fits_rotor": true,
+        "summary": "PLANETARY_STRENGTH_VS_ROTOR_BORE \u2014 best nest inside rotor ID 105.9 mm reaches FoS \u2248 1.005 (< 1.2); enlarge rotor bore, change tooth counts/topology, or accept external planetary; do not claim PASS",
+        "permanent_unblock_options": [
+          {
+            "option_id": "enlarge_rotor_bore",
+            "kind": "geometry_writeback",
+            "summary": "Grow hollow rotor ID so a FoS\u22651.2 planetary tip fits, then re-run EM + structural screens on the new bore.",
+            "code_hooks": "scripts/lib/fpk_concentric_geometry.py;scripts/motor-stack/iso6336_fia_front_kit_case.py;scripts/motor-stack/em_fia_front_kit_case.py"
+          },
+          {
+            "option_id": "change_planetary_tooth_counts",
+            "kind": "geometry_writeback",
+            "summary": "Retarget sun/planet/ring teeth (and possibly ratio split) so a smaller tip clears FoS\u22651.2 inside the current rotor bore.",
+            "code_hooks": "scripts/motor-stack/iso6336_fia_front_kit_case.py#propose_strength_feasible_geometry"
+          },
+          {
+            "option_id": "external_planetary_topology",
+            "kind": "architecture_decision",
+            "summary": "Move the planetary outside the rotor bore (side-by-side / offset layout) so strength and EM envelopes stop fighting.",
+            "code_hooks": "docs/plans/MOTOR-MULTIPHYSICS-AND-CAD-PLAIN-LANGUAGE-2026-07-30.md#architecture-blockers"
+          }
+        ],
+        "human_decision_required": true
+      },
+      {
+        "blocker_id": "EM_TORQUE_VS_ROTOR_BORE",
+        "domain": "magnetic.planetary_bore_torque",
+        "status": "OPEN",
+        "severity": "architecture_hold",
+        "ship_ok": false,
+        "cannot_greenwash": true,
+        "evidence_path": "_motor_stack/em_fia_front_kit_case.json",
+        "nest_fits_rotor": true,
+        "duty_torque_screen_ok": false,
+        "torque_vs_required_ratio": 0.626371,
+        "torque_reliable": false,
+        "torque_magnitude_mean_nm": 81.558081,
+        "required_shaft_torque_nm": 125.214912,
+        "loaded_torque_magnitude_nm": 78.43099532943242,
+        "summary": "Planetary strength clears inside the enlarged rotor bore (nest_fits_rotor) but twin-bound FEMM duty torque screen is below the required shaft torque \u2014 EM magnet volume vs bore conflict; do not set duty_torque_screen_ok.",
+        "permanent_unblock_options": [
+          {
+            "option_id": "grow_em_annulus_in_bore",
+            "kind": "geometry_writeback",
+            "summary": "Keep nest_fits_rotor but recover magnet volume: grow rotor OD ring within the bay, pole-pitch-aware V-magnet arc, and thicker radial magnet build \u2014 then re-run FEMM duty torque screen.",
+            "code_hooks": "scripts/lib/fpk_concentric_geometry.py#EM_MIN_ROTOR_RADIAL_MM;scripts/motor-stack/em_fia_front_kit_case.py#derive_fia_geometry"
+          },
+          {
+            "option_id": "longer_stack_or_more_poles",
+            "kind": "geometry_writeback",
+            "summary": "Increase active stack length and/or pole count so torque rises without shrinking the planetary-clearing bore.",
+            "code_hooks": "scripts/motor-stack/em_fia_front_kit_case.py;scripts/lib/fpk_concentric_geometry.py"
+          },
+          {
+            "option_id": "external_planetary_or_smaller_tip",
+            "kind": "architecture_decision",
+            "summary": "Move planetary partially external, retarget tooth counts/module, or split ratio so ring tip shrinks and rotor bore can return magnet annulus to the pre-enlarge build.",
+            "code_hooks": "scripts/motor-stack/iso6336_fia_front_kit_case.py#propose_strength_feasible_geometry;docs/plans/MOTOR-MULTIPHYSICS-AND-CAD-PLAIN-LANGUAGE-2026-07-30.md#architecture-blockers"
+          }
+        ],
+        "human_decision_required": true
+      }
+    ],
+    "architecture_blockers_open_count": 2,
+    "required_checks": {
+      "magnetic": {
+        "status": "PARTIAL",
+        "duty_torque_screen_ok": false,
+        "twin_bound_case": {
+          "status": "PARTIAL",
+          "ship_ok": false,
+          "duty_torque_screen_ok": false,
+          "torque_reliable": false,
+          "torque_magnitude_mean_nm": 81.558081,
+          "mean_torque_vs_required_ratio": 0.651345,
+          "loaded_torque_magnitude_nm": 78.43099532943242,
+          "required_shaft_torque_nm": 125.214912,
+          "duty_screen_fail_reasons": [
+            "torque_reliable=false",
+            "mean_ratio=0.6513<1.0"
+          ],
+          "loaded_torque_nm": -78.43099532943242,
+          "position_sweep": {
+            "n_positions": 37,
+            "torque_magnitude_mean_nm": 81.558081,
+            "torque_vs_required_ratio_mean": 0.651345,
+            "torque_vs_required_ratio_min": 0.44692,
+            "torque_vs_required_ratio_max": 0.77976
+          }
+        }
+      },
+      "rotor_dynamics": {
+        "status": "PARTIAL",
+        "twin_bound_case": {
+          "status": "PARTIAL",
+          "ship_ok": false
+        }
+      },
+      "structural": {
+        "status": "PARTIAL",
+        "twin_bound_case": {
+          "status": "PARTIAL",
+          "ship_ok": false,
+          "screening_fos_vs_yield": 2.635
+        }
+      },
+      "water_jacket": {
+        "status": "PARTIAL",
+        "maximum_winding_temperature_c": 99.4,
+        "pressure_drop_kpa": 20.1613,
+        "twin_bound_case": {
+          "status": "PARTIAL",
+          "ship_ok": false
+        }
+      },
+      "inverter_cold_plate": {
+        "status": "PARTIAL",
+        "maximum_module_temperature_c": 117.411,
+        "pressure_drop_kpa": 24.9212,
+        "twin_bound_case": {
+          "status": "PARTIAL",
+          "ship_ok": false
+        }
+      },
+      "gear_oil": {
+        "status": "PARTIAL",
+        "cornering_pickup_ok": true,
+        "jet_pressure_required_kpa": 284.273,
+        "twin_bound_case": {
+          "status": "PARTIAL",
+          "ship_ok": false,
+          "required_shaft_torque_nm": 101.74065606263126,
+          "cornering_pickup_ok": true,
+          "pickup_gallery_adequate": true,
+          "jet_pressure_required_kpa": 284.273
+        }
+      },
+      "gear_strength": {
+        "status": "PARTIAL",
+        "twin_bound_case": {
+          "status": "PARTIAL",
+          "ship_ok": false,
+          "nest_fits_rotor": true
+        }
+      }
+    },
+    "fia_duty": {
+      "front_regen_electrical_cap_kw": 250,
+      "continuous_design_duty_kw": 250,
+      "bay_w_mm": 343,
+      "bay_d_mm": 259,
+      "bay_h_mm": 267,
+      "mass_cap_kg": 32,
+      "max_rotor_speed_rpm": 24000,
+      "dc_bus_voltage_v": 750,
+      "coolant_inlet_c": 60,
+      "coolant_flow_l_min": 12,
+      "binding_doc": "docs/plans/FIA-FRONT-POWERTRAIN-KIT-BINDING-REQUIREMENTS-2026-07-30.md"
+    },
+    "honesty": "Blender explains packaging. Analytical tools screen. PASS needs twin-bound result_ref + geometry_revision + input_hash. Toolchain smoke \u2260 PASS. ship_ok stays false. OPEN architectureBlockers block release until permanently unblocked."
+  },
+  "assumption_based_design": {
+    "schema": "forgeos.fpk.assumption_based_design/v1",
+    "stamped_at": "2026-08-04T16:06:28Z",
+    "twin": "/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/formula-e-front-mgu-20260729-1432",
+    "pitch": "Under frozen packaging and duty assumptions consistent with the public Formula E front-kit envelope, the concentric motor\u2013inverter\u2013planetary\u2013diff layout is sized into the bay. The electromagnetic duty-torque screen does not clear (mean / reliability vs required shaft torque at n_max) \u2014 peak FEMM torque alone is not a pass. Open architecture blockers: PLANETARY_STRENGTH_VS_ROTOR_BORE, EM_TORQUE_VS_ROTOR_BORE. Not homologated \u2014 replace assumptions when JLR inputs arrive; ship_ok stays false.",
+    "review_status": "RESULTS_AVAILABLE_UNDER_ASSUMPTIONS",
+    "ship_ok": false,
+    "homologation": "NOT_CLAIMED",
+    "honesty": "RESULT_UNDER_ASSUMPTIONS means educated guesses were frozen and named, then models were run. It is not hardware correlation and not ship_ok. NEEDS_PARTNER_INPUT / NEEDS_HARDWARE rows are deliberate \u2014 we did not invent them.",
+    "assumptions": [
+      {
+        "id": "A-DUTY",
+        "status": "FROZEN_ASSUMPTION",
+        "statement": "Continuous front regen electrical duty",
+        "value": "250 kW",
+        "replace_with": "Team race software / energy tool CSV (DEC-007)"
+      },
+      {
+        "id": "A-BAY",
+        "status": "FROZEN_ASSUMPTION",
+        "statement": "Package envelope and dry mass aspiration",
+        "value": "343\u00d7259\u00d7267 mm; ~32 kg dry",
+        "replace_with": "Chassis ICD STEP + weighed bill of materials"
+      },
+      {
+        "id": "A-BUS",
+        "status": "FROZEN_ASSUMPTION",
+        "statement": "DC bus voltage seed",
+        "value": "750 V",
+        "replace_with": "Exact bus window and ripple limits"
+      },
+      {
+        "id": "A-COOL",
+        "status": "FROZEN_ASSUMPTION",
+        "statement": "Coolant inlet and flow",
+        "value": "60 \u00b0C / 12 L/min",
+        "replace_with": "Team coolant loop ICD"
+      },
+      {
+        "id": "A-SPEED",
+        "status": "FROZEN_ASSUMPTION",
+        "statement": "Maximum rotor speed",
+        "value": "24000 rpm",
+        "replace_with": "Team max used speed + overspeed policy"
+      },
+      {
+        "id": "A-RATIO",
+        "status": "FROZEN_ASSUMPTION",
+        "statement": "Overall gear ratio seed (2 into nest \u00d7 4 post-diff)",
+        "value": "8",
+        "replace_with": "Final ratio from vehicle model"
+      },
+      {
+        "id": "A-SIC",
+        "status": "FROZEN_ASSUMPTION",
+        "statement": "SiC module class (topology + analytical loss; not MPN)",
+        "value": "3\u00d7 half-bridge class; ~4.3 kW inverter dissipation seed; ESL ~6.4 nH",
+        "replace_with": "Supplier module MPN + datasheet + STEP (DEC-001)"
+      },
+      {
+        "id": "A-IFACE",
+        "status": "PROVISIONAL_HYPOTHESIS",
+        "statement": "Vehicle port XYZ / mount CAD (bay-local provisional layout)",
+        "value": "Provisional bay-local XYZ frozen in provisional_partner_seeds.json (S-IFACE-XYZ) for packaging/GA \u2014 NOT a chassis ICD",
+        "replace_with": "Chassis interface control drawing coordinates (BARB-ICD-XYZ)"
+      },
+      {
+        "id": "A-EM-TRUTH",
+        "status": "PROVISIONAL_HYPOTHESIS",
+        "statement": "Working EM truth until dyno",
+        "value": "Path B FE mean 122.099939 N\u00b7m @ 24000 rpm; arch duty 104.098914 N\u00b7m; torque_reliable=false",
+        "replace_with": "BARB-DYNO measured map"
+      },
+      {
+        "id": "A-DUTY-LAP",
+        "status": "PROVISIONAL_HYPOTHESIS",
+        "statement": "Thermal duty hypothesis until lap log",
+        "value": "DEC-008 intermittent vignette (24 s class) vs continuous screen",
+        "replace_with": "BARB-DUTY-CYCLE lap/stint CSV \u226520 Hz"
+      },
+      {
+        "id": "A-PE-CLASS",
+        "status": "PROVISIONAL_HYPOTHESIS",
+        "statement": "SiC/ESL/cap class until supplier + double-pulse",
+        "value": "3-module class; ESL ~6.4 nH seed; C 71\u2013884 \u00b5F concept band; NO MPN",
+        "replace_with": "BARB-SIC-MODULE + BARB-DOUBLE-PULSE + film MPN"
+      },
+      {
+        "id": "S-EM-TRUTH",
+        "status": "PROVISIONAL_HYPOTHESIS",
+        "statement": "Until dyno returns, Path B FE kit-case mean torque is the working EM truth",
+        "value": "path_b_mean_nm=122.099939; architecture_duty_nm=104.098914; binding_duty_nm=125.214912; rpm=24000.0; stack_mm=130.0; magnets=6.0 \u00d7 22.5 mm, 16 regions",
+        "replace_with": "BARB-DYNO measured map @ 24k / 60 \u00b0C / 12 L/min"
+      },
+      {
+        "id": "S-DUTY-LAP",
+        "status": "PROVISIONAL_HYPOTHESIS",
+        "statement": "Until lap log returns, DEC-008 intermittent vignette is the thermal duty hypothesis",
+        "value": "vignette=24 s on / 100 s class intermittent regen; continuous_electrical_kw=250; magnet_temp_intermittent_c=99.4; magnet_temp_continuous_screen_c=159.35",
+        "replace_with": "BARB-DUTY-CYCLE lap/stint CSV \u226520 Hz"
+      },
+      {
+        "id": "S-COOLANT",
+        "status": "PROVISIONAL_HYPOTHESIS",
+        "statement": "Coolant boundary until flow bench",
+        "value": "inlet_c=60; flow_l_min=12; network_delta_p_kpa_seed=45.08",
+        "replace_with": "BARB-FLOW-BENCH measured \u0394p/flow/wall taps"
+      },
+      {
+        "id": "S-BUS-PE",
+        "status": "PROVISIONAL_HYPOTHESIS",
+        "statement": "DC bus + SiC class + ESL until supplier/double-pulse",
+        "value": "vdc_nom_v=750.0; vdc_min_v=600.0; vdc_max_v=900.0; sic_module_count_class=3; esl_nominal_nh=6.39; esl_band_nh=[4.15, 9.9]",
+        "replace_with": "BARB-SIC-MODULE + BARB-DOUBLE-PULSE + film cap MPN"
+      },
+      {
+        "id": "S-PCB",
+        "status": "PROVISIONAL_HYPOTHESIS",
+        "statement": "Forge draft PCBs remain the working topology until supplier Gerbers",
+        "value": "disposition=NOT_FABRICATION_READY; boards=gate-drive + control drafts; supplier_gerbers=False",
+        "replace_with": "BARB-GERBERS supplier-stamped stack-up"
+      },
+      {
+        "id": "S-IFACE-XYZ",
+        "status": "PROVISIONAL_HYPOTHESIS",
+        "statement": "Bay-local provisional port/mount XYZ for packaging & GA layout",
+        "value": "replace_with=Chassis ICD XYZ from team (BARB-ICD-XYZ)",
+        "replace_with": "BARB-ICD-XYZ team interface control drawing"
+      },
+      {
+        "id": "S-GEAR",
+        "status": "PROVISIONAL_HYPOTHESIS",
+        "statement": "Ratio seed 8 held; planetary nest strength remains architecture hold",
+        "value": "gear_ratio=8; architecture_hold=PLANETARY_STRENGTH_VS_ROTOR_BORE; writeback_invalidated=True; working_topology_hypothesis=OPT-C_EXTERNAL_PLANETARY; option_screen=gear_topology_option_screen.json",
+        "replace_with": "BARB-GEAR-STRENGTH topology decision + BARB-GEAR-OIL-BENCH"
+      },
+      {
+        "id": "S-ROTOR-FOS",
+        "status": "PROVISIONAL_HYPOTHESIS",
+        "statement": "Screening FoS 1.74 @ 24k is working structural hypothesis until instrumented overspeed",
+        "value": "screening_fos_24k=1.74; assumed_yield_mpa=355; release_fos_closed=False",
+        "replace_with": "BARB-ROTOR-RETENTION instrumented overspeed"
+      },
+      {
+        "id": "S-NVH",
+        "status": "PROVISIONAL_HYPOTHESIS",
+        "statement": "No modal numbers invented; OPEN register is the working state",
+        "value": "modal_hz=None; policy=explicit_OPEN_until_mounts_and_dyno_NVH",
+        "replace_with": "BARB-NVH + frozen mounts"
+      },
+      {
+        "id": "S-IRON-LOSS",
+        "status": "PROVISIONAL_HYPOTHESIS",
+        "statement": "Iron loss working band until calorimeter",
+        "value": "lamination_mid_w=6035.1; class_band_kw=[3.9, 8.5]; dec009_stamp_w=11732.5",
+        "replace_with": "BARB-IRON-LOSS calorimeter / transient FE"
+      }
+    ],
+    "results_under_assumptions": [
+      {
+        "id": "R-BAY-FIT",
+        "status": "RESULT_UNDER_ASSUMPTIONS",
+        "statement": "Concentric cassette packaging",
+        "value": "Housing \u00d8\u2014\u00d7L\u2014 mm; rotor ID \u2014 / OD \u2014 mm",
+        "evidence": "state.orchestratorContract.quantities + Blender FPK geometry"
+      },
+      {
+        "id": "R-EM-DUTY",
+        "status": "RESULT_UNDER_ASSUMPTIONS",
+        "statement": "Electromagnetic duty torque screen (peak \u2260 continuous at n_max)",
+        "value": "Required at n_max\u2248T=P/\u03c9 104.098914 N\u00b7m; FEMM peak 118.8716131172735 N\u00b7m; position-sweep mean 122.099939 N\u00b7m; torque_reliable=False; duty_torque_screen_ok=False",
+        "evidence": "_motor_stack/em_fia_front_kit_case_PATH_B_DEC009.json"
+      },
+      {
+        "id": "R-COOL-NET",
+        "status": "RESULT_UNDER_ASSUMPTIONS",
+        "statement": "Coupled cooling network at assumed coolant point",
+        "value": "\u0394p=45.0826 kPa; T_winding=82.892 \u00b0C; T_module=77.61 \u00b0C; coupled_ok=True; Cu=2180.49 W; inv=4318.0 W; motor_loss=8215.59 W; total_loss=12533.59 W",
+        "evidence": "_motor_stack/analytical_fia_cooling_network_screen.json"
+      },
+      {
+        "id": "R-GEAR-OIL",
+        "status": "RESULT_UNDER_ASSUMPTIONS",
+        "statement": "Geometry-bound gear-oil jet / pickup / churning screen",
+        "value": "jet=16.4771 L/min; \u0394P_jet=271.463 kPa; churning=1202.17 W; immersion=0.4342; cornering_ok=False; gallery_ok=True",
+        "evidence": "_motor_stack/gear_oil_fia_front_kit_case.json"
+      },
+      {
+        "id": "R-GEAR-PLANET",
+        "status": "RESULT_UNDER_ASSUMPTIONS",
+        "statement": "Planetary strength + nest fit",
+        "value": "duty_strength_screen_ok=False; nest_fits_rotor=True",
+        "evidence": "_motor_stack/iso6336_fia_front_kit_case.json"
+      },
+      {
+        "id": "R-BEVEL-DIFF",
+        "status": "RESULT_UNDER_ASSUMPTIONS",
+        "statement": "Bevel differential handbook strength screen",
+        "value": "min_strength_FoS=1.2172; contact_FoS=1.2172; duty_strength_screen_ok=True",
+        "evidence": "_motor_stack/iso_bevel_fia_front_kit_case.json"
+      },
+      {
+        "id": "R-STRUCT-ROTOR",
+        "status": "RESULT_UNDER_ASSUMPTIONS",
+        "statement": "Rotor ring centrifugal screen @ max rpm",
+        "value": "von_Mises=134.7243 MPa; screening_FoS=2.635; below_yield=True",
+        "evidence": "_motor_stack/calculix_fia_rotor_screen.json"
+      },
+      {
+        "id": "R-STRUCT-POCKET",
+        "status": "RESULT_UNDER_ASSUMPTIONS",
+        "statement": "Magnet-pocket iron-bridge centrifugal screen",
+        "value": "FEA_von_Mises=190.3724 MPa; FEA_FoS=1.865; analytical_FoS=1.418",
+        "evidence": "_motor_stack/calculix_fia_magnet_pocket_screen.json"
+      },
+      {
+        "id": "R-STRUCT-MOUNT",
+        "status": "RESULT_UNDER_ASSUMPTIONS",
+        "statement": "Cast case / bay-mount torque screen",
+        "value": "motor_reaction=125.2193 N\u00b7m; carrier_output=1001.7542 N\u00b7m; min_screening_FoS=3.864; bay_mount_shear_FoS=3.864",
+        "evidence": "_motor_stack/analytical_fia_case_mount_screen.json"
+      },
+      {
+        "id": "R-PATH-B-BARS",
+        "status": "RESULT_UNDER_ASSUMPTIONS",
+        "statement": "Dual torque bars under Path B hypothesis",
+        "value": "mean=122.099939 N\u00b7m; arch=104.098914 N\u00b7m; mean/arch=1.173",
+        "evidence": "_motor_stack/em_fia_front_kit_case_PATH_B_DEC009.json"
+      },
+      {
+        "id": "R-VOLTAGE-24K",
+        "status": "RESULT_UNDER_ASSUMPTIONS",
+        "statement": "Analytical voltage util @ 24k vs 600\u2013900 V (scalar model)",
+        "value": "util@750=0.659; worst_bus=600.0; all_fit=True; closes_bar_a=False",
+        "evidence": "_motor_stack/path_b_voltage_feasibility_screen.json"
+      },
+      {
+        "id": "R-POST-DIFF",
+        "status": "RESULT_UNDER_ASSUMPTIONS",
+        "statement": "Post-diff final-drive software screening",
+        "value": "blocker=CLEARED; FoS\u22651.2005; bay_fit=True; interfaces_ok=True",
+        "evidence": "_motor_stack/post_diff_final_drive_packaging_screen.json"
+      },
+      {
+        "id": "R-CAD",
+        "status": "RESULT_UNDER_ASSUMPTIONS",
+        "statement": "Parametric CAD spine (not supplier release)",
+        "value": "parametric_family_count=11; release_authority_coverage=0.0",
+        "evidence": "motor-multiphysics.json cadAuthority"
+      }
+    ],
+    "asks_from_partner": [
+      {
+        "id": "ASK-ICD-XYZ",
+        "priority": 1,
+        "ask": "Chassis interface XYZ for HV, coolant, LV/CAN, halfshafts, mounts",
+        "closes": [
+          "A-IFACE"
+        ],
+        "decision_register": []
+      },
+      {
+        "id": "ASK-SIC-MPN",
+        "priority": 2,
+        "ask": "SiC power module manufacturer + MPN + datasheet (+ STEP if available)",
+        "closes": [
+          "A-SIC",
+          "DEC-001"
+        ],
+        "decision_register": [
+          "DEC-001"
+        ]
+      },
+      {
+        "id": "ASK-CAP-BANK",
+        "priority": 3,
+        "ask": "Preferred DC-link film capacitor MPNs / envelope",
+        "closes": [
+          "dc_link_capacitors"
+        ],
+        "decision_register": []
+      },
+      {
+        "id": "ASK-COOLANT",
+        "priority": 4,
+        "ask": "Confirm or replace coolant 60 \u00b0C / 12 L/min and pressure budget",
+        "closes": [
+          "A-COOL"
+        ],
+        "decision_register": [
+          "DEC-004"
+        ]
+      },
+      {
+        "id": "ASK-RATIO-SPEED",
+        "priority": 5,
+        "ask": "Confirm overall ratio seed 8.0 and max used rotor speed",
+        "closes": [
+          "A-RATIO",
+          "A-SPEED"
+        ],
+        "decision_register": [
+          "DEC-003"
+        ]
+      },
+      {
+        "id": "ASK-BENCH",
+        "priority": 6,
+        "ask": "Any dyno / HIL / flow / double-pulse data on a comparable unit",
+        "closes": [
+          "DEC-008",
+          "DEC-010",
+          "hardwareCorrelation"
+        ],
+        "decision_register": [
+          "DEC-008",
+          "DEC-010",
+          "DEC-006",
+          "DEC-001"
+        ]
+      },
+      {
+        "id": "ASK-GERBERS",
+        "priority": 7,
+        "ask": "Supplier electronics Gerbers / pinout ICD when available",
+        "closes": [
+          "DEC-009"
+        ],
+        "decision_register": [
+          "DEC-009"
+        ]
+      }
+    ],
+    "architecture_blockers_open": [
+      "PLANETARY_STRENGTH_VS_ROTOR_BORE",
+      "EM_TORQUE_VS_ROTOR_BORE"
+    ],
+    "brief_markdown": "docs/plans/JLR-FE-FRONT-FPK-ASSUMPTION-BASED-RESULTS-FOR-JACK-2026-07-31.md",
+    "email_draft_markdown": "docs/plans/JLR-FE-FRONT-FPK-EMAIL-ASK-JACK-2026-07-31.md",
+    "jack_fill_in_xlsx": "JLR-FE-FRONT-FPK-ASSUMPTIONS-FOR-JACK.xlsx",
+    "proveCatch": {
+      "ship_ok_false": true,
+      "has_assumptions": true,
+      "has_results": true,
+      "has_asks": true,
+      "review_status_is_results_available": true,
+      "pitch_not_greenwash_when_duty_fails": true
+    }
+  },
+  "bar_b_readiness": {
+    "schema": "forgeos.fpk.bar_b_readiness/v1",
+    "stamped_at": "2026-08-04T12:30:32Z",
+    "twin": "/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/formula-e-front-mgu-20260729-1432",
+    "bar": "B",
+    "definition": "Bar B = race / homologation. Requires real HIL, supplier Gerbers, dyno, chassis XYZ, and bench correlation. Educated assumptions complete the review checklist and predict results \u2014 they do not complete homologation.",
+    "verdict": "BAR_B_LIST_FILLED_UNDER_ASSUMPTIONS_NOT_HOMOLOGATED",
+    "ship_ok": false,
+    "homologation": "NOT_HOMOLOGATED",
+    "fia_race_ready": false,
+    "honesty": "ASSUMED_CONCEPT rows have named educated guesses + screening evidence. NEEDS_HARDWARE rows have READY_FOR_BENCH recipes / predicted models. NEEDS_PARTNER_INPUT rows are deliberately blank of invented millimetres or supplier Gerbers. Every row carries an executable_ask (artefact, format, conditions, unblocks, already_have, priority) so partners can act without a follow-up. ship_ok stays false until physical artefacts exist.",
+    "counts": {
+      "rows_total": 10,
+      "assumed_concept": 3,
+      "needs_hardware": 5,
+      "needs_partner_input": 2,
+      "hardware_correlation_holds_open": 6,
+      "rows_blocking_ship_ok": 10,
+      "executable_asks": 10
+    },
+    "rows": [
+      {
+        "id": "BARB-SIC-MODULE",
+        "bar_b_item": "SiC module identity + thermal limit (DEC-001)",
+        "closure_class": "ASSUMED_CONCEPT",
+        "decision_register": [
+          "DEC-001"
+        ],
+        "assumed_value": "3\u00d7 traction half-bridge class; analytical inverter dissipation ~4.318 kW; ESL seed ~6.39 nH; N42UH-class magnet / SiC loss model \u2014 not a frozen supplier MPN",
+        "result_under_assumption": "Cooling network T_module\u224877.6 \u00b0C at A-COOL; packaging screen present",
+        "evidence": [
+          "_motor_stack/analytical_fia_cooling_network_screen.json",
+          "_motor_stack/inverter_packaging_fia_front_kit_case.json"
+        ],
+        "blocks_ship_ok": true,
+        "replace_with": "Please freeze the SiC traction half-bridge module MPN and send the full datasheet (PDF), package STEP with terminal/pad geometry, Rth(j-c)/Rth(c-s) curves, and Tj max / short-circuit SOA, matched to the twin seed of 3 modules and ~4.318 kW inverter dissipation under A-COOL (60 \u00b0C / 12 L/min) \u2014 this closes BARB-SIC-MODULE and unblocks heater-plate (BARB-HEATER-PLATE) and double-pulse (BARB-DOUBLE-PULSE) stack geometry; we already hold an analytical ESL seed (~6.39 nH) and packaging screen, not a supplier MPN or measured ESL.",
+        "executable_ask": {
+          "artefact": "Frozen supplier SiC half-bridge module identity: manufacturer part number, package outline, terminal/pad geometry, and thermal limits",
+          "format": "PDF datasheet + package STEP (or supplier 3D with pad/terminal datums) + CSV or datasheet tables for Rth(j-c), Rth(c-s), Tj max, short-circuit SOA; pinout netlist for gate/desat/NTC if separate from Gerber ICD",
+          "conditions": "Revision-matched to the traction inverter BOM line; thermal ratings quoted at or convertible to A-COOL coolant 60 \u00b0C / 12 L/min and design phase current class (DEC-001); do not substitute a different package family without calling it a new revision",
+          "unblocks": "BARB-SIC-MODULE (DEC-001); enables BARB-HEATER-PLATE TIM/stack geometry and BARB-DOUBLE-PULSE commutation-loop layout; removes module_mpn_and_step OPEN on inverter packaging screen",
+          "already_have": "Analytical 3\u00d7 half-bridge class seed; inverter dissipation ~4.318 kW; bus ESL analytical seed ~6.39 nH (band 3\u201315 nH); cooling network T_module\u224877.6 \u00b0C screening \u2014 no supplier MPN, no package STEP, no measured Rth",
+          "priority": 6
+        },
+        "homologation_status": "OPEN"
+      },
+      {
+        "id": "BARB-ROTOR-RETENTION",
+        "bar_b_item": "Rotor retention / overspeed (DEC-006)",
+        "closure_class": "ASSUMED_CONCEPT",
+        "decision_register": [
+          "DEC-006"
+        ],
+        "assumed_value": "Max speed 24000 rpm (contract quantity); CalculiX centrifugal + magnet-pocket screens as retention seed (not instrumented overspeed)",
+        "result_under_assumption": "Rotor screening FoS\u22482.635; pocket screen present=True; screen speed=19500 rpm",
+        "evidence": [
+          "_motor_stack/calculix_fia_rotor_screen.json",
+          "_motor_stack/calculix_fia_magnet_pocket_screen.json"
+        ],
+        "blocks_ship_ok": true,
+        "replace_with": "Please run an instrumented overspeed / retention test on a revision-matched rotor (sleeve/bridge/magnet pocket as built) through approved speed steps up to at least the controlled max used speed (contract screen 19500 rpm; DEC-009 target class 24,000 rpm if that revision is the release article), logging speed, vibration, strain or radial growth, and post-test NDT/photo of magnets and retention \u2014 deliver CSV + signed PDF report; closes BARB-ROTOR-RETENTION / DEC-006 (screening FoS\u22482.635 is not a release factor). We already hold CalculiX centrifugal and magnet-pocket screens; do not re-send FEA-only evidence.",
+        "executable_ask": {
+          "artefact": "Instrumented overspeed / rotor retention test on the revision-matched rotor article (magnets, sleeve/bridge, pockets)",
+          "format": "CSV time-series: time_s, rotor_speed_rpm, vibration channels, strain or radial_growth_um; plus PDF report with speed-step table, post-test inspection photos/NDT, and pass/fail vs acceptance band",
+          "conditions": "Guarded spin rig; speed steps through approved schedule to at least controlled max used speed (live screen 19500 rpm; use DEC-009 release speed if that is the frozen article); ambient and rotor temperature logged; article serial + drawing revision on the header row; retention must remain intact with no magnet shift",
+          "unblocks": "BARB-ROTOR-RETENTION and DEC-006; supplies the measured strain/growth that can reverse DEC-009 only if release-grade FoS fails (do not reverse DEC-009 by opinion)",
+          "already_have": "CalculiX rotor screen (FoS\u22482.635 vs assumed yield at 19500 rpm) and magnet-pocket screen; hardware_correlation hold OVERSPEED_ROTOR_RETENTION recipe \u2014 no instrumented spin data",
+          "priority": 7
+        },
+        "homologation_status": "OPEN"
+      },
+      {
+        "id": "BARB-DUTY-CYCLE",
+        "bar_b_item": "Duty-cycle / E_net authority (DEC-007)",
+        "closure_class": "ASSUMED_CONCEPT",
+        "decision_register": [
+          "DEC-007"
+        ],
+        "assumed_value": "Continuous design duty 250 kW front regen; twin vignette 24 s regen / 100 s cycle (DEC-008 intermittent); public FIA energy tools as placeholder spectrum",
+        "result_under_assumption": "EM source=PATH_B_DEC009; duty screen ok=False (torque_reliable=False); mean |T|\u2248122.10 N\u00b7m vs architecture duty\u2248104.10 N\u00b7m (conservative binding\u2248125.21 N\u00b7m); DEC-008 vignette 24s/100s",
+        "evidence": [
+          "_motor_stack/em_fia_front_kit_case_PATH_B_DEC009.json",
+          "_motor_stack/em_fia_torque_map_screen.json"
+        ],
+        "blocks_ship_ok": true,
+        "replace_with": "Please send team lap telemetry (or FIA energy-tool export) that is authority for this car/season: CSV with columns time_s, vehicle_speed_kph (or axle_speed_rpm), front_axle_regen_power_kw OR hv_dc_current_a + hv_dc_voltage_v, and brake_pressure_bar; \u226520 Hz sampling (100 Hz preferred); at least one full race stint or \u226510 flying laps at representative fuel/energy load. This is the only artefact that confirms or reverses DEC-008 intermittent duty (24 s regen every 100 s) \u2014 do not re-open DEC-008/009 by opinion; DEC-009 hangs on DEC-008. Closes BARB-DUTY-CYCLE / DEC-007 and sets E_net authority. We already hold the twin vignette and public-tool placeholder spectrum.",
+        "executable_ask": {
+          "artefact": "Team lap / stint telemetry or FIA energy-tool export that is the named duty-cycle authority for this car and season",
+          "format": "CSV (UTF-8) with header row and columns at minimum: time_s, vehicle_speed_kph OR axle_speed_rpm, front_axle_regen_power_kw OR (hv_dc_current_a AND hv_dc_voltage_v), brake_pressure_bar; optional: throttle, inverter_temp_c, coolant_temp_c. One file per stint/session plus a one-page PDF stating car, event, tyre set, and energy mode",
+          "conditions": "Sampling \u226520 Hz (100 Hz preferred), time-synchronised channels, no gaps >0.5 s during flying laps; \u226510 flying laps or one full race stint at representative energy load; channel units SI as named; if only axle torque is available, state the gear ratio used. Compare against twin DEC-008 vignette 24 s regen / 100 s cycle \u2014 materially higher duty (guide: continuous regen fraction \u227340%) is the data that reverses DEC-008 (and then forces DEC-009 re-score); lower or equal duty confirms it",
+          "unblocks": "BARB-DUTY-CYCLE and DEC-007 (E_net authority); confirms or reverses DEC-008 intermittent duty from data only; DEC-009 thermal/torque case hangs on DEC-008 \u2014 do not reverse either decision by opinion",
+          "already_have": "Twin illustrative vignette duty_regen_time_s=24 / duty_motoring_time_s=76; front regen cap 250 kW; public FIA energy-tool placeholder spectrum; EM duty screen under that assumption \u2014 no team lap CSV",
+          "priority": 1
+        },
+        "homologation_status": "OPEN"
+      },
+      {
+        "id": "BARB-HIL",
+        "bar_b_item": "HIL on populated inverter (DEC-008)",
+        "closure_class": "NEEDS_HARDWARE",
+        "decision_register": [
+          "DEC-008"
+        ],
+        "assumed_value": "Firmware bring-up contract SPEC complete (FAB-READY \u2014 UNPROVEN IN HARDWARE); cannot assume HIL PASS",
+        "result_under_assumption": "Contract checklist SPEC; hil_present=False; bring-up verdict from firmware/bring-up-contract.json",
+        "evidence": [
+          "firmware/README.md",
+          "firmware/bring-up-contract.json"
+        ],
+        "blocks_ship_ok": true,
+        "replace_with": "Please run HIL on the populated inverter revision (gate-drive + control boards mated to the frozen SiC module) against a real-time plant model: deliver pass/fail matrix + timestamped logs covering safe-off, desat/OC (<10 \u00b5s class), phase-current and DC-link sense scaling (\u00b15%), resolver track, CAN-FD loss, and HVIL \u2014 PDF summary + CSV/MF4 traces, board serials and firmware hash on the header. Closes BARB-HIL only on measured PASS (bring-up is FAB-READY_UNPROVEN_IN_HARDWARE today). We already hold the bring-up contract and channel checklist; do not re-send SPEC-only paperwork.",
+        "executable_ask": {
+          "artefact": "Hardware-in-the-loop pass on the populated inverter revision (control + gate-drive + SiC power stage as a unit)",
+          "format": "PDF HIL report with case matrix (pass/fail, timing) + raw logs CSV or MF4: time_s, commanded_state, gate_enable, desat_trip, phase_current_a[3], vdc_v, resolver_angle_rad, can_status, hvil_status; firmware git hash and board serials in metadata",
+          "conditions": "Populated hardware revision-matched to the frozen module and Gerber set; cases must include normal torque track, sensor-fault injection, resolver loss, CAN-FD loss, desaturation / OC safe-off (target \u226410 \u00b5s class per bring-up contract), and HVIL open; scaled analogue channels within \u00b15% of plant; no unsafe output persists after a trip; ambient and coolant conditions logged",
+          "unblocks": "BARB-HIL; required before any claim of functionally verified inverter firmware. Note: decision-register DEC-008 id is also used for A-DUTY intermittent freeze \u2014 HIL evidence does not by itself reverse the duty vignette; duty reversal needs BARB-DUTY-CYCLE lap CSV",
+          "already_have": "firmware/bring-up-contract.json (verdict FAB-READY_UNPROVEN_IN_HARDWARE, hil_present=false); channel counts (phase_current\u00d73, resolver\u00d71, coolant_temp, HVIL); safe-off desat_oc target 10 \u00b5s class; HIL_POPULATED_INVERTER bench recipe \u2014 no HIL pass log",
+          "priority": 8
+        },
+        "homologation_status": "OPEN",
+        "software_prep": "READY_FOR_BENCH"
+      },
+      {
+        "id": "BARB-GERBERS",
+        "bar_b_item": "Supplier Gerbers / pinout ICD (DEC-009)",
+        "closure_class": "NEEDS_PARTNER_INPUT",
+        "decision_register": [
+          "DEC-009"
+        ],
+        "assumed_value": "Forge KiCad/Gerber drafts are engineering review only \u2014 not supplier release; cannot invent supplier Gerbers",
+        "result_under_assumption": "PCB disposition=bespoke; boards=2 (traction_gate_drive, traction_control); DRC violations=0; NOT_FABRICATION_READY=True; pipeline.ok=True; supplier Gerbers OPEN",
+        "evidence": [
+          "state.pcb",
+          "pcb-stage.json",
+          "pcb-boards/ (if present)"
+        ],
+        "blocks_ship_ok": true,
+        "replace_with": "Please issue supplier-release Gerber + drill + pick-and-place + pinout ICD for the traction gate-drive and traction control boards mated to the frozen SiC module MPN (RS-274X or ODB++, Excellon, IPC-D-356, positions CSV, PDF pinout with net names and connector part numbers, stack-up and controlled-impedance notes). Do not re-send our Forge KiCad drafts \u2014 we already have 2 routed boards (traction_gate_drive, traction_control), DRC 0 violations, marked NOT_FABRICATION_READY / forgeDraftOnly. Closes BARB-GERBERS only when the pack is supplier-stamped; millimetres and layer stack must come from you.",
+        "executable_ask": {
+          "artefact": "Supplier-release PCB fabrication pack and pinout ICD for the inverter control and gate-drive boards, revision-locked to the frozen SiC module",
+          "format": "Gerber RS-274X (or ODB++) + Excellon drill + IPC-D-356 netlist + pick-and-place CSV + PDF pinout/connector ICD (net name, pin, mating connector MPN) + stack-up PDF with controlled-impedance targets; one zip per board with drawing number and rev in the filename",
+          "conditions": "Boards must mate to the frozen SiC module MPN and chassis LV/CAN and HV interfaces; creepage/clearance stated for the HV domain; rev letter frozen; DRC clean on supplier ruleset; explicitly labelled SUPPLIER RELEASE (not engineering review). Do not invent or ask us to invent pad coordinates for a module you have not frozen",
+          "unblocks": "BARB-GERBERS; required before fabrication and before HIL on production-intent bare boards. Note: decision-register DEC-009 id is also used for DEC-EM-1 24 krpm/130 mm freeze \u2014 Gerber evidence does not reverse that EM decision",
+          "already_have": "Forge KiCad drafts only: 2 routed boards (traction_gate_drive, traction_control), pipeline complete, DRC violations=0, NOT_FABRICATION_READY=True, supplier_gerbers=OPEN \u2014 engineering review, not a fab release",
+          "priority": 5
+        },
+        "homologation_status": "OPEN"
+      },
+      {
+        "id": "BARB-DYNO",
+        "bar_b_item": "Motor + inverter dyno correlation (DEC-010)",
+        "closure_class": "NEEDS_HARDWARE",
+        "decision_register": [
+          "DEC-010"
+        ],
+        "assumed_value": "Hybrid EM map + loss/FW screens under A-DUTY/A-MAG/A-SPEED/A-BUS \u2014 predicted model only, not measured map",
+        "result_under_assumption": "duty_torque_screen_ok=False; mean |T|\u2248122.10 N\u00b7m / required\u2248104.10 N\u00b7m; iron_loss_w screening\u22486035 W (range 3.9\u20138.5 kW); torque_map status remains OPEN for dyno",
+        "evidence": [
+          "_motor_stack/em_fia_front_kit_case.json",
+          "_motor_stack/em_fia_mtpa_screen.json",
+          "_motor_stack/em_fia_torque_map_screen.json",
+          "_motor_stack/em_fia_voltage_fw_screen.json"
+        ],
+        "blocks_ship_ok": true,
+        "replace_with": "Please run a calibrated motor+inverter dyno map on the revision-matched assembly at A-COOL coolant inlet 60 \u00b0C / 12 L/min: speed grid 0\u2013max used rpm in \u22641000 rpm steps (include base and 24000 rpm class points), torque grid 0\u2013104.1 N\u00b7m in \u226425 N\u00b7m steps at each speed, log shaft torque, speed, DC/AC power, \u03b7, winding/magnet/module/coolant temperatures, and a calorimetric loss split (coolant \u0394T\u00d7\u1e41\u00d7cp plus shaft power balance \u2014 not shaft torque alone) so the iron-loss screening band 3.9\u20138.5 kW (point estimate 6035 W) can collapse. Deliver CSV + calibration certificates. Closes BARB-DYNO / DEC-010 and narrows BARB-DUTY-CYCLE thermal integrals; we already hold hybrid EM/MTPA/FW predicted maps.",
+        "executable_ask": {
+          "artefact": "Calibrated dyno torque / efficiency / thermal map of the revision-matched MGU + inverter assembly, with calorimetric loss split",
+          "format": "CSV with columns: speed_rpm, shaft_torque_nm, shaft_power_kw, vdc_v, idc_a, id_a, iq_a, ac_power_kw, efficiency, coolant_inlet_c, coolant_outlet_c, coolant_flow_l_min, winding_temp_c, magnet_temp_c_or_rotor_proxy_c, module_temp_c, calorimetric_loss_w, electrical_loss_w; plus PDF run sheet and torque-transducer / meter calibration certificates",
+          "conditions": "Coolant held at A-COOL: inlet 60 \u00b0C \u00b12 \u00b0C, flow 12 L/min \u00b15%; DC bus at kit voltage class (750 V nominal); speed grid 0 to max used rpm in steps \u22641000 rpm (include base speed and 24000 rpm class); torque grid 0 to \u2265104.1 N\u00b7m in steps \u226425 N\u00b7m at each speed; steady thermal soak at each map corner; calorimetric loss from coolant \u0394T\u00d7\u1e41\u00d7cp required (shaft torque alone will not collapse the 3.9\u20138.5 kW iron-loss range); assembly revision hash on the header",
+          "unblocks": "BARB-DYNO and DEC-010; narrows BARB-DUTY-CYCLE loss integrals and the iron-loss screening range 3.9\u20138.5 kW; acceptance guide \u00b110% torque / \u00b13 pp efficiency vs predicted model at matched points (from hardware_correlation_bench_prep). Never sets torque_reliable from software alone",
+          "already_have": "Predicted EM front-kit case, MTPA, torque-map and voltage-FW screens; required shaft torque \u2248104.10 N\u00b7m; screening iron_loss_w\u22486035 W (basis screening_estimate, range 3.9\u20138.5 kW); DYNO hold recipe \u2014 no measured dyno CSV",
+          "priority": 2
+        },
+        "homologation_status": "OPEN",
+        "software_prep": "READY_FOR_BENCH"
+      },
+      {
+        "id": "BARB-FLOW-BENCH",
+        "bar_b_item": "Flow bench jacket + cold plate",
+        "closure_class": "NEEDS_HARDWARE",
+        "decision_register": [],
+        "assumed_value": "A-COOL 60 \u00b0C / 12 L/min; OF duct \u0394p + coupled network temperatures",
+        "result_under_assumption": "\u0394p\u224845.1 kPa; coupled_ok=True; T_module\u224877.6 \u00b0C; slot_to_iron_k_per_w=0.006; iron_to_jacket_k_per_w=0.0077",
+        "evidence": [
+          "_motor_stack/openfoam_fia_water_jacket_case.json",
+          "_motor_stack/openfoam_fia_cold_plate_case.json",
+          "_motor_stack/analytical_fia_cooling_network_screen.json"
+        ],
+        "blocks_ship_ok": true,
+        "replace_with": "Please flow-bench the revision-matched motor water jacket and inverter cold plate separately and in series: EGW mix as kit, inlet 60 \u00b0C, step flow from ~3 to ~20 L/min (include the A-COOL point 12 L/min), record stabilised inlet/outlet pressure (kPa), flow (L/min), and fluid temperatures; add wall/near-wall temperature taps on stator iron, slot/winding proxy, jacket wall, module case and cold-plate land so we can calibrate screening constants slot_to_iron_k_per_w=0.006 and iron_to_jacket_k_per_w=0.0077 in analytical_fia_cooling_network_screen.py. CSV + calibration certs. Closes BARB-FLOW-BENCH (model \u0394p\u224845.1 kPa today). We already hold OpenFOAM jacket/cold-plate cases and the coupled network screen.",
+        "executable_ask": {
+          "artefact": "Measured pressure-flow and temperature-instrumented flow-bench curves for the motor water jacket and inverter cold plate",
+          "format": "CSV per article (jacket, cold_plate, optional series): flow_l_min, p_inlet_kpa, p_outlet_kpa, delta_p_kpa, t_fluid_in_c, t_fluid_out_c, t_wall_iron_c, t_slot_or_winding_c, t_jacket_wall_c, t_module_case_c, t_cold_plate_land_c; PDF rig schematic and instrument calibration certificates",
+          "conditions": "Coolant mix and inlet temperature controlled to A-COOL class (60 \u00b0C \u00b12 \u00b0C); flow stepped across approximately 3\u201320 L/min including the kit point 12 L/min; each point thermally stabilised; articles revision-matched to release CAD; temperature taps on iron, slot/winding proxy, jacket wall, module case and cold-plate land required for Rth calibration (\u0394p-only curves are not enough to retune slot_to_iron_k_per_w=0.006 and iron_to_jacket_k_per_w=0.0077)",
+          "unblocks": "BARB-FLOW-BENCH; calibrates analytical_fia_cooling_network_screen.py screening constants slot_to_iron_k_per_w=0.006 and iron_to_jacket_k_per_w=0.0077; tightens BARB-HEATER-PLATE and duty/thermal predictions. Acceptance guide \u00b115% \u0394p vs OpenFOAM/network model with monotonic trend",
+          "already_have": "OpenFOAM water-jacket and cold-plate cases; coupled network screen (\u0394p\u224845.1 kPa, coupled_ok=True, T_module\u224877.6 \u00b0C); screening Rth seeds slot_to_iron=0.006 K/W, iron_to_jacket=0.0077 K/W \u2014 no measured bench curves",
+          "priority": 3
+        },
+        "homologation_status": "OPEN",
+        "software_prep": "READY_FOR_BENCH"
+      },
+      {
+        "id": "BARB-HEATER-PLATE",
+        "bar_b_item": "Heater-plate module temperatures",
+        "closure_class": "NEEDS_HARDWARE",
+        "decision_register": [
+          "DEC-001"
+        ],
+        "assumed_value": "Network T_module from analytical Rth + OF \u0394p under A-SIC/A-COOL",
+        "result_under_assumption": "T_module\u224877.6 \u00b0C (screening); module_to_coolant_k_per_w=0.01",
+        "evidence": [
+          "_motor_stack/analytical_fia_cooling_network_screen.json"
+        ],
+        "blocks_ship_ok": true,
+        "replace_with": "Please run a heater-plate test on the revision-matched SiC module/TIM/cold-plate stack (frozen MPN + TIM thickness/type): apply calibrated heater power steps covering ~4.32 kW class dissipation at A-COOL 60 \u00b0C / 12 L/min, log steady module case, TIM interfaces, plate, coolant inlet/outlet temperatures, and report measured Rth(j-c) / Rth(c-coolant). CSV + photos of stack-up. Closes BARB-HEATER-PLATE (screening T_module\u224877.6 \u00b0C). We already hold the analytical network prediction; need the physical stack.",
+        "executable_ask": {
+          "artefact": "Heater-plate thermal correlation of the revision-matched SiC module / TIM / cold-plate stack",
+          "format": "CSV: heater_power_w, t_module_case_c, t_tim_interface_c, t_cold_plate_c, t_coolant_in_c, t_coolant_out_c, flow_l_min, rth_module_to_coolant_k_per_w; PDF stack-up (TIM type, thickness, torque/pressure) and calibration certificates",
+          "conditions": "Stack matches frozen module MPN and release TIM; coolant 60 \u00b0C / 12 L/min (A-COOL); heater power stepped through points bracketing ~4318 W class inverter dissipation; each point to thermal steady state; acceptance guide \u00b15 \u00b0C on module temperature and \u00b115% on Rth vs network model",
+          "unblocks": "BARB-HEATER-PLATE and supports DEC-001 thermal limit; feeds module_to_coolant_k_per_w back into the cooling network screen",
+          "already_have": "Analytical network T_module\u224877.6 \u00b0C; module_to_coolant_k_per_w seed=0.01; HEATER_PLATE_MODULE_TEMPS bench recipe \u2014 no heater-plate CSV",
+          "priority": 9
+        },
+        "homologation_status": "OPEN",
+        "software_prep": "READY_FOR_BENCH"
+      },
+      {
+        "id": "BARB-DOUBLE-PULSE",
+        "bar_b_item": "Double-pulse ESL / switching",
+        "closure_class": "NEEDS_HARDWARE",
+        "decision_register": [
+          "DEC-001",
+          "DEC-008"
+        ],
+        "assumed_value": "Bus ESL analytical seed (~6.39 nH class) \u2014 not measured commutation loop",
+        "result_under_assumption": "ESL seed nominal\u22486.39 nH (band [3.0, 15.0]); measured ESL OPEN",
+        "evidence": [
+          "_motor_stack/inverter_packaging_fia_front_kit_case.json"
+        ],
+        "blocks_ship_ok": true,
+        "replace_with": "Please run guarded double-pulse tests on the populated SiC hardware (revision-matched laminated bus + frozen module): at kit DC bus (750 V class) and current points up to design phase current, capture Vgs, Vds, Id, timing, device temperature, and extract commutation-loop ESL, voltage overshoot, Eon/Eoff. Deliver scope CSV/binary + PDF with loop geometry photo and gate-resistor settings. Closes BARB-DOUBLE-PULSE (analytical ESL seed ~6.39 nH is not measured). We already hold the packaging ESL seed and target band 3\u201315 nH.",
+        "executable_ask": {
+          "artefact": "Double-pulse switching characterisation on populated SiC inverter hardware with measured commutation-loop ESL",
+          "format": "Scope CSV or vendor binary per pulse point: time, vgs_v, vds_v, id_a; derived table CSV of vdc_v, id_peak_a, esl_nh, overshoot_v, eon_mj, eoff_mj, rg_ohm, tj_c; PDF with bus geometry photo, probe points, and gate settings",
+          "conditions": "Populated revision-matched bus + frozen module MPN; DC bus at kit class (750 V nominal) and current points spanning design phase-current class; guarded cell; compare extracted ESL to analytical seed ~6.39 nH (target band 3\u201315 nH, preferred \u226410 nH); acceptance guide \u00b120% ESL, \u00b110% overshoot, \u00b115% Eon/Eoff vs prediction with no device-limit breach",
+          "unblocks": "BARB-DOUBLE-PULSE; replaces analytical ESL seed with measured loop inductance; supports DEC-001 switching loss and safe gate settings for HIL/dyno",
+          "already_have": "Inverter packaging screen ESL nominal 6.39 nH (low/high 4.15/9.90 nH); double_pulse_and_measured_esl status OPEN; DOUBLE_PULSE_ESL_SIC bench recipe \u2014 no scope capture",
+          "priority": 10
+        },
+        "homologation_status": "OPEN",
+        "software_prep": "READY_FOR_BENCH"
+      },
+      {
+        "id": "BARB-ICD-XYZ",
+        "bar_b_item": "FIA / chassis port XYZ",
+        "closure_class": "NEEDS_PARTNER_INPUT",
+        "decision_register": [],
+        "assumed_value": "Port types only (HV, coolant\u00d72, LV/CAN, halfshafts, mounts) \u2014 millimetres deliberately not invented",
+        "result_under_assumption": "Interface ICD TYPES_ONLY_XYZ_OPEN",
+        "evidence": [
+          "JLR-FE-FRONT-FPK-INTERFACE-ICD.md"
+        ],
+        "blocks_ship_ok": true,
+        "replace_with": "Please issue the chassis / FIA port coordinate ICD for this front MGU bay: XYZ (mm) and Euler orientation for HV_DC_IN, COOLANT_IN, COOLANT_OUT, LV_CAN, HALFSHAFT_L/R flange datums, and MOUNT_EARS (\u00d74), in the vehicle frame, as STEP or CAD-native + CSV point table with tolerance class. We already hold types-only ICD (TYPES_ONLY_XYZ_OPEN) and press-class envelope (343\u00d7259\u00d7267 mm) \u2014 do not ask us to invent millimetres and do not re-send type lists without coordinates. Closes BARB-ICD-XYZ.",
+        "executable_ask": {
+          "artefact": "Chassis / FIA interface coordinate ICD locating every MGU port and mount in the vehicle frame",
+          "format": "STEP (or CATIA/NX native) of port/mount datums + CSV: port_id, x_mm, y_mm, z_mm, rx_deg, ry_deg, rz_deg, tolerance_mm, mating_connector_or_flange_mpn; PDF sheet with vehicle-frame definition and revision",
+          "conditions": "Vehicle frame and origin explicitly defined; ports required at minimum: HV_DC_IN, COOLANT_IN, COOLANT_OUT, LV_CAN, HALFSHAFT_L, HALFSHAFT_R, MOUNT_EARS (4); millimetres mandatory \u2014 types-only responses will be rejected as incomplete; revision locked to the bay this car/season uses",
+          "unblocks": "BARB-ICD-XYZ; unblocks casing machine datums, harness lengths, and mount FEA boundary conditions. Never invent coordinates in the twin",
+          "already_have": "JLR-FE-FRONT-FPK-INTERFACE-ICD.md \u2014 TYPES_ONLY_XYZ_OPEN; port type table (HV DC, coolant\u00d72, LV/CAN, halfshafts, 4 mount ears); press/bay-class envelope 343\u00d7259\u00d7267 mm \u2014 no measured or supplier XYZ",
+          "priority": 4
+        },
+        "homologation_status": "OPEN"
+      }
+    ],
+    "can_mint_ship_ok": false,
+    "why_not_complete": "Completing Bar B means measured HIL/dyno/Gerbers/XYZ \u2014 not better guesses. The list is now fully filled for Jack with executable asks; homologation remains NOT_HOMOLOGATED.",
+    "brief_assumption_pack": "docs/plans/JLR-FE-FRONT-FPK-ASSUMPTION-BASED-RESULTS-FOR-JACK-2026-07-31.md",
+    "email_ask": "docs/plans/JLR-FE-FRONT-FPK-EMAIL-ASK-JACK-2026-07-31.md",
+    "ask_priority_order": [
+      "BARB-DUTY-CYCLE",
+      "BARB-DYNO",
+      "BARB-FLOW-BENCH",
+      "BARB-ICD-XYZ",
+      "BARB-GERBERS",
+      "BARB-SIC-MODULE",
+      "BARB-ROTOR-RETENTION",
+      "BARB-HIL",
+      "BARB-HEATER-PLATE",
+      "BARB-DOUBLE-PULSE"
+    ],
+    "proveCatch": {
+      "ship_ok_false": true,
+      "can_mint_ship_ok_false": true,
+      "has_assumed_and_hardware_rows": true,
+      "partner_xyz_not_invented": true,
+      "all_rows_block_ship": true,
+      "all_rows_have_executable_ask": true,
+      "executable_ask_priorities_unique": true,
+      "duty_cycle_priority_one": true
+    }
+  },
+  "latest_blender_pack": "20260805-1036-V1.297-formula-e-front-mgu-design-pack",
+  "blender_renders_present": [
+    "00-hero.png",
+    "04-product-exterior.png",
+    "05-product-left.png",
+    "06-product-right.png",
+    "07-product-service.png",
+    "08-product-ghost-shell.png",
+    "13-product-exploded.png",
+    "blender-cover.png"
+  ],
+  "motor_stack_json_artefacts": [
+    "analytical_fia_case_mount_screen.json",
+    "analytical_fia_cooling_network_screen.json",
+    "analytical_fia_cooling_thermal_screen.json",
+    "bar_b_executable_asks.json",
+    "bearing_reaction_oom_screen.json",
+    "blender_cycle2_morphology_note.json",
+    "blender_cycle3_morphology_note.json",
+    "blender_cycle3_render_proof.json",
+    "blender_cycle3_source_proof.json",
+    "busbar_esl_budget_screen.json",
+    "calculix_fia_magnet_pocket_screen.json",
+    "calculix_fia_rotor_screen.json",
+    "calculix_magnet_pocket_REBALANCED.json",
+    "calculix_rotor_speed_sweep.json",
+    "coolant_loop_one_pager.json",
+    "dc_link_capacitor_concept_screen.json",
+    "dec_008_duty_restamp.json",
+    "dec_009_em_restamp.json",
+    "dec_em1_option_screen.json",
+    "deliverable_coherence_enforce.json",
+    "diff_architecture_decision.json",
+    "dyno_request_matrix.json",
+    "em_architecture_gap_fe.json",
+    "em_combined_case.json",
+    "em_dense_at_kit_angle_slice.json",
+    "em_fia_airgap_fundamental_probe.json",
+    "em_fia_demag_screen.json",
+    "em_fia_front_kit_case.json",
+    "em_fia_front_kit_case_BASELINE_PATHCURRENT.json",
+    "em_fia_front_kit_case_DEC009.json",
+    "em_fia_front_kit_case_PATH_B_DEC009.json",
+    "em_fia_front_kit_case_REBALANCED.json",
+    "em_fia_front_kit_case_REBALANCED_PATHCURRENT.json",
+    "em_fia_front_kit_case_REPLAY_0802.json",
+    "em_fia_mtpa_screen.json",
+    "em_fia_mtpa_screen_DEC009.json",
+    "em_fia_mtpa_screen_PATH_B_DENSE.json",
+    "em_fia_mtpa_screen_REBALANCED.json",
+    "em_fia_torque_map_screen.json",
+    "em_fia_torque_scaling_probe.json"
+  ],
+  "jack_fill_in_xlsx": {
+    "path": "/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/formula-e-front-mgu-20260729-1432/JLR-FE-FRONT-FPK-ASSUMPTIONS-FOR-JACK.xlsx",
+    "present": true,
+    "bytes": 14242,
+    "sheets_expected": [
+      "Instructions",
+      "Assumptions (fill)",
+      "Results (context)",
+      "Asks (fill)"
+    ]
+  },
+  "jack_email_excerpt_secondary": "# Email draft \u2014 Jack / JLR (show the physics engine \u2192 then five precise asks)\n\n**To:** Jack (JLR Formula E technology)  \n**From:** Tristan / Fractional Forge  \n**Subject:** We built a first-principles front powertrain kit in Anvil \u2014 FEMM, OpenFOAM, CalculiX, ISO 6336, and CAD from the same millimetres\n\n**Attachments / links to send with the email**\n- **Fill-in workbook (primary ask vehicle):** `out/formula-e-front-mgu-20260729-1432/JLR-FE-FRONT-FPK-ASSUMPTIONS-FOR-JACK.xlsx` \u2014 yellow cells = Jack confirms/replaces; Asks sheet for attachments  \n- 2\u20133 Blender stills (hero + ghost / cutaway + exterior) \u2014 geometry driven by the solvers below, not \u201cartist CAD\u201d  \n- One-pager: `docs/plans/JLR-FE-FRONT-FPK-ASSUMPTION-BASED-RESULTS-FOR-JACK-2026-07-31.md`  \n- Optional: engineering `dossier.xlsx` + Bar B readiness table  \n\n---\n\nHi Jack,\n\nI wanted to show you something we have actually **run**, not a mood board.\n\nWe put **Anvil** (our design engine) on a Formula E\u2013class **front powertrain kit** \u2014 motor + SiC inverter + reduction + differential \u2014 and drove it from **first-principles physics** into a full concept pack: numbers, thermal network, gear screens, FEA, CFD pressure drops, and Blender geometry that shares the **same millimetres** as the solvers.\n\nWhere public Gen3 data stopped, we **froze named assumptions** and kept going so you can see a closed kit story. This is **not** a homologated or dyno-correlated race release (`ship_ok` stays false until real benches). It **is** the kind of pack you can open, attack, and overwrite with your ICD.\n\n---\n\n### What we built (and how \u2014 the exciting bit)\n\n**One geometry spine.** Rotor bore, stator OD, planetary nest, cold-plate footprint, and housing envelope are not separate PowerPoint numbers. Packaging, EM, gears, cooling, and the Blender cassette all read the **same quantities**. Cutaways are **physics-linked morphology under assumptions** \u2014 useful for review, not a claim that every solid is CAD-family authentic or that screens have cleared.\n\n**Electromagnetics \u2014 FEMM (finite-element magnetics)**  \n- Duty locked to public front regen: **250 kW** at **19,500 rpm** \u21d2 required shaft torque \u2248 **122\u2013125 N\u00b7m** from T = P/\u03c9 (hard arithmetic, not a marketing curve).  \n- Loaded FEMM point: peak torque estimate \u2248 **207 N\u00b7m** at best rotor position; **mean** over the position sweep \u2248 **119 N\u00b7m** (`torque_reliable=false` \u2014 we refuse to pretend a single angle is a dyno map).  \n- Peak air-gap flux on the loaded point ~**1.4 T**; phas",
+  "operator_concerns": [
+    "PROCESS: identity lock across EM / gears / cooling / Blender mm?",
+    "GREENWASH: results-under-assumptions / Bar B filled \u2192 race-ready?",
+    "EM arithmetic: 250 kW \u2194 T=P/\u03c9 \u2194 rpm \u2194 peak vs mean vs torque_reliable",
+    "Thermal process: loss \u2192 network \u2192 OpenFOAM \u0394p \u2014 units / fantasy temps?",
+    "Gears/oil: FoS\u22481.2 theatre; cornering_ok=False buried?",
+    "Structure/dynamics: CalculiX / Ross mislabeled as retention proof?",
+    "PCB/HIL/Gerbers \u2014 any false PASS? forgeDraftOnly respected?",
+    "Blender morphology vs Lucid training check; cutaway clay honesty",
+    "Excel LIVE formulas vs pasted literals on power/thermal",
+    "Interfaces XYZ types-only \u2014 invented millimetres?",
+    "Mass 32 kg aspiration vs CAD roll-up",
+    "ship_ok / homologationHonesty must stay NOT_HOMOLOGATED",
+    "Assumption\u2192ask loop: can Jack overwrite freezes via xlsx?",
+    "Jack email secondary \u2014 only if process-critical overclaim"
+  ],
+  "excel_notes": {
+    "prior_council_formula_coverage_pct_sample": {
+      "Calculations": 21.5,
+      "Brief": 8.9,
+      "Engineering Analysis": 11.4
+    },
+    "require_check": "FPK power/thermal LIVE trace must exist; bare literals FAIL"
+  },
+  "polish_round": {
+    "generated_at": "2026-08-05T11:48:23Z",
+    "instruction_to_council": "Attack the POST cycle-3 Blender re-render and POST densified PCB (2026-08-05). Prior REJECT findings may be stale \u2014 verify against CURRENT evidence. Especially attack: (1) Blender inverter/cap as coloured blocks vs real SiC+film bank; (2) PCB B+/PROTOTYPE_PACKAGE claims vs package_family density; (3) Excel tab scores vs formula liveness (stale scorecard risk); (4) DC-link/inverter PARTIAL screens greenwashed as packaging OK; (5) Multiphysics screening labelled as release FoS.",
+    "pcb_grade_card": {
+      "schema": "forgeos.pcb.grade_card/v2",
+      "ran_at": "2026-08-05T10:36:55Z",
+      "ship_ok": false,
+      "axes": {
+        "draft_review_readiness": {
+          "grade": "B+",
+          "evidence": [
+            "drc0=True",
+            "designFitness.ok=True",
+            "design-fitness weighted score\u22487.93/10 (tiers={'package_family': 27, 'mpn_symbol_footprint': 28, 'mpn_package_only': 5})",
+            "pipeline.ok=True",
+            "phase current sensors land on Sensor_Current:LEM_HTFS (not SOIC-8)",
+            "MCU pad count capped at package (TQFP-48, no pins 49\u201352)",
+            "traction_control channels densified: phase\u00d73, bucks\u00d73, isolation, CAN transceiver"
+          ],
+          "still_open": [
+            "exact automotive MCU / CAN / gate-driver MPNs still OPEN for many draft packages",
+            "firmware tier proof beyond SPEC / synthetic board sim"
+          ]
+        },
+        "fabrication_readiness": {
+          "grade": "PROTOTYPE_PACKAGE",
+          "evidence": [
+            "prototype fab package per board: gerbers + drill + stackup + fab notes + zip",
+            "NOT supplier-released",
+            "NOT HIL-proven",
+            "forgeDraftOnly remains true for supplier-identity purposes"
+          ],
+          "still_open": [
+            "supplier Gerbers / stackup approval",
+            "HIL / hardware proof",
+            "fabricator DFM sign-off"
+          ]
+        }
+      },
+      "composite_label": "PCB draft-review ready \u00b7 PROTOTYPE fab package \u00b7 NOT supplier-released",
+      "NOT_FABRICATION_READY": true,
+      "PROTOTYPE_FAB_PACKAGE": true,
+      "forgeDraftOnly": true,
+      "supplierGerbers": false,
+      "hilPresent": false,
+      "banner_required": "PROTOTYPE FAB PACKAGE \u2014 NOT SUPPLIER-RELEASED \u2014 NOT HIL-PROVEN \u2014 UNPROVEN IN HARDWARE",
+      "release_statement": "Draft-review B+ (fitness\u22487.93, DRC0, channels densified). Fabrication axis: PROTOTYPE_PACKAGE \u2014 internal quote pack only. ship_ok false.",
+      "fitness_score_approx": 7.93,
+      "tier_counts": {
+        "package_family": 27,
+        "mpn_symbol_footprint": 28,
+        "mpn_package_only": 5
+      }
+    },
+    "blender_cycle3_render_proof": {
+      "schema": "forgeos.motor_stack.blender_cycle3_render_proof/v1",
+      "ran_at": "2026-08-05T10:35:00Z",
+      "ship_ok": false,
+      "mesh_count": 275,
+      "morphology_prefix_found": {
+        "u_se_td_housing_machine_band": true,
+        "u_se_td_hv_connector": true,
+        "u_se_td_lv_connector": true,
+        "u_se_td_sic_inverter": true,
+        "u_se_td_coolant_in": true,
+        "u_se_td_coolant_out": true
+      },
+      "heroes_fresh": {
+        "00-hero.png": true,
+        "04-product-exterior.png": true,
+        "05-product-left.png": true,
+        "06-product-right.png": true,
+        "07-product-service.png": true,
+        "08-product-ghost-shell.png": true
+      },
+      "ok": true
+    },
+    "blender_cycle3_morphology": {
+      "schema": "forgeos.motor_stack.blender_cycle3_morphology/v1",
+      "ran_at": "2026-08-05T12:00:00Z",
+      "ship_ok": false,
+      "status": "provisional_visualisation_uplift",
+      "goal": "Race FE powertrain kit language \u2014 not generic industrial charcoal clay",
+      "prior": {
+        "cycle2": "involute teeth + coolant QD boss/hex/collar/barb/hose/clamp",
+        "visual_brief": "out/.../jack_em_pack/10-fe-visual-brief.md"
+      },
+      "changes": {
+        "universal_materials": {
+          "helper": "scripts/blender-templates/forge_blender_lib.py::make_powertrain_role_mat",
+          "roles": [
+            "cast_al_housing",
+            "machined_al",
+            "anodised_al",
+            "carbon_structure",
+            "sic_module_body",
+            "ceramic_dbc",
+            "steel_machined",
+            "steel_fastener",
+            "copper_bus",
+            "hv_shell_dark",
+            "hv_safety_orange",
+            "rubber_boot",
+            "braid_shield",
+            "coolant_port_body",
+            "coolant_qd_collar"
+          ],
+          "bom_pbr": "scripts/lib/bom_physical_properties.py \u2014 SiC, carbon fibre, ceramic DBC, anodised Al"
+        },
+        "sic_module_stack": {
+          "helper": "_fpk_place_sic_inverter_stack",
+          "morphology": "carrier + ceramic_DBC + 3\u00d7 module packages + Cu terminal tabs + clamp cues"
+        },
+        "hv_connector_kit": {
+          "helper": "_fpk_place_hv_connector",
+          "morphology": "flange+bolts + shell + key_flat + safety_orange_collar + dual_pins + HVIL + braid_collar + hazard_band + boot"
+        },
+        "lv_connector_kit": {
+          "helper": "_fpk_place_lv_connector",
+          "morphology": "flange+bolts + shell + key_flat + 2\u00d73 pin face + strain-relief boot"
+        },
+        "housing_race_details": {
+          "machine_band": "u_se_td_housing_machine_band (lighter brushed Al mid-barrel)",
+          "end_bell_faces": "u_se_td_end_bell_face_* machined land rings",
+          "cast_ribs": "T-section web + foot (not flat slabs)",
+          "nameplate": "border (machined Al) + plate (steel)"
+        },
+        "coolant_qd": {
+          "status": "kept from cycle-2; collars now use make_powertrain_role_mat(coolant_qd_collar)"
+        }
+      },
+      "explicitly_not_claimed": [
+        "FIA coolant / HV / LV connector XYZ ICD",
+        "Partner STEP / silhouette paste",
+        "Released gear tooth set / ISO 6336 strength",
+        "ship_ok / Bar A close",
+        "SiC module MPN or supplier Gerbers"
+      ],
+      "re_render": {
+        "runner": "scripts/motor-stack/rerender-fe-front-race-kit.sh",
+        "before_dir": "out/formula-e-front-mgu-20260729-1432/_cycle3_before",
+        "after_dir": "out/formula-e-front-mgu-20260729-1432/_cycle3_previews",
+        "command": "bash scripts/motor-stack/rerender-fe-front-race-kit.sh"
+      }
+    },
+    "max_outcome_status": {
+      "ran_at": "2026-08-05T10:36:55Z",
+      "ship_ok": false,
+      "multiphysics_ok": true,
+      "blender_cycle3_ok": true,
+      "pcb_grade": "B+",
+      "pcb_fab_axis": "PROTOTYPE_PACKAGE",
+      "pcb_fitness_ok": true,
+      "pcb_fitness_score_approx": 7.93
+    },
+    "multiphysics_r1": {
+      "schema": "forgeos.multiphysics.r1_known_answer/v2",
+      "ran_at": "2026-08-05T09:01:57Z",
+      "ship_ok": false,
+      "method": "FEMM_heat_flow_femmcli",
+      "problem": {
+        "L_m": 0.05,
+        "k": 1,
+        "qv": 100000.0,
+        "T0": 20,
+        "analytic": "T=T0+(qv/(2k))*(2Lx-x^2)"
+      },
+      "femm_heat_flow": {
+        "status": "RAN_PASS",
+        "binary": "scripts/phantm/bin/femmcli",
+        "api_gotcha": "hi_setsegmentprop requires 6th arg conductor='<None>' \u2014 5-arg form segfaults in this femmcli",
+        "max_abs_error_k": 0.004042836641517056,
+        "rel_error_vs_rise": 3.234269313213645e-05,
+        "pass": true,
+        "T_max_femm": 144.9997783590977,
+        "T_max_analytic": 145.0,
+        "samples": [
+          {
+            "x_mm": 0.0,
+            "T_femm": 20.00000000223551,
+            "T_analytic": 20.0,
+            "abs_err": 2.235509555248427e-09
+          },
+          {
+            "x_mm": 10.0,
+            "T_femm": 64.99751841348981,
+            "T_analytic": 65.0,
+            "abs_err": 0.002481586510185707
+          },
+          {
+            "x_mm": 20.0,
+            "T_femm": 99.99716143223937,
+            "T_analytic": 100.0,
+            "abs_err": 0.0028385677606337367
+          },
+          {
+            "x_mm": 25.0,
+            "T_femm": 113.7485763821164,
+            "T_analytic": 113.75000000000001,
+            "abs_err": 0.001423617883617112
+          },
+          {
+            "x_mm": 30.0,
+            "T_femm": 124.9959571633585,
+            "T_analytic": 125.00000000000001,
+            "abs_err": 0.004042836641517056
+          },
+          {
+            "x_mm": 40.0,
+            "T_femm": 139.9968888869337,
+            "T_analytic": 140.0,
+            "abs_err": 0.0031111130662964115
+          },
+          {
+            "x_mm": 50.0,
+            "T_femm": 144.9997783590977,
+            "T_analytic": 145.00000000000003,
+            "abs_err": 0.00022164090233900424
+          }
+        ]
+      },
+      "fd_crosscheck": {
+        "nx": 201,
+        "max_abs_error_k": 0.6249999999056115,
+        "rel_error_vs_rise": 0.004999999999244891,
+        "T_max_c": 144.37500000009442,
+        "T_analytic_max_c": 145.00000000000003,
+        "pass": true,
+        "pass_criterion": "rel_error_vs_rise < 5%"
+      },
+      "gate": "R2_allowed",
+      "fd_pass": true
+    },
+    "multiphysics_r4_dense": {
+      "schema": "forgeos.multiphysics.r4_calculix_dense/v1",
+      "ran_at": "2026-08-05T10:08:53Z",
+      "ship_ok": false,
+      "mesh": {
+        "nr": 8,
+        "nth": 16,
+        "nz": 4,
+        "n_nodes": 765,
+        "n_elements": 512,
+        "ri_m": 0.05295,
+        "ro_m": 0.0697,
+        "half_z_m": 0.0325,
+        "type": "C3D8_quarter_ring"
+      },
+      "rpm": 24000.0,
+      "T_ref_c": 20.0,
+      "T_field": "FEMM R2 radial samples mapped by r=hypot(x,y)",
+      "centrif_only": {
+        "ok": true,
+        "returncode": 0,
+        "max_von_mises_mpa": 218.08735221337298,
+        "n_integration_points": 4096,
+        "tail": "p to 1 cpu(s) for the stress calculation.\n\n Using up to 1 cpu(s) for the symmetric stiffness/mass contributions.\n\n Factoring the system of equations using the symmetric spooles solver\n Using up to 1 cpu(s) for spooles.\n\n Using up to 1 cpu(s) for the stress calculation.\n\n\n Job finished\n\n________________________________________\n\nTotal CalculiX Time: 0.060178\n________________________________________\n"
+      },
+      "centrif_plus_thermal_gradient": {
+        "ok": true,
+        "returncode": 0,
+        "max_von_mises_mpa": 240.6570970107397,
+        "n_integration_points": 4096,
+        "tail": "p to 1 cpu(s) for the stress calculation.\n\n Using up to 1 cpu(s) for the symmetric stiffness/mass contributions.\n\n Factoring the system of equations using the symmetric spooles solver\n Using up to 1 cpu(s) for spooles.\n\n Using up to 1 cpu(s) for the stress calculation.\n\n\n Job finished\n\n________________________________________\n\nTotal CalculiX Time: 0.054891\n________________________________________\n"
+      },
+      "delta_vm_mpa": 22.569744797366724,
+      "assumed_yield_mpa": 355.0,
+      "status": "RAN",
+      "honest_limits": [
+        "quarter ring continuum \u2014 not laminate/magnet-pocket mesh",
+        "stator FEMM T mapped onto rotor ring as screening proxy",
+        "not *COUPLED TEMPERATURE-DISPLACEMENT heat conduction solve",
+        "not release FoS"
+      ],
+      "compare_to_coarse": {
+        "prior_coarse_nodes": 56,
+        "prior_delta_vm_mpa": 24.99
+      }
+    },
+    "ross_k_sens": {
+      "schema": "forgeos.multiphysics.ross_bearing_k_sensitivity/v1",
+      "ran_at": "2026-08-05T10:09:55Z",
+      "ship_ok": false,
+      "operating_rpm": 24000.0,
+      "base_kxx_n_m": 50000000.0,
+      "required_subcritical_factor": 1.2,
+      "rows": [
+        {
+          "k_factor": 0.25,
+          "kxx_n_m": 12500000.0,
+          "first_critical_rpm": 11029.287,
+          "margin_over_operating": 0.4596,
+          "clear_subcritical_1p2": false
+        },
+        {
+          "k_factor": 0.5,
+          "kxx_n_m": 25000000.0,
+          "first_critical_rpm": 16018.578,
+          "margin_over_operating": 0.6674,
+          "clear_subcritical_1p2": false
+        },
+        {
+          "k_factor": 1.0,
+          "kxx_n_m": 50000000.0,
+          "first_critical_rpm": 22922.382,
+          "margin_over_operating": 0.9551,
+          "clear_subcritical_1p2": false
+        },
+        {
+          "k_factor": 2.0,
+          "kxx_n_m": 100000000.0,
+          "first_critical_rpm": 32540.931,
+          "margin_over_operating": 1.3559,
+          "clear_subcritical_1p2": true
+        },
+        {
+          "k_factor": 4.0,
+          "kxx_n_m": 200000000.0,
+          "first_critical_rpm": 45926.893,
+          "margin_over_operating": 1.9136,
+          "clear_subcritical_1p2": true
+        },
+        {
+          "k_factor": 8.0,
+          "kxx_n_m": 400000000.0,
+          "first_critical_rpm": 64385.595,
+          "margin_over_operating": 2.6827,
+          "clear_subcritical_1p2": true
+        }
+      ],
+      "baseline_first_critical_rpm": 22922.382,
+      "k_factor_for_clear_1p2": 2.0,
+      "headline": "Assumed-bearing stiffness sweep vs 24k. Identity OPEN.",
+      "honest_limits": [
+        "isotropic assumed K/C",
+        "steel equivalent disk",
+        "not modal/dyno correlated"
+      ]
+    },
+    "dc_link_cap": {
+      "schema": "forgeos.fpk.dc_link_capacitor_concept_screen/v1",
+      "status": "PARTIAL_ANALYTICAL_SCREEN",
+      "ship_ok": false,
+      "evidence_class": "twin_bound_analytical_design_space",
+      "ran_at": "2026-08-04T12:33:52Z",
+      "inputs": {
+        "v_dc": 750.0,
+        "i_ph_rms": 535.0,
+        "p_elec_kw": 250.0,
+        "eta_inv": 0.98766
+      },
+      "derived": {
+        "i_dc_a": 333.33,
+        "formula_c_min": "C_min = I_dc / (2\u00b7\u03c0\u00b7f_sw\u00b7\u0394V), \u0394V = dv_frac\u00b7V_dc"
+      },
+      "assumptions": {
+        "dc_bus_voltage_v": {
+          "value": 750.0,
+          "status": "twin_seed",
+          "source": "state.dc_bus_voltage_v"
+        },
+        "electrical_power_kw": {
+          "value": 250.0,
+          "status": "twin_seed"
+        },
+        "phase_current_design_a_rms": {
+          "value": 535.0,
+          "status": "twin_seed"
+        },
+        "pwm_switching_frequency_khz": {
+          "low": 8.0,
+          "nom": 12.0,
+          "high": 20.0,
+          "status": "ASSUMED_CONCEPT_range",
+          "note": "Not measured; FE SiC class typically 8\u201320 kHz. Sensitivity only."
+        },
+        "allowable_bus_ripple_fraction": {
+          "low": 0.01,
+          "nom": 0.02,
+          "high": 0.05,
+          "status": "ASSUMED_CONCEPT_range",
+          "note": "\u0394V/V targets 1\u20135% for concept envelope \u2014 not a supplier limit."
+        },
+        "film_cap_energy_density_j_per_cm3": {
+          "low": 0.5,
+          "nom": 1.0,
+          "high": 1.5,
+          "status": "ASSUMED_CONCEPT_class",
+          "note": "Order-of-magnitude film bank packing \u2014 not a datasheet."
+        }
+      },
+      "sensitivity_cases": [
+        {
+          "f_sw_khz": 8.0,
+          "dv_frac": 0.01,
+          "c_min_uF": 884.2,
+          "energy_j": 248.68,
+          "volume_cm3_band": {
+            "low": 165.8,
+            "nom": 248.7,
+            "high": 497.4
+          }
+        },
+        {
+          "f_sw_khz": 8.0,
+          "dv_frac": 0.02,
+          "c_min_uF": 442.1,
+          "energy_j": 124.34,
+          "volume_cm3_band": {
+            "low": 82.9,
+            "nom": 124.3,
+            "high": 248.7
+          }
+        },
+        {
+          "f_sw_khz": 8.0,
+          "dv_frac": 0.05,
+          "c_min_uF": 176.8,
+          "energy_j": 49.74,
+          "volume_cm3_band": {
+            "low": 33.2,
+            "nom": 49.7,
+            "high": 99.5
+          }
+        },
+        {
+          "f_sw_khz": 12.0,
+          "dv_frac": 0.01,
+          "c_min_uF": 589.5,
+          "energy_j": 165.79,
+          "volume_cm3_band": {
+            "low": 110.5,
+            "nom": 165.8,
+            "high": 331.6
+          }
+        },
+        {
+          "f_sw_khz": 12.0,
+          "dv_frac": 0.02,
+          "c_min_uF": 294.7,
+          "energy_j": 82.89,
+          "volume_cm3_band": {
+            "low": 55.3,
+            "nom": 82.9,
+            "high": 165.8
+          }
+        },
+        {
+          "f_sw_khz": 12.0,
+          "dv_frac": 0.05,
+          "c_min_uF": 117.9,
+          "energy_j": 33.16,
+          "volume_cm3_band": {
+            "low": 22.1,
+            "nom": 33.2,
+            "high": 66.3
+          }
+        },
+        {
+          "f_sw_khz": 20.0,
+          "dv_frac": 0.01,
+          "c_min_uF": 353.7,
+          "energy_j": 99.47,
+          "volume_cm3_band": {
+            "low": 66.3,
+            "nom": 99.5,
+            "high": 198.9
+          }
+        },
+        {
+          "f_sw_khz": 20.0,
+          "dv_frac": 0.02,
+          "c_min_uF": 176.8,
+          "energy_j": 49.74,
+          "volume_cm3_band": {
+            "low": 33.2,
+            "nom": 49.7,
+            "high": 99.5
+          }
+        },
+        {
+          "f_sw_khz": 20.0,
+          "dv_frac": 0.05,
+          "c_min_uF": 70.7,
+          "energy_j": 19.89,
+          "volume_cm3_band": {
+            "low": 13.3,
+            "nom": 19.9,
+            "high": 39.8
+          }
+        }
+      ],
+      "envelope": {
+        "c_min_uF": {
+          "min": 70.7,
+          "max": 884.2
+        },
+        "volume_cm3_nom_band": {
+          "min": 19.9,
+          "max": 248.7
+        },
+        "i_ripple_rms_a": {
+          "low": 150.0,
+          "nom": 183.3,
+          "high": 233.3,
+          "unit": "A_rms",
+          "status": "ASSUMED_CONCEPT_order_of_magnitude"
+        },
+        "esl_nh": {
+          "target_band": [
+            3.0,
+            15.0
+          ],
+          "seed_from_packaging_screen_nh": 6.39,
+          "status": "OPEN_measured_double_pulse",
+          "note": "Matches inverter packaging ESL seed; measurement is Bar B DOUBLE-PULSE."
+        }
+      },
+      "explicitly_not_claimed": [
+        "supplier_MPN",
+        "committed_volume_or_CAD_box",
+        "capacitor_lifetime_hours",
+        "qualified_ripple_current_datasheet",
+        "measured_ESL",
+        "ship_ok",
+        "Bar_B_closed"
+      ],
+      "partner_ask_stub": {
+        "artefact": "SiC module MPN + preferred film capacitor class datasheets + laminated bus STEP",
+        "unblocks": "BARB-SIC-MODULE, BARB-DOUBLE-PULSE, packaging freeze",
+        "already_have": "This analytical envelope + packaging ESL seed"
+      },
+      "release_statement": "Concept design-space only. Numbers are sensitivity envelopes under named PWM/ripple assumptions. No capacitor is selected. ship_ok false.",
+      "source_twin": "/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/formula-e-front-mgu-20260729-1432"
+    },
+    "inverter_packaging": {
+      "cold_plate_cfd_note": "Hydraulic \u0394p may also appear under motorMultiphysics.inverter_cold_plate when openfoam_fia_cold_plate_case.json exists \u2014 packaging screen here is geometric/electrical, not CHT.",
+      "double_pulse_and_measured_esl": {
+        "statement": "Twin fpk_bus_esl_* values are analytical laminated-bus seeds. Double-pulse switching energy and measured stray inductance are OPEN.",
+        "status": "OPEN"
+      },
+      "evidence_class": "twin_bound_analytical_packaging_partial",
+      "fia_question": "Can a SiC MCU package 250 kW at 750 V inside the MCU box / cold-plate land with ESL in the laminated-bus target band?",
+      "input_quantities": {
+        "bay_d_mm": 259.0,
+        "bay_h_mm": 267.0,
+        "bay_w_mm": 343.0,
+        "bus_esl_high_nh": 9.9,
+        "bus_esl_low_nh": 4.15,
+        "bus_esl_nominal_nh": 6.39,
+        "cold_plate_channel_count": 8,
+        "cold_plate_channel_height_mm": 1.336,
+        "cold_plate_channel_width_mm": 5.345,
+        "cold_plate_delta_p_pa": null,
+        "cold_plate_length_mm": 235.3,
+        "cold_plate_width_mm": 139.6,
+        "continuous_electrical_power_kw": 250.0,
+        "dc_bus_voltage_v": 750.0,
+        "front_regen_electrical_cap_kw": 250.0,
+        "inverter_dissipated_kw": 4.318,
+        "inverter_efficiency": 0.98766,
+        "mass_inverter_kg": 8.2,
+        "mcu_d_mm": 139.6,
+        "mcu_h_mm": 28.0,
+        "mcu_w_mm": 235.3,
+        "sic_module_count": 3
+      },
+      "input_quantities_sha256": "4e1a93a70a0790231e99124e7aeb27fdcbdb88ffd24cf9179970fdc9b7ec2115",
+      "model_assumptions": [
+        "DC current = continuous electrical power / DC bus voltage (no ripple).",
+        "ESL target band 3.0\u201315.0 nH (preferred high \u226410.0 nH).",
+        "Cold-plate land defaults to MCU footprint when plate length is unset (serpentine family training length 180.0\u00d7120.0 mm is not forced as the kit land).",
+        "SiC module count from twin quantity seed \u2014 not a frozen BOM line."
+      ],
+      "module_mpn_and_step": {
+        "sic_module_count_seed": 3,
+        "statement": "Phase-module count is a twin seed only. Supplier MPN, package STEP, and terminal geometry that drive the laminated bus remain OPEN.",
+        "status": "OPEN"
+      },
+      "release_statement": "Concept packaging evidence only. No module procurement identity, no measured ESL, no HIL. ship_ok stays false.",
+      "schema": "forgeos.motor_stack.inverter_packaging_fia_front_kit_case/v1",
+      "screening_results": {
+        "bus_esl_high_nh": 9.9,
+        "bus_esl_low_nh": 4.15,
+        "bus_esl_nominal_nh": 6.39,
+        "cold_plate_covers_mcu_footprint": true,
+        "cold_plate_delta_p_pa_seed": null,
+        "cold_plate_interface_area_mm2": 32847.88,
+        "current_density_a_per_module": 111.11,
+        "dc_current_a": 333.333,
+        "esl_high_within_preferred": true,
+        "esl_nominal_in_target_band": true,
+        "esl_preferred_high_nh": 10.0,
+        "esl_target_band_nh": [
+          3.0,
+          15.0
+        ],
+        "inverter_dissipated_kw": 4.318,
+        "mcu_fits_bay": true,
+        "mcu_footprint_area_mm2": 32847.88,
+        "mcu_volume_l": 0.91974,
+        "power_density_in_band": true,
+        "power_density_kw_l": 271.82,
+        "sic_module_count": 3
+      },
+      "ship_ok": false,
+      "source_state_sha256": "2a56c7cd5bb92945d47cf70917ea268c782bec535b546146f9ca9c96815b9b15",
+      "source_twin": "out/formula-e-front-mgu-20260729-1432",
+      "status": "PARTIAL",
+      "works_in_kit_context": {
+        "packaging_screen_ok": true,
+        "statement": "Analytical MCU packaging screen (density / DC current / ESL seed / cold-plate land / bay fit). Module MPN, supplier STEP, and double-pulse ESL measurement remain OPEN."
+      }
+    },
+    "tab_scorecard_summary": {
+      "min_tab": "Executive Summary",
+      "min_score": 0,
+      "scored_count": 30,
+      "fail_tabs": [
+        "Executive Summary",
+        "Overview",
+        "Brief",
+        "Calculations",
+        "Cost waterfall",
+        "Connection trace",
+        "Quality & Audit",
+        "\u26a0 Checks",
+        "Verification"
+      ],
+      "unscored_tabs": [],
+      "verified_out_of_scope_tabs": [
+        "Process schedules",
+        "Line & velocity",
+        "HVAC",
+        "Quantities",
+        "Inputs Master (M0)"
+      ],
+      "all_pass": false
+    },
+    "visual_exam_notes_20260805": {
+      "examiner": "grok_vision_this_session",
+      "heroes_opened": [
+        "00-hero.png",
+        "04-product-exterior.png",
+        "07-product-service.png",
+        "08-product-ghost-shell.png",
+        "13-product-exploded.png"
+      ],
+      "findings": [
+        "Hero/ghost show copper windings + gears + top PCB stack + HV orange + QD \u2014 architecture readable",
+        "SiC/DC-link region is schematic coloured prisms/blocks \u2014 NOT recognisable film-cap bank or module packages",
+        "Exterior is glossy closed black pod \u2014 product-studio quality, weak FE race authenticity",
+        "Exploded has R/Y/B bars and PCB but no distinct DC-link capacitor morphology",
+        "Prior agent claimed cycle-3 without opening images; visual exam now done"
+      ]
+    },
+    "known_excel_risk": "Historical red-team: Calculations ~21% formula coverage with power/torque as literals \u2014 VERIFY on current workbook before trusting scores"
+  }
+}

@@ -154,7 +154,7 @@ const CANDIDATE_RULES: readonly CandidateRule[] = [
     // ADUM1201ARZ-RL7 could not resolve a footprint (distributor package text "NSOIC,
     // 8 Pins" missed the SOIC matcher) → wet_lab_hat's isolate_wet_peripherals role stayed
     // unfilled → design-fitness FAIL → pcbGate architecture_unfit → PCB 0.
-    roleTest: /galvanic[_ -]?isolator|digital[_ -]?isolator|usb[_ -]?isolator|(?:^|[_ -])isolator(?:$|[_ -])|adum\d/i,
+    roleTest: /galvanic[_ -]?isolator|digital[_ -]?isolator|usb[_ -]?isolator|(?:^|[_ -])isolator(?:$|[_ -])|adum\d|hv[_ -]?lv[_ -]?(?:isolation|isolator|barrier)/i,
     functionClass: 'isolator_ic',
     manufacturer: 'Analog Devices',
     partNumber: 'ADUM1201ARZ-RL7',
@@ -164,6 +164,49 @@ const CANDIDATE_RULES: readonly CandidateRule[] = [
     packageEvidence: 'Analog Devices ADUM1201ARZ: dual-channel digital isolator (1 fwd / 1 rev) in 8-lead NSOIC (R-8), 2.7-5.5 V both sides',
     referenceEvidence: 'Organoid bioreactor BoM X-124 USB Galvanic Isolator exact ADUM1201ARZ-RL7 (Analog Devices); ADuM1201 datasheet Rev K',
     pinoutEvidence: 'ADuM1201 R-8 pinout 1=VDD1 2=VOA 3=VIB 4=GND1 5=GND2 6=VOB 7=VIA 8=VDD2; KiCad Isolator:ADuM1201AR with Package_SO:SOIC-8_3.9x4.9mm_P1.27mm',
+  },
+  {
+    // INTENT (FE front 2026-08-05): vehicle CAN path needs a real transceiver
+    // identity — package_family QFN alone keeps fitness below A- threshold.
+    roleTest: /can[_ -]?fd[_ -]?transceiver|vehicle[_ -]?can[_ -]?transceiver|(?:^|[_ -])can[_ -]?transceiver(?:$|[_ -])/i,
+    functionClass: 'connectivity_ic',
+    manufacturer: 'Texas Instruments',
+    partNumber: 'SN65HVD255D',
+    footprint: { library: 'Package_SO', footprint: 'SOIC-8_3.9x4.9mm_P1.27mm' },
+    symbol: { library: 'Interface_CAN_LIN', symbol: 'SN65HVD255D' },
+    ratings: { voltageV: 5.5 },
+    packageEvidence: 'TI SN65HVD255D: turbo CAN transceiver, 5 V, SOIC-8 (D package)',
+    referenceEvidence: 'TI SN65HVD255 datasheet SLLSE57; KiCad Interface_CAN_LIN:SN65HVD255D + Package_SO:SOIC-8_3.9x4.9mm_P1.27mm',
+    pinoutEvidence: 'SOIC-8 CAN: TXD/GND/VCC/RXD/CANL/CANH/S/… per SN65HVD255D; local KiCad symbol SN65HVD255D',
+  },
+  {
+    // INTENT: phase current sense AFE — zero-drift op-amp path (not SOIC generic).
+    roleTest: /current[_ -]?sense[_ -]?front[_ -]?end|phase[_ -]?current[_ -]?(?:afe|front[_ -]?end)/i,
+    functionClass: 'op_amp',
+    manufacturer: 'Texas Instruments',
+    partNumber: 'OPA333AIDBVT',
+    footprint: { library: 'Package_TO_SOT_SMD', footprint: 'SOT-23-5' },
+    symbol: { library: 'Amplifier_Operational', symbol: 'OPA333xxDBV' },
+    ratings: { voltageV: 5.5 },
+    packageEvidence: 'TI OPA333AIDBVT: 1.8 V zero-drift op-amp in SOT-23-5 (DBV)',
+    referenceEvidence: 'TI OPA333 datasheet SBOS351; KiCad Amplifier_Operational:OPA333 + Package_TO_SOT_SMD:SOT-23-5 (screening AFE stand-in for phase current front-end)',
+    pinoutEvidence: 'SOT-23-5 OPA333 pinout; local KiCad Amplifier_Operational:OPA333xxDBV',
+  },
+  {
+    // INTENT: LV buck rails — real 3.3 V LDO/buck package instead of bare SOT-23.
+    roleTest: /lv[_ -]?buck[_ -]?rails?|buck[_ -]?(?:regulator|rail)|(?:^|[_ -])dc[_ -]?dc(?:$|[_ -])/i,
+    functionClass: 'regulator',
+    manufacturer: 'Texas Instruments',
+    partNumber: 'TPS62160DSGR',
+    footprint: {
+      library: 'Package_SON',
+      footprint: 'WSON-8-1EP_2x2mm_P0.5mm_EP0.9x1.6mm',
+    },
+    symbol: { library: 'Regulator_Switching', symbol: 'TPS62160DSG' },
+    ratings: { voltageV: 17, currentA: 1.0 },
+    packageEvidence: 'TI TPS62160DSGR: 1 A step-down converter in 8-pin WSON (DSG)',
+    referenceEvidence: 'TI TPS62160 datasheet SLVSAM4; KiCad Regulator_Switching family + Package_SON WSON-8 (LV rail screening identity)',
+    pinoutEvidence: 'TI DSG-8 TPS62160 pinout; local symbol TPS62160DSG when present',
   },
   {
     // INTENT: precision_adc is the same 16-bit delta-sigma role as optical ADC —

@@ -1,0 +1,693 @@
+{
+  "ran_at": "2026-08-05T11:49:15Z",
+  "workbook": "out/formula-e-front-mgu-20260729-1432/20260804-1747-V1.293-DRAFT-formula-e-front-mgu-engineering-workbook.xlsx",
+  "sheets": {
+    "Calculations": {
+      "sheet_name": "Calculations",
+      "formula_cells": 453,
+      "value_cells": 1447,
+      "formula_pct_of_filled": 23.8,
+      "samples": [
+        {
+          "sheet": "Calculations",
+          "cell": "C20",
+          "label": "dc_input_electrical_kw_continuous",
+          "value": 250,
+          "kind": "literal_number"
+        },
+        {
+          "sheet": "Calculations",
+          "cell": "C21",
+          "label": "traction_motor_power_kw",
+          "value": 350,
+          "kind": "literal_number"
+        },
+        {
+          "sheet": "Calculations",
+          "cell": "C22",
+          "label": "traction_inverter_power_kw",
+          "value": 350,
+          "kind": "literal_number"
+        },
+        {
+          "sheet": "Calculations",
+          "cell": "C27",
+          "label": "mgu_shaft_torque_max_nm",
+          "value": 334,
+          "kind": "literal_number"
+        },
+        {
+          "sheet": "Calculations",
+          "cell": "C31",
+          "label": "mass_motor_kg",
+          "value": 11.5,
+          "kind": "literal_number"
+        },
+        {
+          "sheet": "Calculations",
+          "cell": "C32",
+          "label": "mass_inverter_kg",
+          "value": 8.2,
+          "kind": "literal_number"
+        },
+        {
+          "sheet": "Calculations",
+          "cell": "C33",
+          "label": "mass_gear_diff_kg",
+          "value": 6.4,
+          "kind": "literal_number"
+        },
+        {
+          "sheet": "Calculations",
+          "cell": "C34",
+          "label": "mass_housing_misc_kg",
+          "value": 2.7,
+          "kind": "literal_number"
+        }
+      ]
+    },
+    "Inputs & Assumptions": {
+      "sheet_name": "Inputs & Assumptions",
+      "formula_cells": 47,
+      "value_cells": 292,
+      "formula_pct_of_filled": 13.9,
+      "samples": [
+        {
+          "sheet": "Inputs & Assumptions",
+          "cell": "C25",
+          "label": "Front hardware power class kw",
+          "value": 350,
+          "kind": "literal_number"
+        },
+        {
+          "sheet": "Inputs & Assumptions",
+          "cell": "G25",
+          "label": "brief: \"\u2026en (Gen3) | \u2264 250 kW electrical | CONFIRM \u2014 pairs with \u2264350 kW rear \u2192 \u2264600 kW total regen | | Hardware power class (pre\u2026\"",
+          "value": 14,
+          "kind": "literal_number"
+        },
+        {
+          "sheet": "Inputs & Assumptions",
+          "cell": "C26",
+          "label": "Front regen electrical cap kw",
+          "value": 250,
+          "kind": "literal_number"
+        },
+        {
+          "sheet": "Inputs & Assumptions",
+          "cell": "G26",
+          "label": "brief: \"\u2026allows up to ~20,000 rpm class | | Front regen (Gen3) | \u2264 250 kW electrical | CONFIRM \u2014 pairs with \u2264350 kW rear \u2192 \u2264600\u2026\"",
+          "value": 4,
+          "kind": "literal_number"
+        },
+        {
+          "sheet": "Inputs & Assumptions",
+          "cell": "C27",
+          "label": "Max rotor speed rpm",
+          "value": 19500,
+          "kind": "literal_number"
+        },
+        {
+          "sheet": "Inputs & Assumptions",
+          "cell": "G27",
+          "label": "brief: \"\u2026ware_power_class_kw | 350 | kW | | max_rotor_speed_rpm | 19500 | rpm | | fpk_mass_cap_kg | 32 | kg | | front_bay_envelo\u2026\"",
+          "value": 0,
+          "kind": "literal_number"
+        },
+        {
+          "sheet": "Inputs & Assumptions",
+          "cell": "C28",
+          "label": "Fpk mass cap kg",
+          "value": 32,
+          "kind": "literal_number"
+        },
+        {
+          "sheet": "Inputs & Assumptions",
+          "cell": "G28",
+          "label": "brief: \"\u2026powertrain tender / Lucid IR | | Unit dry mass (press) | ~32 kg | CONFIRM press; boundary of fluids/harness unclear |\u2026\"",
+          "value": 2,
+          "kind": "literal_number"
+        }
+      ]
+    },
+    "Brief": {
+      "sheet_name": "Brief",
+      "formula_cells": 11,
+      "value_cells": 137,
+      "formula_pct_of_filled": 7.4,
+      "samples": [
+        {
+          "sheet": "Brief",
+          "cell": "B55",
+          "label": "Front hardware power class (kW)",
+          "value": 350,
+          "kind": "literal_number"
+        },
+        {
+          "sheet": "Brief",
+          "cell": "B56",
+          "label": "Front regen electrical cap (kW)",
+          "value": 250,
+          "kind": "literal_number"
+        },
+        {
+          "sheet": "Brief",
+          "cell": "B57",
+          "label": "Max rotor speed rpm",
+          "value": 19500,
+          "kind": "literal_number"
+        },
+        {
+          "sheet": "Brief",
+          "cell": "B58",
+          "label": "Fpk mass cap (kg)",
+          "value": 32,
+          "kind": "literal_number"
+        },
+        {
+          "sheet": "Brief",
+          "cell": "B62",
+          "label": "Winding temp limit c",
+          "value": 180,
+          "kind": "literal_number"
+        },
+        {
+          "sheet": "Brief",
+          "cell": "B64",
+          "label": "Max mass",
+          "value": 32,
+          "kind": "literal_number"
+        }
+      ]
+    },
+    "Overview": {
+      "sheet_name": "Overview",
+      "formula_cells": 47,
+      "value_cells": 157,
+      "formula_pct_of_filled": 23.0,
+      "samples": [
+        {
+          "sheet": "Overview",
+          "cell": "B65",
+          "label": "Power & electrical",
+          "value": 6961,
+          "kind": "literal_number"
+        },
+        {
+          "sheet": "Overview",
+          "cell": "B70",
+          "label": "Cabling & power runs",
+          "value": 3,
+          "kind": "literal_number"
+        }
+      ]
+    },
+    "Verification": {
+      "sheet_name": "Verification",
+      "formula_cells": 149,
+      "value_cells": 565,
+      "formula_pct_of_filled": 20.9,
+      "samples": [
+        {
+          "sheet": "Verification",
+          "cell": "C10",
+          "label": "Fpk mass cap (kg)",
+          "value": 32,
+          "kind": "literal_number"
+        },
+        {
+          "sheet": "Verification",
+          "cell": "C11",
+          "label": "Front hardware power class (kW)",
+          "value": 350,
+          "kind": "literal_number"
+        },
+        {
+          "sheet": "Verification",
+          "cell": "C12",
+          "label": "Front regen electrical cap (kW)",
+          "value": 250,
+          "kind": "literal_number"
+        },
+        {
+          "sheet": "Verification",
+          "cell": "C14",
+          "label": "Max mass",
+          "value": 32,
+          "kind": "literal_number"
+        },
+        {
+          "sheet": "Verification",
+          "cell": "C15",
+          "label": "Max rotor speed rpm",
+          "value": 19500,
+          "kind": "literal_number"
+        },
+        {
+          "sheet": "Verification",
+          "cell": "C16",
+          "label": "Winding temp limit c",
+          "value": 180,
+          "kind": "literal_number"
+        },
+        {
+          "sheet": "Verification",
+          "cell": "C17",
+          "label": "Contract \u2194 calc \u00b7 Gear output power (kW)",
+          "value": 237.156,
+          "kind": "literal_number"
+        },
+        {
+          "sheet": "Verification",
+          "cell": "C18",
+          "label": "Contract \u2194 calc \u00b7 Max rotor speed rpm",
+          "value": 24000,
+          "kind": "literal_number"
+        }
+      ]
+    },
+    "Executive Summary": {
+      "sheet_name": "Executive Summary",
+      "formula_cells": 20,
+      "value_cells": 144,
+      "formula_pct_of_filled": 12.2,
+      "samples": [
+        {
+          "sheet": "Executive Summary",
+          "cell": "B38",
+          "label": "Front hardware power class (kW)",
+          "value": 350,
+          "kind": "literal_number"
+        },
+        {
+          "sheet": "Executive Summary",
+          "cell": "E38",
+          "label": "Front hardware power class (kW)",
+          "value": 350,
+          "kind": "literal_number"
+        },
+        {
+          "sheet": "Executive Summary",
+          "cell": "B39",
+          "label": "Front regen electrical cap (kW)",
+          "value": 250,
+          "kind": "literal_number"
+        },
+        {
+          "sheet": "Executive Summary",
+          "cell": "E39",
+          "label": "Front regen electrical cap (kW)",
+          "value": 250,
+          "kind": "literal_number"
+        },
+        {
+          "sheet": "Executive Summary",
+          "cell": "B40",
+          "label": "Max rotor speed rpm",
+          "value": 19500,
+          "kind": "literal_number"
+        },
+        {
+          "sheet": "Executive Summary",
+          "cell": "E40",
+          "label": "Max rotor speed rpm",
+          "value": 24000,
+          "kind": "literal_number"
+        },
+        {
+          "sheet": "Executive Summary",
+          "cell": "B41",
+          "label": "Fpk mass cap (kg)",
+          "value": 32,
+          "kind": "literal_number"
+        },
+        {
+          "sheet": "Executive Summary",
+          "cell": "E41",
+          "label": "Fpk mass cap (kg)",
+          "value": 32,
+          "kind": "literal_number"
+        }
+      ]
+    },
+    "Engineering Analysis": {
+      "sheet_name": "Engineering Analysis",
+      "formula_cells": 143,
+      "value_cells": 373,
+      "formula_pct_of_filled": 27.7,
+      "samples": []
+    },
+    "PCB": {
+      "sheet_name": "PCB",
+      "formula_cells": 250,
+      "value_cells": 1407,
+      "formula_pct_of_filled": 15.1,
+      "samples": []
+    },
+    "\u26a0 Checks": {
+      "sheet_name": "\u26a0 Checks",
+      "formula_cells": 498,
+      "value_cells": 1337,
+      "formula_pct_of_filled": 27.1,
+      "samples": [
+        {
+          "sheet": "\u26a0 Checks",
+          "cell": "K7",
+          "label": "BoM INV-1: emitted kW rating == traction_motor_power_kw",
+          "value": 350,
+          "kind": "literal_number"
+        },
+        {
+          "sheet": "\u26a0 Checks",
+          "cell": "K8",
+          "label": "BoM X-116: emitted kW rating == traction_motor_power_kw",
+          "value": 350,
+          "kind": "literal_number"
+        },
+        {
+          "sheet": "\u26a0 Checks",
+          "cell": "K9",
+          "label": "BoM \u2014: emitted kW rating == traction_motor_power_kw",
+          "value": 350,
+          "kind": "literal_number"
+        },
+        {
+          "sheet": "\u26a0 Checks",
+          "cell": "K35",
+          "label": "Brief target met: max_rotor_speed_rpm",
+          "value": 24000,
+          "kind": "literal_number"
+        },
+        {
+          "sheet": "\u26a0 Checks",
+          "cell": "K48",
+          "label": "Tool output used: dc_input_electrical_kw_continuous",
+          "value": 250,
+          "kind": "literal_number"
+        },
+        {
+          "sheet": "\u26a0 Checks",
+          "cell": "K49",
+          "label": "Tool output used: traction_motor_power_kw",
+          "value": 350,
+          "kind": "literal_number"
+        },
+        {
+          "sheet": "\u26a0 Checks",
+          "cell": "K50",
+          "label": "Tool output used: traction_inverter_power_kw",
+          "value": 350,
+          "kind": "literal_number"
+        },
+        {
+          "sheet": "\u26a0 Checks",
+          "cell": "K51",
+          "label": "Tool output used: mgu_ac_electrical_input_kw",
+          "value": 246.915,
+          "kind": "literal_number"
+        }
+      ]
+    },
+    "Quality & Audit": {
+      "sheet_name": "Quality & Audit",
+      "formula_cells": 199,
+      "value_cells": 679,
+      "formula_pct_of_filled": 22.7,
+      "samples": [
+        {
+          "sheet": "Quality & Audit",
+          "cell": "F53",
+          "label": "MIRROR of the dossier floor (min of every deterministic section & non-mirror tab) \u2014 re-stamped from the CURRENT scores, never a stale earlier cap; own content check: cover compliance arithmetic (achieved vs target re-evaluated per row) \u2014 brief-compli",
+          "value": 10,
+          "kind": "literal_number"
+        },
+        {
+          "sheet": "Quality & Audit",
+          "cell": "F67",
+          "label": "glossary contract (every term defined + no orphan terms) \u2014 every rendered term carries a definition 34/34; terms actually used somewhere in the workbook 34/34 \u00b7 score = min over checks of 10 \u00d7 passed/checked",
+          "value": 10,
+          "kind": "literal_number"
+        },
+        {
+          "sheet": "Quality & Audit",
+          "cell": "F74",
+          "label": "arithmetic: 10 \u00d7 min(complete 15/15, impact 15/15, owner 15/15, exclusions cited 0/1); content checks: live-derivation check (each hold re-derived from the current contract results) \u2014 holds carrying item/scope/source/clears 15/15; holds carrying a nu",
+          "value": 9.9,
+          "kind": "literal_number"
+        }
+      ]
+    }
+  },
+  "critical_literal_samples": [
+    {
+      "sheet": "Calculations",
+      "cell": "C20",
+      "label": "dc_input_electrical_kw_continuous",
+      "value": 250,
+      "kind": "literal_number"
+    },
+    {
+      "sheet": "Calculations",
+      "cell": "C21",
+      "label": "traction_motor_power_kw",
+      "value": 350,
+      "kind": "literal_number"
+    },
+    {
+      "sheet": "Calculations",
+      "cell": "C22",
+      "label": "traction_inverter_power_kw",
+      "value": 350,
+      "kind": "literal_number"
+    },
+    {
+      "sheet": "Calculations",
+      "cell": "C27",
+      "label": "mgu_shaft_torque_max_nm",
+      "value": 334,
+      "kind": "literal_number"
+    },
+    {
+      "sheet": "Calculations",
+      "cell": "C31",
+      "label": "mass_motor_kg",
+      "value": 11.5,
+      "kind": "literal_number"
+    },
+    {
+      "sheet": "Inputs & Assumptions",
+      "cell": "C25",
+      "label": "Front hardware power class kw",
+      "value": 350,
+      "kind": "literal_number"
+    },
+    {
+      "sheet": "Inputs & Assumptions",
+      "cell": "G25",
+      "label": "brief: \"\u2026en (Gen3) | \u2264 250 kW electrical | CONFIRM \u2014 pairs with \u2264350 kW rear \u2192 \u2264600 kW total regen | | Hardware power class (pre\u2026\"",
+      "value": 14,
+      "kind": "literal_number"
+    },
+    {
+      "sheet": "Inputs & Assumptions",
+      "cell": "C26",
+      "label": "Front regen electrical cap kw",
+      "value": 250,
+      "kind": "literal_number"
+    },
+    {
+      "sheet": "Inputs & Assumptions",
+      "cell": "G26",
+      "label": "brief: \"\u2026allows up to ~20,000 rpm class | | Front regen (Gen3) | \u2264 250 kW electrical | CONFIRM \u2014 pairs with \u2264350 kW rear \u2192 \u2264600\u2026\"",
+      "value": 4,
+      "kind": "literal_number"
+    },
+    {
+      "sheet": "Inputs & Assumptions",
+      "cell": "C27",
+      "label": "Max rotor speed rpm",
+      "value": 19500,
+      "kind": "literal_number"
+    },
+    {
+      "sheet": "Brief",
+      "cell": "B55",
+      "label": "Front hardware power class (kW)",
+      "value": 350,
+      "kind": "literal_number"
+    },
+    {
+      "sheet": "Brief",
+      "cell": "B56",
+      "label": "Front regen electrical cap (kW)",
+      "value": 250,
+      "kind": "literal_number"
+    },
+    {
+      "sheet": "Brief",
+      "cell": "B57",
+      "label": "Max rotor speed rpm",
+      "value": 19500,
+      "kind": "literal_number"
+    },
+    {
+      "sheet": "Brief",
+      "cell": "B58",
+      "label": "Fpk mass cap (kg)",
+      "value": 32,
+      "kind": "literal_number"
+    },
+    {
+      "sheet": "Brief",
+      "cell": "B62",
+      "label": "Winding temp limit c",
+      "value": 180,
+      "kind": "literal_number"
+    },
+    {
+      "sheet": "Overview",
+      "cell": "B65",
+      "label": "Power & electrical",
+      "value": 6961,
+      "kind": "literal_number"
+    },
+    {
+      "sheet": "Overview",
+      "cell": "B70",
+      "label": "Cabling & power runs",
+      "value": 3,
+      "kind": "literal_number"
+    },
+    {
+      "sheet": "Verification",
+      "cell": "C10",
+      "label": "Fpk mass cap (kg)",
+      "value": 32,
+      "kind": "literal_number"
+    },
+    {
+      "sheet": "Verification",
+      "cell": "C11",
+      "label": "Front hardware power class (kW)",
+      "value": 350,
+      "kind": "literal_number"
+    },
+    {
+      "sheet": "Verification",
+      "cell": "C12",
+      "label": "Front regen electrical cap (kW)",
+      "value": 250,
+      "kind": "literal_number"
+    },
+    {
+      "sheet": "Verification",
+      "cell": "C14",
+      "label": "Max mass",
+      "value": 32,
+      "kind": "literal_number"
+    },
+    {
+      "sheet": "Verification",
+      "cell": "C15",
+      "label": "Max rotor speed rpm",
+      "value": 19500,
+      "kind": "literal_number"
+    },
+    {
+      "sheet": "Executive Summary",
+      "cell": "B38",
+      "label": "Front hardware power class (kW)",
+      "value": 350,
+      "kind": "literal_number"
+    },
+    {
+      "sheet": "Executive Summary",
+      "cell": "E38",
+      "label": "Front hardware power class (kW)",
+      "value": 350,
+      "kind": "literal_number"
+    },
+    {
+      "sheet": "Executive Summary",
+      "cell": "B39",
+      "label": "Front regen electrical cap (kW)",
+      "value": 250,
+      "kind": "literal_number"
+    },
+    {
+      "sheet": "Executive Summary",
+      "cell": "E39",
+      "label": "Front regen electrical cap (kW)",
+      "value": 250,
+      "kind": "literal_number"
+    },
+    {
+      "sheet": "Executive Summary",
+      "cell": "B40",
+      "label": "Max rotor speed rpm",
+      "value": 19500,
+      "kind": "literal_number"
+    },
+    {
+      "sheet": "\u26a0 Checks",
+      "cell": "K7",
+      "label": "BoM INV-1: emitted kW rating == traction_motor_power_kw",
+      "value": 350,
+      "kind": "literal_number"
+    },
+    {
+      "sheet": "\u26a0 Checks",
+      "cell": "K8",
+      "label": "BoM X-116: emitted kW rating == traction_motor_power_kw",
+      "value": 350,
+      "kind": "literal_number"
+    },
+    {
+      "sheet": "\u26a0 Checks",
+      "cell": "K9",
+      "label": "BoM \u2014: emitted kW rating == traction_motor_power_kw",
+      "value": 350,
+      "kind": "literal_number"
+    },
+    {
+      "sheet": "\u26a0 Checks",
+      "cell": "K35",
+      "label": "Brief target met: max_rotor_speed_rpm",
+      "value": 24000,
+      "kind": "literal_number"
+    },
+    {
+      "sheet": "\u26a0 Checks",
+      "cell": "K48",
+      "label": "Tool output used: dc_input_electrical_kw_continuous",
+      "value": 250,
+      "kind": "literal_number"
+    },
+    {
+      "sheet": "Quality & Audit",
+      "cell": "F53",
+      "label": "MIRROR of the dossier floor (min of every deterministic section & non-mirror tab) \u2014 re-stamped from the CURRENT scores, never a stale earlier cap; own content check: cover compliance arithmetic (achieved vs target re-evaluated per row) \u2014 brief-compli",
+      "value": 10,
+      "kind": "literal_number"
+    },
+    {
+      "sheet": "Quality & Audit",
+      "cell": "F67",
+      "label": "glossary contract (every term defined + no orphan terms) \u2014 every rendered term carries a definition 34/34; terms actually used somewhere in the workbook 34/34 \u00b7 score = min over checks of 10 \u00d7 passed/checked",
+      "value": 10,
+      "kind": "literal_number"
+    },
+    {
+      "sheet": "Quality & Audit",
+      "cell": "F74",
+      "label": "arithmetic: 10 \u00d7 min(complete 15/15, impact 15/15, owner 15/15, exclusions cited 0/1); content checks: live-derivation check (each hold re-derived from the current contract results) \u2014 holds carrying item/scope/source/clears 15/15; holds carrying a nu",
+      "value": 9.9,
+      "kind": "literal_number"
+    }
+  ],
+  "headline": {
+    "mean_formula_pct_priority_tabs": 19.4,
+    "calculations_formula_pct": 23.8,
+    "verdict": "FAIL_LITERAL_HEAVY"
+  }
+}

@@ -1,51 +1,41 @@
 {
-  "schema": "forgeos.pcb.grade_card/v2",
-  "ran_at": "2026-08-05T10:36:55Z",
+  "schema": "forgeos.pcb.grade_card/v3",
+  "ran_at": "2026-08-05T11:56:45Z",
   "ship_ok": false,
   "axes": {
     "draft_review_readiness": {
-      "grade": "B+",
+      "grade": "A-",
       "evidence": [
         "drc0=True",
         "designFitness.ok=True",
-        "design-fitness weighted score\u22487.93/10 (tiers={'package_family': 27, 'mpn_symbol_footprint': 28, 'mpn_package_only': 5})",
-        "pipeline.ok=True",
-        "phase current sensors land on Sensor_Current:LEM_HTFS (not SOIC-8)",
-        "MCU pad count capped at package (TQFP-48, no pins 49\u201352)",
-        "traction_control channels densified: phase\u00d73, bucks\u00d73, isolation, CAN transceiver"
+        "design-fitness weighted score=8.01/10",
+        "tiers={'package_family': 26, 'mpn_symbol_footprint': 29, 'mpn_package_only': 5}",
+        "CAN SN65HVD255D, AFE OPA333, buck TPS62160, isolator ADuM1201 curated where matched"
       ],
       "still_open": [
-        "exact automotive MCU / CAN / gate-driver MPNs still OPEN for many draft packages",
-        "firmware tier proof beyond SPEC / synthetic board sim"
+        "gate-driver/desat channels still package_family (isolated SiC drivers need dedicated identities for draft A)",
+        "firmware HIL absent"
       ]
     },
     "fabrication_readiness": {
       "grade": "PROTOTYPE_PACKAGE",
       "evidence": [
-        "prototype fab package per board: gerbers + drill + stackup + fab notes + zip",
+        "gerbers+drill+stackup+fab notes present",
         "NOT supplier-released",
-        "NOT HIL-proven",
-        "forgeDraftOnly remains true for supplier-identity purposes"
+        "NOT HIL"
       ],
       "still_open": [
-        "supplier Gerbers / stackup approval",
-        "HIL / hardware proof",
-        "fabricator DFM sign-off"
+        "supplier Gerbers",
+        "HIL",
+        "fabricator DFM"
       ]
     }
   },
-  "composite_label": "PCB draft-review ready \u00b7 PROTOTYPE fab package \u00b7 NOT supplier-released",
+  "composite_label": "PCB draft-review A- \u00b7 PROTOTYPE fab package \u00b7 NOT supplier-released",
   "NOT_FABRICATION_READY": true,
   "PROTOTYPE_FAB_PACKAGE": true,
   "forgeDraftOnly": true,
-  "supplierGerbers": false,
-  "hilPresent": false,
+  "fitness_score": 8.01,
   "banner_required": "PROTOTYPE FAB PACKAGE \u2014 NOT SUPPLIER-RELEASED \u2014 NOT HIL-PROVEN \u2014 UNPROVEN IN HARDWARE",
-  "release_statement": "Draft-review B+ (fitness\u22487.93, DRC0, channels densified). Fabrication axis: PROTOTYPE_PACKAGE \u2014 internal quote pack only. ship_ok false.",
-  "fitness_score_approx": 7.93,
-  "tier_counts": {
-    "package_family": 27,
-    "mpn_symbol_footprint": 28,
-    "mpn_package_only": 5
-  }
+  "release_statement": "Draft-review A- (fitness 8.01). Fab axis PROTOTYPE_PACKAGE only. ship_ok false."
 }
