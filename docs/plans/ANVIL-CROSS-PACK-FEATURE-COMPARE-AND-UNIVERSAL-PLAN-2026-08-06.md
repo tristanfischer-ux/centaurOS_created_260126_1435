@@ -208,6 +208,6 @@ Implement **P0 + FE cover prose fix (`electromagnetics/` not `em-honesty/`)** im
 | Sprint B FE DRAFT tab-floor note | **Done** (`00-DRAFT-TAB-FLOOR-NOTE.txt`) while floor remains &lt;8 |
 | Dual-class chrome smoke | **Done** |
 | FE full tab floor ≥9 remediation | **Open** (honest DRAFT note until closed) |
-| Illustrated multi-MB cover for bio | **Open** (next: cover v2 with embedded figures) |
+| Illustrated multi-MB cover for bio | **Done** — `00-COVER-NARRATIVE-illustrated.html` + figure PDF via universal `build_pack_cover` v2 |
 
 *End of plan.*

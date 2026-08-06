@@ -119,11 +119,67 @@ def test_send_pack_chrome_if_present() -> None:
         print(f"chrome OK: {pack.name}")
 
 
+def test_illustrated_cover_discover_and_emit() -> None:
+    """Cover v2: discover figures + emit illustrated HTML (temp pack)."""
+    import base64
+    import tempfile
+    from build_pack_cover import discover_pack_figures, write_illustrated_cover
+
+    png_1x1 = base64.b64decode(
+        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="
+    )
+    with tempfile.TemporaryDirectory() as td:
+        pack = Path(td)
+        (pack / "renders").mkdir()
+        (pack / "renders" / "00-hero.png").write_bytes(png_1x1)
+        (pack / "renders" / "08-product-ghost-shell.png").write_bytes(png_1x1)
+        (pack / "drawings").mkdir()
+        (pack / "drawings" / "general-arrangement.png").write_bytes(png_1x1)
+        figs = discover_pack_figures(pack)
+        assert len(figs) >= 3
+        r = write_illustrated_cover(
+            pack,
+            product_title="Illust Selftest",
+            pack_revision="V0",
+            twin_id="selftest",
+            decision_bullets=["Figure embed works."],
+            figures=figs,
+        )
+        html = Path(r["illustrated_html"]).read_text(encoding="utf-8")
+        assert "data:image" in html
+        assert "Product hero" in html
+        print("illustrated cover selftest OK", r["embedded_bytes"], "bytes")
+
+
+def test_bio_pack_has_illustrated_cover_if_present() -> None:
+    """Live bio pack should ship multi-MB illustrated cover after cover v2."""
+    pack = _latest_pack("**/*benchtop*design-pack")
+    if not pack or not pack.is_dir():
+        print("skip: no bio pack")
+        return
+    ill = pack / "00-COVER-NARRATIVE-illustrated.html"
+    if not ill.is_file():
+        print(f"skip illustrated: {pack.name} (pre-cover-v2)")
+        return
+    size = ill.stat().st_size
+    text = ill.read_text(encoding="utf-8", errors="replace")
+    assert "data:image" in text, "illustrated cover must embed figures"
+    # With real renders, expect multi-hundred-KB minimum; soft floor avoids flaking
+    # on CI without large assets.
+    if (pack / "renders" / "00-hero.png").is_file() and (
+        pack / "renders" / "00-hero.png"
+    ).stat().st_size > 100_000:
+        assert size > 200_000, f"illustrated cover too thin: {size} bytes"
+    print(f"bio illustrated cover OK: {pack.name} ({size // 1024} KB)")
+
+
 if __name__ == "__main__":
     test_forbidden_segment_helper()
     test_capability_matrix_pure()
     test_motor_pack_if_present()
     test_instrument_pack_if_present()
     test_send_pack_chrome_if_present()
+    test_illustrated_cover_discover_and_emit()
+    test_bio_pack_has_illustrated_cover_if_present()
     print("test_dual_class_pack_smoke OK")
 

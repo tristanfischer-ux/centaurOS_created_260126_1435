@@ -293,6 +293,34 @@ def apply_send_pack_chrome(
         n = rewrite_em_honesty_prose(pack_p)
         if n:
             report["actions"].append(f"rewrote_em_honesty_paths:{n} files")
+    # Cover contract v2 — illustrated HTML + figure PDF when renders/drawings exist.
+    # Do not overwrite a handcrafted multi-MB illustrated cover (e.g. FE narrative pack).
+    existing_ill = pack_p / "00-COVER-NARRATIVE-illustrated.html"
+    skip_illust = existing_ill.is_file() and existing_ill.stat().st_size > 500_000
+    if skip_illust:
+        report["actions"].append(
+            f"illustrated_cover:kept existing ({existing_ill.stat().st_size // 1024} KB)"
+        )
+    else:
+        try:
+            from build_pack_cover import upgrade_pack_cover_illustration
+        except ImportError:  # pragma: no cover
+            upgrade_pack_cover_illustration = None  # type: ignore
+        if upgrade_pack_cover_illustration is not None:
+            try:
+                ill = upgrade_pack_cover_illustration(
+                    pack_p,
+                    product_title=product_title,
+                    pack_revision=pack_revision,
+                    brand=brand,
+                    twin_id=twin_p.name,
+                    ship_ok=ship_ok,
+                )
+                n_fig = len(ill.get("figures") or [])
+                report["actions"].append(f"illustrated_cover:{n_fig} figures")
+                report["illustrated"] = ill
+            except Exception as exc:  # never block chrome for cover polish
+                report["actions"].append(f"illustrated_cover_skipped:{exc}")
     report["ship_ok"] = ship_ok
     return report
 
