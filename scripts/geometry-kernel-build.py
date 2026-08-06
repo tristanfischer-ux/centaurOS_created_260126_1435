@@ -42,6 +42,8 @@ def main(argv: list[str] | None = None) -> int:
         from geometry_step_export import _selftest as t4
         from geometry_kernel import _selftest as t5
         from geometry_draw_sync import _selftest as t6
+        from geometry_master import _selftest as t7
+        from geometry_freecad_smoke import main as freecad_main
 
         t1()
         t2()
@@ -49,6 +51,8 @@ def main(argv: list[str] | None = None) -> int:
         t4()
         t5()
         t6()
+        t7()
+        assert freecad_main(["--selftest"]) == 0
         # film plan importer (no bpy required)
         import subprocess
         from pathlib import Path as _P

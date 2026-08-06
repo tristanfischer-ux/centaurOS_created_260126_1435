@@ -1,7 +1,7 @@
 # Anvil geometry kernel — CAD-first design
 
 **Date:** 2026-08-06  
-**Status:** Implemented (PR1–PR6 MVP + named STEP tree + G-DRAW-SYNC + film slave plan) — 2026-08-06  
+**Status:** Implemented through FreeCAD smoke + kernel master enforcement + port-face paths + export_step merge — 2026-08-06  
 **Owner:** Anvil / CentaurOS geometry pipeline  
 **Readers:** Tristan + implementers  
 

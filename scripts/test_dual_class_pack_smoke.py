@@ -170,7 +170,7 @@ def test_domain_product_quality_binds() -> None:
 
 
 def test_geometry_kernel_selftest() -> None:
-    """CLI --selftest for IR + completeness + STEP + kernel."""
+    """CLI --selftest for IR + completeness + STEP + kernel + FreeCAD smoke."""
     import subprocess
 
     script = ROOT / "scripts" / "geometry-kernel-build.py"
@@ -178,12 +178,60 @@ def test_geometry_kernel_selftest() -> None:
         [sys.executable, str(script), "--selftest"],
         capture_output=True,
         text=True,
-        timeout=120,
+        timeout=180,
         cwd=str(ROOT),
     )
     assert r.returncode == 0, r.stderr or r.stdout
     assert "selftest OK" in (r.stdout or "")
     print("geometry_kernel CLI selftest OK")
+
+
+def test_geometry_master_and_port_faces() -> None:
+    """Kernel master mode + port-face routing + FreeCAD/OCCT smoke."""
+    import os
+    import subprocess
+    from pathlib import Path
+
+    sys.path.insert(0, str(ROOT / "scripts" / "lib"))
+    from geometry_master import is_kernel_master, geometry_master_mode
+    from geometry_path_router import port_on_envelope, route_all
+    from geometry_freecad_smoke import smoke_open_step, find_freecadcmd
+
+    os.environ["ANVIL_GEOMETRY_MASTER"] = "kernel"
+    assert is_kernel_master() and geometry_master_mode() == "kernel"
+    os.environ["ANVIL_GEOMETRY_MASTER"] = "legacy_blender"
+    assert not is_kernel_master()
+
+    box = {
+        "tag": "A",
+        "family": "box",
+        "params_mm": {"w": 20, "d": 10, "h": 10},
+        "pose": {"origin_mm": [0, 0, 0]},
+    }
+    pt = port_on_envelope(box, [100, 0, 5], kind="power")
+    assert abs(pt[0] - 10.0) < 0.5, pt
+
+    # FreeCAD or OCCT smoke on existing twin STEP if present
+    step = ROOT / "out" / "organoid-9drive-r11-allfixes" / "geometry" / "assembly.step"
+    if step.is_file():
+        s = smoke_open_step(step)
+        assert s.get("ok"), s
+        print(
+            f"freecad/occt smoke OK backend={s.get('backend')} "
+            f"freecadcmd={find_freecadcmd() is not None}"
+        )
+    else:
+        # selftest path via CLI
+        r = subprocess.run(
+            [sys.executable, str(ROOT / "scripts" / "lib" / "geometry_freecad_smoke.py"), "--selftest"],
+            capture_output=True,
+            text=True,
+            timeout=120,
+            cwd=str(ROOT),
+        )
+        assert r.returncode == 0, r.stderr or r.stdout
+        print("freecad smoke selftest OK (no twin STEP)")
+    print("geometry_master + port faces OK")
 
 
 def test_geometry_kernel_dual_class_emit() -> None:
@@ -342,6 +390,7 @@ if __name__ == "__main__":
     test_illustrated_cover_discover_and_emit()
     test_domain_product_quality_binds()
     test_geometry_kernel_selftest()
+    test_geometry_master_and_port_faces()
     test_geometry_kernel_dual_class_emit()
     test_tab_floor_gate_pure()
     test_pack_parity_sheets_selftest()

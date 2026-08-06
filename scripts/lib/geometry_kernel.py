@@ -399,6 +399,18 @@ def build_assembly_from_twin(
     except Exception as exc:  # pragma: no cover
         film_report = {"ok": False, "error": str(exc)}
 
+    # FreeCAD / OCCT open smoke (proves STEP is openable free)
+    freecad_report: dict[str, Any] = {"ok": False}
+    try:
+        from geometry_freecad_smoke import smoke_open_step
+
+        freecad_report = smoke_open_step(step_path if step_report.get("ok") else gdir / "assembly.step")
+        (gdir / "freecad_smoke.json").write_text(
+            json.dumps(freecad_report, indent=2) + "\n", encoding="utf-8"
+        )
+    except Exception as exc:  # pragma: no cover
+        freecad_report = {"ok": False, "error": str(exc)}
+
     # README for Tristan
     (gdir / "README.txt").write_text(
         "Anvil geometry (CAD master)\n"
@@ -410,9 +422,11 @@ def build_assembly_from_twin(
         "4. blender_import.json + film_plan.json map this assembly into Blender film (slave).\n"
         "   Blender must not invent principal placement when ANVIL_GEOMETRY_MASTER=kernel.\n"
         "5. drawings/ga-geometry-from-ir.svg is G-DRAW-SYNC from this IR.\n"
-        "6. STEP is not supplier fab-ready and not a substitute for HIL/Gerbers.\n"
+        "6. freecad_smoke.json records FreeCAD/OCCT open proof.\n"
+        "7. STEP is not supplier fab-ready and not a substitute for HIL/Gerbers.\n"
         f"\nCompleteness: {comp_report.get('score')}/10 · "
         f"STEP ok={step_report.get('ok')} named_tree={step_report.get('named_tree')} · "
+        f"FreeCAD smoke={freecad_report.get('ok')} backend={freecad_report.get('backend')} · "
         f"solids={comp_report.get('n_solid')} paths={comp_report.get('n_path')} "
         f"holds={comp_report.get('n_open_holds')}\n",
         encoding="utf-8",
@@ -427,6 +441,7 @@ def build_assembly_from_twin(
         "print": print_report,
         "draw_sync": draw_report,
         "film": film_report,
+        "freecad_smoke": freecad_report,
         "n_components": len(components),
         "n_paths": len(ir.get("paths") or []),
         "n_holds": len(ir.get("holds") or []),

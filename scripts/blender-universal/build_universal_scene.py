@@ -29574,6 +29574,39 @@ def main():
     _COMPOSER_STATE = state   # for the COMPOSER=1 universal placer
     _COMPOSER_STATE_PATH = state_path
 
+    # ── CAD-first geometry master (kernel film slave) ───────────────────────
+    # ANVIL_GEOMETRY_MASTER=kernel → do not invent principal placement.
+    # Import meshes from geometry/assembly.json (film_plan) and stop freehand layout.
+    try:
+        _lib_gm = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "lib")
+        if _lib_gm not in sys.path:
+            sys.path.insert(0, _lib_gm)
+        from geometry_master import is_kernel_master, apply_kernel_layout, twin_from_state_path
+        if is_kernel_master():
+            _twin_gm = twin_from_state_path(state_path)
+            print(f"[univ] ANVIL_GEOMETRY_MASTER=kernel — film slave for {_twin_gm}")
+            fl.init_scene()
+            _kr = apply_kernel_layout(_twin_gm, Path(out_dir), build_blender_meshes=True)
+            print(f"[univ] kernel layout: ok={_kr.get('ok')} short_circuit={_kr.get('short_circuit')} "
+                  f"film={_kr.get('film_plan')} blender={_kr.get('blender')}")
+            if _kr.get("ok") and _kr.get("short_circuit"):
+                # Stamp out_dir so pack/excel know layout authority
+                try:
+                    with open(os.path.join(out_dir, "geometry_master.json"), "w") as _fh:
+                        json.dump({
+                            "schema": "anvil.geometry_master/1",
+                            "mode": "kernel",
+                            "forbid_freehand_principals": True,
+                            "note": "Blender skipped freehand placement; film from geometry IR",
+                            "report": {k: v for k, v in _kr.items() if k != "blender" or True},
+                        }, _fh, indent=2)
+                except OSError:
+                    pass
+                print("[univ] geometry master=kernel — freehand principal placement skipped")
+                return
+    except Exception as _gme:
+        print(f"[univ] geometry master check skipped/failed: {_gme}")
+
     # Tell connection_sizing the plant SALINITY (for the marine→duplex pipe-material rule). Read
     # from the contract; absent / fresh-water leaves it None so a non-marine plant is unchanged.
     try:

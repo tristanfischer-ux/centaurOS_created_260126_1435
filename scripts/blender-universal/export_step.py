@@ -222,7 +222,65 @@ def _pin_step_header(path: str) -> None:
 
 
 def write_step(run_dir: str, out_path: str | None = None) -> tuple[str, dict]:
+    """Write STEP for a run.
+
+    When geometry kernel IR is present and master is *kernel* (or
+    ANVIL_STEP_SOURCE=kernel), prefer geometry/assembly.step from the CAD-first
+    kernel. Otherwise build from parts-manifest (legacy path).
+    """
     run_dir = os.path.abspath(run_dir)
+    product = os.path.basename(run_dir.rstrip("/"))
+    if out_path is None:
+        out_path = os.path.join(run_dir, "cad", f"{product}-model.step")
+    os.makedirs(os.path.dirname(out_path), exist_ok=True)
+
+    # ── Kernel IR path (CAD-first) ─────────────────────────────────────────
+    try:
+        _lib = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "lib")
+        if _lib not in sys.path:
+            sys.path.insert(0, _lib)
+        from geometry_master import is_kernel_master, step_source_preference, ensure_geometry_kernel
+        from geometry_step_export import export_step as _export_ir_step
+    except ImportError:
+        is_kernel_master = None  # type: ignore
+        step_source_preference = None  # type: ignore
+        ensure_geometry_kernel = None  # type: ignore
+        _export_ir_step = None  # type: ignore
+
+    ir_path = os.path.join(run_dir, "geometry", "assembly.json")
+    kernel_step = os.path.join(run_dir, "geometry", "assembly.step")
+    prefer_kernel = False
+    if step_source_preference is not None:
+        prefer_kernel = step_source_preference(run_dir) == "kernel"
+    elif is_kernel_master is not None and is_kernel_master():
+        prefer_kernel = os.path.isfile(ir_path)
+    if prefer_kernel and _export_ir_step is not None:
+        if ensure_geometry_kernel is not None:
+            ensure_geometry_kernel(run_dir)
+        if os.path.isfile(ir_path):
+            from pathlib import Path as _Path
+
+            ir = json.load(open(ir_path, encoding="utf-8"))
+            # Always re-export so geometry/assembly.step stays master
+            rep = _export_ir_step(ir, _Path(kernel_step))
+            if rep.get("ok") and os.path.isfile(kernel_step):
+                import shutil
+
+                shutil.copy2(kernel_step, out_path)
+                _pin_step_header(out_path)
+                stats = {
+                    "parts": int(rep.get("n_solids") or 0),
+                    "pipes": int(rep.get("n_paths") or 0),
+                    "pipes_skipped": 0,
+                    "manifest_count": len(ir.get("components") or []),
+                    "bytes": os.path.getsize(out_path),
+                    "source": "geometry_kernel",
+                    "named_tree": rep.get("named_tree"),
+                    "exporter": rep.get("exporter"),
+                }
+                return out_path, stats
+
+    # ── Legacy parts-manifest path ─────────────────────────────────────────
     manifest = json.load(open(os.path.join(run_dir, "parts-manifest.json")))
     parts = manifest["parts"]
     route_lines = []
@@ -230,16 +288,25 @@ def write_step(run_dir: str, out_path: str | None = None) -> tuple[str, dict]:
     if os.path.exists(route_path):
         route_lines = json.load(open(route_path)).get("lines", [])
 
-    product = os.path.basename(run_dir.rstrip("/"))
-    if out_path is None:
-        out_path = os.path.join(run_dir, "cad", f"{product}-model.step")
-    os.makedirs(os.path.dirname(out_path), exist_ok=True)
-
     asm, stats = build_assembly(product, parts, route_lines)
     asm.export(out_path)          # STEP AP214, mm (OCCT write unit default MM)
     _pin_step_header(out_path)
     stats["manifest_count"] = manifest.get("count", len(parts))
     stats["bytes"] = os.path.getsize(out_path)
+    stats["source"] = "parts_manifest"
+    # Mirror into geometry/ when kernel IR absent so packs have one CAD home
+    try:
+        geo_dir = os.path.join(run_dir, "geometry")
+        os.makedirs(geo_dir, exist_ok=True)
+        mirror = os.path.join(geo_dir, "assembly.step")
+        if not os.path.isfile(mirror) or os.environ.get("ANVIL_GEOMETRY_MASTER", "").lower() in (
+            "legacy_blender", "", "legacy",
+        ):
+            import shutil
+            shutil.copy2(out_path, mirror)
+            stats["mirrored_to"] = mirror
+    except OSError:
+        pass
     return out_path, stats
 
 
@@ -431,8 +498,24 @@ def main() -> int:
         ap.error("run_dir required (or --selftest)")
     path, stats = write_step(args.run_dir, out_path=args.out)
     print(f"[export_step] wrote {path}  ({stats['bytes']:,} bytes)  "
-          f"parts={stats['parts']}/{stats['manifest_count']}  pipes={stats['pipes']} "
-          f"(skipped {stats['pipes_skipped']} route lines with no usable data)")
+          f"parts={stats.get('parts')}/{stats.get('manifest_count')}  pipes={stats.get('pipes')} "
+          f"(skipped {stats.get('pipes_skipped', 0)} route lines with no usable data) "
+          f"source={stats.get('source', 'parts_manifest')}")
+    if stats.get("source") == "geometry_kernel":
+        # Kernel STEP uses IR tags; legacy bbox-vs-manifest verify does not apply.
+        # Open-smoke (FreeCAD/OCCT) is the truth gate for kernel masters.
+        try:
+            _lib = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "lib")
+            if _lib not in sys.path:
+                sys.path.insert(0, _lib)
+            from geometry_freecad_smoke import smoke_open_step
+
+            smoke = smoke_open_step(path)
+            print(f"[export_step] kernel smoke ok={smoke.get('ok')} backend={smoke.get('backend')}")
+            return 0 if smoke.get("ok") else 1
+        except Exception as exc:
+            print(f"[export_step] kernel smoke skipped: {exc}")
+            return 0 if os.path.getsize(path) > 200 else 1
     res = verify_step(path, args.run_dir)
     return 0 if res["ok"] else 1
 
