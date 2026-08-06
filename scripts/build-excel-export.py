@@ -41366,6 +41366,20 @@ def _write_deliverable_bundle(run_dir: str, slug: str) -> Optional[dict]:
         skipped.append(f"pack-parity drawings ({_par_exc})")
         print(f"  · pack-parity drawings skipped: {_par_exc}", flush=True)
 
+    # ── 5y. GEOMETRY KERNEL + HERO FILM (CAD master before chrome copy) ─────
+    # ANVIL_GEOMETRY_AUTO=1 (default) builds geometry/; ANVIL_KERNEL_HERO=auto
+    # re-renders film when 00-hero is missing/stale (needs Blender).
+    try:
+        from geometry_pack_hooks import ensure_geometry_and_heroes_for_pack  # noqa: WPS433
+        from pathlib import Path as _PathGeo
+        _geo = ensure_geometry_and_heroes_for_pack(_PathGeo(run_dir))
+        for _a in _geo.get("actions") or []:
+            included.append(str(_a))
+        print(f"  · geometry/hero hooks: {_geo.get('actions')}", flush=True)
+    except Exception as _geo_exc:  # noqa: BLE001
+        skipped.append(f"geometry/hero hooks ({_geo_exc})")
+        print(f"  · geometry/hero hooks skipped: {_geo_exc}", flush=True)
+
     # ── 5z. ANVIL SEND-PACK CHROME (P0) + instrument-physics (P1) ─────────────
     try:
         from build_send_pack import apply_send_pack_chrome  # noqa: WPS433

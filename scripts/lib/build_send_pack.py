@@ -488,11 +488,53 @@ def apply_send_pack_chrome(
     sc_copied = copy_scorecards(twin_p, pack_p)
     if sc_copied:
         report["actions"].append(f"scorecards:{','.join(sc_copied)}")
+    # CAD-first geometry kernel + optional kernel hero film (pack rebuild chain)
+    try:
+        from geometry_pack_hooks import ensure_geometry_and_heroes_for_pack
+    except ImportError:  # pragma: no cover
+        ensure_geometry_and_heroes_for_pack = None  # type: ignore
+    if ensure_geometry_and_heroes_for_pack is not None:
+        try:
+            _geo_h = ensure_geometry_and_heroes_for_pack(twin_p)
+            if _geo_h.get("actions"):
+                report["actions"].extend(_geo_h["actions"])
+            report["geometry_hooks"] = {
+                k: _geo_h.get(k)
+                for k in ("kernel_ok", "hero_ok", "hero_ran", "kernel_built")
+            }
+        except Exception as _ghe:  # pragma: no cover
+            report["actions"].append(f"geometry_hooks_error:{_ghe}")
+
     # CAD master (STEP) — always copy when twin/geometry exists
     cg = copy_geometry(twin_p, pack_p)
     if cg:
         report["actions"].append(f"geometry:{len(cg)} files")
         report["geometry_step"] = (pack_p / "geometry" / "assembly.step").is_file()
+    # Copy kernel hero PNGs into pack root + renders/
+    n_hero = 0
+    for name in (
+        "00-hero.png",
+        "hero-embed.png",
+        "01-top.png",
+        "04-product-exterior.png",
+        "05-product-left.png",
+        "06-product-right.png",
+        "07-product-service.png",
+        "08-product-ghost-shell.png",
+        "kernel-hero-manifest.json",
+    ):
+        src = twin_p / name
+        if not src.is_file():
+            continue
+        dest_r = pack_p / "renders"
+        dest_r.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(src, dest_r / name)
+        if name.endswith(".png") and name.startswith(("00-", "hero-")):
+            shutil.copy2(src, pack_p / name)
+        n_hero += 1
+    if n_hero:
+        report["actions"].append(f"kernel_heroes:{n_hero} files")
+
     # Optional hard gate: ANVIL_REQUIRE_STEP=1 fails pack without STEP
     if os.environ.get("ANVIL_REQUIRE_STEP", "").strip() in ("1", "true", "TRUE", "yes"):
         step_ok = (pack_p / "geometry" / "assembly.step").is_file() or (

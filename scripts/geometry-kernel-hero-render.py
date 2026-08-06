@@ -120,9 +120,16 @@ def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("twins", nargs="*", help="twin directories")
     ap.add_argument("--bio-fe", action="store_true", help="bio + FE default twins")
-    ap.add_argument("--cycles", action="store_true", help="Cycles for 00-hero")
+    ap.add_argument(
+        "--cycles",
+        action="store_true",
+        default=None,
+        help="Force Cycles for 00-hero (default already on via ANVIL_KERNEL_HERO_CYCLES=1)",
+    )
+    ap.add_argument("--eevee", action="store_true", help="Disable Cycles (fast draft)")
     ap.add_argument("--selftest", action="store_true")
     ap.add_argument("--timeout", type=int, default=3600)
+    ap.add_argument("--force", action="store_true", help="Force re-render even if fresh")
     args = ap.parse_args(argv)
 
     if args.selftest:
@@ -147,11 +154,26 @@ def main(argv: list[str] | None = None) -> int:
     if not twins:
         ap.error("no twin dirs")
 
+    if args.force:
+        os.environ["ANVIL_KERNEL_HERO_FORCE"] = "1"
+    if args.eevee:
+        os.environ["ANVIL_KERNEL_HERO_CYCLES"] = "0"
+        os.environ["BLENDER_HERO_CYCLES"] = "0"
+        cycles = False
+    elif args.cycles:
+        os.environ["ANVIL_KERNEL_HERO_CYCLES"] = "1"
+        cycles = True
+    else:
+        # default polish: Cycles on
+        os.environ.setdefault("ANVIL_KERNEL_HERO_CYCLES", "1")
+        cycles = os.environ.get("ANVIL_KERNEL_HERO_CYCLES", "1") not in ("0", "false", "no")
+    os.environ.setdefault("ANVIL_FILM_DENSE", "1")
+
     results = []
     for t in twins:
-        print(f"=== kernel hero render: {t.name} ===")
+        print(f"=== kernel hero render: {t.name} (cycles={cycles}) ===")
         try:
-            res = run_twin(t, cycles=args.cycles, timeout=args.timeout)
+            res = run_twin(t, cycles=cycles, timeout=args.timeout)
         except subprocess.TimeoutExpired:
             res = {"twin": t.name, "ok": False, "error": "timeout"}
         except Exception as exc:

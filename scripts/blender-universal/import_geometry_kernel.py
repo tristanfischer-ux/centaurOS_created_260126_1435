@@ -46,6 +46,11 @@ def load_contract(twin: Path) -> dict[str, Any]:
 
 def film_plan_from_ir(ir: dict[str, Any], contract: dict[str, Any]) -> dict[str, Any]:
     """Deterministic film plan: one mesh descriptor per solid/path."""
+    try:
+        from geometry_film_meshes import film_recipe
+    except ImportError:
+        film_recipe = None  # type: ignore
+
     objects = []
     for c in ir.get("components") or []:
         if not isinstance(c, dict):
@@ -56,6 +61,8 @@ def film_plan_from_ir(ir: dict[str, Any], contract: dict[str, Any]) -> dict[str,
         rpy = (c.get("pose") or {}).get("rotation_rpy_deg") or [0, 0, 0]
         params = c.get("params_mm") or {}
         family = str(c.get("family") or "box")
+        role = str(c.get("role") or "part")
+        name = str(c.get("name") or c.get("tag") or "")
         if family in ("cylinder", "flange_port"):
             mesh = {
                 "type": "cylinder",
@@ -76,11 +83,17 @@ def film_plan_from_ir(ir: dict[str, Any], contract: dict[str, Any]) -> dict[str,
                 "d_mm": float(params.get("d") or 20),
                 "h_mm": float(params.get("h") or 15),
             }
+        recipe = None
+        if film_recipe is not None:
+            recipe = film_recipe(role, family, name)
         objects.append(
             {
                 "name": c.get("export_name") or f"{c.get('tag')}_{c.get('name')}",
                 "tag": c.get("tag"),
-                "role": c.get("role"),
+                "role": role,
+                "name_human": name,
+                "family": family,
+                "film_recipe": recipe,
                 "material": c.get("material"),
                 "geometry_kind": c.get("geometry_kind"),
                 "origin_mm": [float(o[0]), float(o[1]), float(o[2])],
@@ -162,6 +175,17 @@ def _bpy_build(twin: Path) -> dict[str, Any]:
 
     created = 0
     mm = 0.001  # film plan mm → Blender metres
+    dense = os.environ.get("ANVIL_FILM_DENSE", "1").strip().lower() not in (
+        "0", "false", "no", "off",
+    )
+    recipes_used: dict[str, int] = {}
+
+    try:
+        from geometry_film_meshes import film_recipe, build_film_object
+    except ImportError:
+        film_recipe = None  # type: ignore
+        build_film_object = None  # type: ignore
+        dense = False
 
     for spec in plan.get("objects") or []:
         name = "kernel_" + str(spec.get("name") or "part")[:60]
@@ -169,12 +193,13 @@ def _bpy_build(twin: Path) -> dict[str, Any]:
         o = spec.get("origin_mm") or [0, 0, 0]
         ox, oy, oz = float(o[0]) * mm, float(o[1]) * mm, float(o[2]) * mm
         rpy = spec.get("rotation_rpy_deg") or [0, 0, 0]
+        role = str(spec.get("role") or "part")
 
         if spec.get("geometry_kind") == "path":
             curve = bpy.data.curves.new(name + "_crv", type="CURVE")
             curve.dimensions = "3D"
             curve.bevel_depth = max(0.0005, float(spec.get("od_mm") or 4) * mm / 2)
-            curve.bevel_resolution = 2
+            curve.bevel_resolution = 3
             spline = curve.splines.new("POLY")
             pts = spec.get("centreline_mm") or []
             if len(pts) < 2:
@@ -188,10 +213,38 @@ def _bpy_build(twin: Path) -> dict[str, Any]:
                     1.0,
                 )
             obj = bpy.data.objects.new(name, curve)
+        elif dense and film_recipe is not None and build_film_object is not None:
+            family = "cylinder" if mesh_spec.get("type") == "cylinder" else "box"
+            if mesh_spec.get("type") == "cylinder":
+                params_m = {
+                    "dia": float(mesh_spec.get("dia_mm") or 20) * mm,
+                    "len": float(mesh_spec.get("len_mm") or 20) * mm,
+                    "w": float(mesh_spec.get("dia_mm") or 20) * mm,
+                    "d": float(mesh_spec.get("dia_mm") or 20) * mm,
+                    "h": float(mesh_spec.get("len_mm") or 20) * mm,
+                }
+            else:
+                params_m = {
+                    "w": max(float(mesh_spec.get("w_mm") or 20) * mm, 0.001),
+                    "d": max(float(mesh_spec.get("d_mm") or 20) * mm, 0.001),
+                    "h": max(float(mesh_spec.get("h_mm") or 15) * mm, 0.001),
+                }
+            recipe = film_recipe(role, family, str(spec.get("name") or ""))
+            recipes_used[recipe] = recipes_used.get(recipe, 0) + 1
+            obj = build_film_object(
+                name=name,
+                recipe=recipe,
+                origin_m=(ox, oy, oz),
+                params_m=params_m,
+                rpy_deg=(
+                    float(rpy[0] if len(rpy) > 0 else 0),
+                    float(rpy[1] if len(rpy) > 1 else 0),
+                    float(rpy[2] if len(rpy) > 2 else 0),
+                ),
+            )
         elif mesh_spec.get("type") == "cylinder":
             dia = float(mesh_spec.get("dia_mm") or 20) * mm
             ln = float(mesh_spec.get("len_mm") or 20) * mm
-            # depth along Z, bottom at oz
             bpy.ops.mesh.primitive_cylinder_add(
                 radius=max(dia / 2, 0.0005),
                 depth=max(ln, 0.001),
@@ -199,16 +252,19 @@ def _bpy_build(twin: Path) -> dict[str, Any]:
             )
             obj = bpy.context.active_object
             obj.name = name
+            obj.rotation_euler = (
+                math.radians(float(rpy[0])),
+                math.radians(float(rpy[1])),
+                math.radians(float(rpy[2])),
+            )
         else:
             w = max(float(mesh_spec.get("w_mm") or 20) * mm, 0.001)
             d = max(float(mesh_spec.get("d_mm") or 20) * mm, 0.001)
             h = max(float(mesh_spec.get("h_mm") or 15) * mm, 0.001)
-            # size=2 → verts at ±1; scale half-extents so world size = (w,d,h)
             bpy.ops.mesh.primitive_cube_add(size=2, location=(ox, oy, oz + h / 2))
             obj = bpy.context.active_object
             obj.name = name
             obj.scale = (w / 2.0, d / 2.0, h / 2.0)
-            # bake scale so bound_box is honest
             bpy.context.view_layer.objects.active = obj
             obj.select_set(True)
             try:
@@ -216,15 +272,15 @@ def _bpy_build(twin: Path) -> dict[str, Any]:
             except Exception:
                 pass
             obj.select_set(False)
+            obj.rotation_euler = (
+                math.radians(float(rpy[0])),
+                math.radians(float(rpy[1])),
+                math.radians(float(rpy[2])),
+            )
 
-        obj.rotation_euler = (
-            math.radians(float(rpy[0])),
-            math.radians(float(rpy[1])),
-            math.radians(float(rpy[2])),
-        )
         obj["anvil_source"] = "geometry_ir"
         obj["anvil_tag"] = str(spec.get("tag") or "")
-        obj["anvil_role"] = str(spec.get("role") or "")
+        obj["anvil_role"] = role
         if obj.name not in coll.objects:
             for c in list(obj.users_collection):
                 c.objects.unlink(obj)
@@ -240,6 +296,8 @@ def _bpy_build(twin: Path) -> dict[str, Any]:
         "created": created,
         "film_plan": str(plan_path),
         "master": "kernel",
+        "dense_film": dense,
+        "recipes": recipes_used,
     }
     (twin / "geometry" / "blender_import_report.json").write_text(
         json.dumps(report, indent=2) + "\n", encoding="utf-8"

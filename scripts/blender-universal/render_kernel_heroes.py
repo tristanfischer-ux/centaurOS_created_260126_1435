@@ -76,7 +76,13 @@ def _role_rgba(role: str, kind: str = "") -> tuple[float, float, float, float]:
     return table.get(r, table["part"])
 
 
-def _mat(name: str, rgba: tuple[float, float, float, float], *, alpha: Optional[float] = None):
+def _mat(
+    name: str,
+    rgba: tuple[float, float, float, float],
+    *,
+    alpha: Optional[float] = None,
+    role: str = "",
+):
     import bpy
 
     a = alpha if alpha is not None else rgba[3]
@@ -84,16 +90,54 @@ def _mat(name: str, rgba: tuple[float, float, float, float], *, alpha: Optional[
     m.use_nodes = True
     nt = m.node_tree
     bsdf = nt.nodes.get("Principled BSDF")
+    r = (role or "").lower()
     if bsdf:
         bsdf.inputs["Base Color"].default_value = (rgba[0], rgba[1], rgba[2], 1.0)
         if "Alpha" in bsdf.inputs:
             bsdf.inputs["Alpha"].default_value = a
+        # Role-tuned PBR for Cycles polish
+        rough, metal = 0.42, 0.12
+        if r in ("motor", "inverter", "thermal"):
+            rough, metal = 0.28, 0.72
+        elif r == "enclosure":
+            rough, metal = 0.38, 0.45
+        elif r == "vessel":
+            rough, metal = 0.12, 0.05
+            if "Transmission" in bsdf.inputs:
+                try:
+                    bsdf.inputs["Transmission"].default_value = 0.55
+                except Exception:
+                    pass
+            if "Transmission Weight" in bsdf.inputs:
+                try:
+                    bsdf.inputs["Transmission Weight"].default_value = 0.55
+                except Exception:
+                    pass
+            a = min(a, 0.55)
+            bsdf.inputs["Alpha"].default_value = a
+        elif r == "pcb":
+            rough, metal = 0.55, 0.05
+        elif r == "sensor":
+            rough, metal = 0.35, 0.35
         if "Roughness" in bsdf.inputs:
-            bsdf.inputs["Roughness"].default_value = 0.45
+            bsdf.inputs["Roughness"].default_value = rough
         if "Metallic" in bsdf.inputs:
-            bsdf.inputs["Metallic"].default_value = 0.15 if rgba[0] > 0.5 else 0.05
+            bsdf.inputs["Metallic"].default_value = metal
+        if "Specular" in bsdf.inputs:
+            try:
+                bsdf.inputs["Specular"].default_value = 0.45
+            except Exception:
+                pass
+        if "Specular IOR Level" in bsdf.inputs:
+            try:
+                bsdf.inputs["Specular IOR Level"].default_value = 0.5
+            except Exception:
+                pass
     if a < 0.99:
-        m.blend_method = "BLEND"
+        try:
+            m.blend_method = "BLEND"
+        except Exception:
+            pass
         try:
             m.shadow_method = "NONE"
         except Exception:
@@ -190,8 +234,7 @@ def _apply_role_materials(plan: dict) -> None:
         if obj.get("anvil_source") != "geometry_ir" and not obj.name.startswith("kernel_"):
             continue
         rgba = _role_rgba(str(role), str(kind))
-        # ghost enclosures slightly more opaque for product exterior
-        mat = _mat(f"mat_{obj.name}", rgba)
+        mat = _mat(f"mat_{obj.name}", rgba, role=str(role))
         if obj.data:
             if hasattr(obj.data, "materials"):
                 obj.data.materials.clear()
@@ -281,10 +324,17 @@ def render_suite(twin: Path) -> dict[str, Any]:
     hero_loc = (cx + hero_diag, cy - hero_diag, cz + max_dim * 0.55)
     hero_tgt = (cx, cy, z0 + dz * 0.4)
     hero_scale = ortho(math.hypot(dx, dy), dz + math.hypot(dx, dy) * 0.25)
-    use_cycles = os.environ.get("BLENDER_HERO_CYCLES", "0") == "1"
+    # Default ON for polish (set BLENDER_HERO_CYCLES=0 or ANVIL_KERNEL_HERO_CYCLES=0 to skip)
+    _cyc_env = os.environ.get("ANVIL_KERNEL_HERO_CYCLES") or os.environ.get(
+        "BLENDER_HERO_CYCLES", "1"
+    )
+    use_cycles = _cyc_env.strip().lower() not in ("0", "false", "no", "off")
+    # Prefer OpenImageDenoise + moderate samples (override via BLENDER_CYCLES_SAMPLES)
+    if use_cycles and not os.environ.get("BLENDER_CYCLES_SAMPLES"):
+        os.environ["BLENDER_CYCLES_SAMPLES"] = "96"
     print(
         f"[kernel-hero] plan_bbox_m dx={dx:.4f} dy={dy:.4f} dz={dz:.4f} "
-        f"hero_scale={hero_scale:.4f} n_obj={plan.get('n_objects')}"
+        f"hero_scale={hero_scale:.4f} n_obj={plan.get('n_objects')} cycles={use_cycles}"
     )
     save(
         "00-hero.png",
