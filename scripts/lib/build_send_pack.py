@@ -31,6 +31,52 @@ def _read_json(path: Path) -> Optional[dict]:
         return None
 
 
+def _dual_grade_lines(twin: Path, pack: Path, floor_status: Optional[dict] = None) -> list[str]:
+    """Tab floor (engine contracts) vs domain product grade (manufacturer sanity)."""
+    lines: list[str] = []
+    tab_min = None
+    if floor_status and floor_status.get("min_score") is not None:
+        tab_min = floor_status.get("min_score")
+    sc = _read_json(twin / "tab-scorecard.json") or _read_json(pack / "tab-scorecard.json")
+    if tab_min is None and isinstance(sc, dict):
+        tab_min = (sc.get("summary") or {}).get("min_score")
+    qsc = _read_json(twin / "quality-scorecard.json") or _read_json(pack / "quality-scorecard.json")
+    domain = None
+    release = None
+    if isinstance(qsc, dict):
+        for s in qsc.get("sections") or []:
+            if not isinstance(s, dict):
+                continue
+            if s.get("name") == "domain_product_quality":
+                domain = s.get("score")
+            if s.get("name") == "release_readiness":
+                release = s.get("score")
+    st = _read_json(twin / "state.json")
+    if domain is None and isinstance(st, dict):
+        dpq = st.get("_domainProductQuality") or {}
+        if isinstance(dpq, dict):
+            domain = dpq.get("score")
+    lines.append("GRADES (read both — they answer different questions):")
+    lines.append(
+        f"  · Tab floor (engine sheet contracts): "
+        f"{tab_min if tab_min is not None else 'see tab-scorecard.json'}/10"
+    )
+    lines.append(
+        f"  · Domain product grade (catalogue/kinetics/topology sanity): "
+        f"{domain if domain is not None else 'see quality-scorecard domain_product_quality'}/10"
+    )
+    if release is not None:
+        lines.append(
+            f"  · Release readiness (homologation / Gerbers / HIL): {release}/10"
+        )
+    lines.append(
+        "  A high tab floor does NOT mean manufacturer-ready. "
+        "Read ADVERSARIAL-*.md and open holds before any purchase order."
+    )
+    lines.append("")
+    return lines
+
+
 def write_readme_first(
     pack: Path,
     *,
@@ -38,6 +84,8 @@ def write_readme_first(
     pack_revision: str,
     brand: str = "Anvil",
     ship_ok: Optional[bool] = None,
+    twin: Optional[Path] = None,
+    floor_status: Optional[dict] = None,
 ) -> Path:
     ship = (
         "ship_ok = true"
@@ -53,6 +101,10 @@ def write_readme_first(
         f"{product_title} — {brand} concept design pack {pack_revision}",
         f"{brand} · concept engineering · {ship}",
         "",
+    ]
+    if twin is not None:
+        lines.extend(_dual_grade_lines(Path(twin), pack, floor_status=floor_status))
+    lines += [
         "1. Extract this zip as a folder.",
         "2. Open 00-COVER-NARRATIVE.pdf  or  00-COVER-NARRATIVE.html",
         "3. Or use 00-COVER-CLICK-INDEX.html for one-click navigation.",
@@ -376,6 +428,8 @@ def apply_send_pack_chrome(
         pack_revision=pack_revision,
         brand=brand,
         ship_ok=ship_ok,
+        twin=twin_p,
+        floor_status=floor_status,
     )
     report["actions"].append("README-FIRST.txt")
     write_folder_guide(pack_p, pack_revision=pack_revision)

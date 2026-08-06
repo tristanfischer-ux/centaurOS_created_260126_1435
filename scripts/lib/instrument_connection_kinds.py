@@ -64,8 +64,18 @@ def edge_is_nonphysical(
             return True
     # Fluid into electronics / debug / dry-only parts
     if _FLUID_KIND_RE.search(k):
+        # Cooling-air path is legitimate: fan ↔ heatsink / TEC / cold plate.
+        # Only ban process media (water/media/liquid) into dry electronics, or
+        # air into non-thermal dry parts (debug headers, MCUs, labels).
+        _thermal_air_ok = re.search(
+            r"heatsink|peltier|\btec\b|cold\s*plate|fan|blower|thermal",
+            fn + " " + tn,
+            re.I,
+        )
+        _is_process_wet = re.search(r"water|fluid|media|liquid|hydraulic", k, re.I)
         if _NON_WETTED_RE.search(fn) or _NON_WETTED_RE.search(tn):
-            return True
+            if _is_process_wet or not _thermal_air_ok:
+                return True
     # Safety label or TIM as either end of any net is always noise
     if re.search(r"safety\s*label|thermal\s*interface", fn + " " + tn, re.I):
         if not re.search(r"assembly|mechanical|mount", k, re.I):

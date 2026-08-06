@@ -2483,6 +2483,25 @@ def _verdict_sections(state: dict, run_dir: str = "") -> Tuple[Dict[str, dict], 
     _bc = _performance_card_fact(state)
     if _bc.get("score") is not None:
         facts["brief_compliance"] = _bc
+    # DOMAIN PRODUCT QUALITY (2026-08-06 manufacturer adversarial): catalogue fraud,
+    # impossible culture kinetics, non-physical instrument edges — floors Bar A when
+    # HIGH product defects exist. Homologation-only stays on release_readiness.
+    try:
+        import sys as _sys
+        _libp = os.path.join(os.path.dirname(os.path.abspath(__file__)), "lib")
+        if _libp not in _sys.path:
+            _sys.path.insert(0, _libp)
+        from domain_product_quality import evaluate_domain_product_quality  # noqa: WPS433
+        _dpq = evaluate_domain_product_quality(state or {}, run_dir=run_dir or "")
+        if isinstance(_dpq, dict) and _dpq.get("score") is not None:
+            facts["domain_product_quality"] = {
+                "score": float(_dpq["score"]),
+                "defects": list(_dpq.get("defects") or []),
+            }
+            if isinstance(state, dict):
+                state["_domainProductQuality"] = _dpq
+    except Exception as _dpq_exc:  # noqa: BLE001 — never kill verdict on domain grade
+        print(f"  · domain_product_quality skipped: {_dpq_exc}")
     return facts, advisory
 
 
@@ -31347,21 +31366,50 @@ def build(run_dir: str, out_path: str) -> dict:
             )
     except Exception as _pg_exc:  # noqa: BLE001 — never block export on gate import
         print(f"  · instrument plant-driver gate skipped: {_pg_exc}")
-    # CATALOGUE FUNCTION-CLASS AUDIT (Anvil, manufacturer adversarial): log (do not
-    # hard-block export) when a role name contradicts the pinned MPN class — e.g.
-    # fan-as-stirrer, ADC-as-flow. Universal noun rules; any product class.
+    # CATALOGUE FUNCTION-CLASS + DOMAIN PRODUCT QUALITY (Anvil, manufacturer
+    # adversarial): evaluate once, stash on state, and print. Domain grade enters
+    # the Bar A floor via _verdict_sections (no longer log-only).
     try:
-        from catalogue_function_class import audit_parts_iterable  # noqa: WPS433
-        _id_findings = audit_parts_iterable(state.get("requirementsBom") or [])
-        _id_findings += audit_parts_iterable(state.get("partVerifications") or [])
-        if _id_findings:
-            print(
-                f"  · catalogue function-class audit: {len(_id_findings)} identity "
-                f"conflict(s) — e.g. {_id_findings[0].get('issue', '')[:120]}",
-                flush=True,
-            )
+        import sys as _sys_cf
+        _lib_cf = os.path.join(os.path.dirname(os.path.abspath(__file__)), "lib")
+        if _lib_cf not in _sys_cf.path:
+            _sys_cf.path.insert(0, _lib_cf)
+        from domain_product_quality import evaluate_domain_product_quality  # noqa: WPS433
+        _dpq0 = evaluate_domain_product_quality(state, run_dir=run_dir)
+        state["_domainProductQuality"] = _dpq0
+        # Persist into quality-scorecard.json so cover/chrome can read dual grade.
+        try:
+            _qpath = os.path.join(run_dir, "quality-scorecard.json")
+            if os.path.isfile(_qpath):
+                with open(_qpath, encoding="utf-8") as _qf:
+                    _qsc = json.load(_qf)
+                _secs = list(_qsc.get("sections") or [])
+                _secs = [s for s in _secs if not (
+                    isinstance(s, dict) and s.get("name") == "domain_product_quality"
+                )]
+                _secs.append({
+                    "name": "domain_product_quality",
+                    "score": _dpq0.get("score"),
+                    "defects": list(_dpq0.get("defects") or []),
+                    "advisory": False,
+                    "qualityLoopActionable": True,
+                })
+                _qsc["sections"] = _secs
+                with open(_qpath, "w", encoding="utf-8") as _qf:
+                    json.dump(_qsc, _qf, indent=2)
+                    _qf.write("\n")
+        except Exception as _qsc_exc:  # noqa: BLE001
+            print(f"  · domain grade scorecard write skipped: {_qsc_exc}")
+        print(
+            f"  · domain_product_quality: {_dpq0.get('score')}/10 "
+            f"(HIGH={_dpq0.get('high_count')} MED={_dpq0.get('med_count')} "
+            f"binding={_dpq0.get('binding')})",
+            flush=True,
+        )
+        if _dpq0.get("defects"):
+            print(f"      e.g. {_dpq0['defects'][0][:140]}", flush=True)
     except Exception as _cf_exc:  # noqa: BLE001
-        print(f"  · catalogue function-class audit skipped: {_cf_exc}")
+        print(f"  · domain_product_quality skipped: {_cf_exc}")
     # INTENT (P6 / cold-v17): restore state.pcb from sidecar when a nested chain
     # race wiped it — before Verification / PCB tab / Gate-38 mirrors read state.
     if _ensure_pcb_from_sidecar(state, run_dir):

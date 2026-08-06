@@ -151,6 +151,23 @@ def test_illustrated_cover_discover_and_emit() -> None:
         print("illustrated cover selftest OK", r["embedded_bytes"], "bytes")
 
 
+def test_domain_product_quality_binds() -> None:
+    """Catalogue fraud / bacteria kinetics must bind domain grade ≤4."""
+    from domain_product_quality import prove_catch_selftest, evaluate_domain_product_quality
+    prove_catch_selftest()
+    # Clean instrument fixture scores high on product axis
+    clean = {
+        "productClass": "benchtop_instrument",
+        "requirementsBom": [{"name": "Heatsink Fan", "part": "axial fan", "part_number": "MF40101"}],
+        "orchestratorContract": {"quantities": {}},
+        "pcb": {"forgeDraftOnly": True, "NOT_FABRICATION_READY": True},
+    }
+    r = evaluate_domain_product_quality(clean)
+    assert r["score"] <= 8.0  # PCB draft MED
+    assert r["binding"] is False
+    print("domain_product_quality dual-class smoke OK")
+
+
 def test_tab_floor_gate_pure() -> None:
     """ANVIL_TAB_FLOOR helper: below-floor → DRAFT note path, ok floor → pass."""
     import tempfile
@@ -212,6 +229,7 @@ if __name__ == "__main__":
     test_instrument_pack_if_present()
     test_send_pack_chrome_if_present()
     test_illustrated_cover_discover_and_emit()
+    test_domain_product_quality_binds()
     test_tab_floor_gate_pure()
     test_bio_pack_has_illustrated_cover_if_present()
     print("test_dual_class_pack_smoke OK")
