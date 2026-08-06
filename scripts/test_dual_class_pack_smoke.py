@@ -151,6 +151,38 @@ def test_illustrated_cover_discover_and_emit() -> None:
         print("illustrated cover selftest OK", r["embedded_bytes"], "bytes")
 
 
+def test_tab_floor_gate_pure() -> None:
+    """ANVIL_TAB_FLOOR helper: below-floor → DRAFT note path, ok floor → pass."""
+    import tempfile
+    from build_send_pack import _tab_floor_status, write_draft_tab_floor_note, apply_send_pack_chrome
+    import json
+
+    with tempfile.TemporaryDirectory() as td:
+        twin = Path(td) / "twin"
+        pack = Path(td) / "pack"
+        twin.mkdir()
+        pack.mkdir()
+        (pack / "MANIFEST.txt").write_text("x\n")
+        (pack / "dossier.xlsx").write_bytes(b"PK")
+        sc = {
+            "summary": {"min_score": 7.0, "min_tab": "Calculations", "fail_tabs": ["Calculations"], "all_pass": False},
+            "tabs": {"Calculations": {"score": 7.0}, "Brief": {"score": 10}},
+        }
+        (twin / "tab-scorecard.json").write_text(json.dumps(sc))
+        st = _tab_floor_status(twin, pack, floor=9.0)
+        assert st["ok"] is False
+        write_draft_tab_floor_note(pack, st, pack_revision="V0")
+        assert (pack / "00-DRAFT-TAB-FLOOR-NOTE.txt").is_file()
+        # Raise floor
+        sc["summary"] = {"min_score": 9.0, "min_tab": "Brief", "fail_tabs": [], "all_pass": True}
+        sc["tabs"] = {"Calculations": {"score": 9.0}, "Brief": {"score": 10}}
+        (twin / "tab-scorecard.json").write_text(json.dumps(sc))
+        r = apply_send_pack_chrome(twin, pack, pack_revision="V0", ship_ok=False, tab_floor=9.0)
+        assert r["tab_floor"]["ok"] is True
+        assert not (pack / "00-DRAFT-TAB-FLOOR-NOTE.txt").is_file()
+        print("tab floor gate selftest OK")
+
+
 def test_bio_pack_has_illustrated_cover_if_present() -> None:
     """Live bio pack should ship multi-MB illustrated cover after cover v2."""
     pack = _latest_pack("**/*benchtop*design-pack")
@@ -180,6 +212,7 @@ if __name__ == "__main__":
     test_instrument_pack_if_present()
     test_send_pack_chrome_if_present()
     test_illustrated_cover_discover_and_emit()
+    test_tab_floor_gate_pure()
     test_bio_pack_has_illustrated_cover_if_present()
     print("test_dual_class_pack_smoke OK")
 

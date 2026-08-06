@@ -2419,7 +2419,13 @@ def _verdict_sections(state: dict, run_dir: str = "") -> Tuple[Dict[str, dict], 
         # readiness, homologation), but they must NOT drag the Bar A concept floor
         # (and therefore Exec Summary / Quality & Audit mirrors) to 4 on an honest
         # concept pack. A concept can score tabs ≥9 while remaining NOT_HOMOLOGATED.
-        if s.get("qualityLoopActionable") is False:
+        # Name-keyed fallback: stale scorecards may omit qualityLoopActionable.
+        _release_axes = {
+            "release_readiness",
+            "homologation_readiness",
+            "fab_release_readiness",
+        }
+        if s.get("qualityLoopActionable") is False or nm in _release_axes:
             # Keep visible as advisory annotation — never a silent drop.
             defects = list(ent.get("defects") or [])
             defects.insert(
@@ -6976,6 +6982,15 @@ def _rhs_is_selection_style(rhs: str) -> bool:
         return False
     if re.search(r"[<>]=?", rhs):        # '... pick the smallest that satisfies X >= Y'
         return True
+    # Bare catalogue / grade token (e.g. M400-50A, NEMA-17) — no arithmetic operators.
+    # A pure material/grade assignment is a pick, not a live formula. Without this,
+    # lamination_grade = M400-50A never earns the disclosure mark and floors Calculations.
+    # GOTCHA: do not treat hyphen inside grade tokens as a binary minus.
+    _tok = str(rhs).strip().strip("'\"")
+    if _tok and not re.search(r"[\+\*/\^%\(\)]", _tok) and not re.search(
+        r"\s-\s|^\-|-$", _tok
+    ) and re.fullmatch(r"[A-Za-z][A-Za-z0-9._\-/]{1,40}", _tok):
+        return True
     # normalise the spaced 'x' multiplication sign FIRST (same as formula_to_excel) —
     # otherwise 'x (Q_m3h / 3600)' misreads the literal multiply sign as a function
     # call named 'x' and every ordinary "a x (b) x c" arithmetic RHS false-positives.
@@ -7379,12 +7394,24 @@ def tab_calculations(wb: Workbook, state: dict, run_dir: str) -> Tuple[int, int]
                     vc.font = vfont
                     vc.alignment = WRAP_TOP
                 else:
-                    # non-arithmetic substitution (rare) — keep honest static text
-                    _legacy_marker = f"  [result — {_DISCLOSED_NONLIVE_MARK} (no result value)]"
+                    # Catalogue / grade / text pick (e.g. lamination_grade = M400-50A).
+                    # Put the value in col B AND disclose non-live so the scorer can
+                    # resolve the definition — an empty B with only col E left the
+                    # worked-calc permanently "unresolved" and floored Calculations.
+                    _legacy_marker = (
+                        f"  [table selection — {_DISCLOSED_NONLIVE_MARK}]"
+                    )
                     static_count += 1
-                    ws.cell(r, 5, res_val)
+                    if res_val is not None:
+                        lc = ws.cell(r, 2, str(res_val))
+                        lc.fill = FILL_RESULT
+                    ws.cell(r, 5, res_val if res_val is not None else "")
                     ws.cell(r, 7, res_unit)
-                    ws.cell(r, 8, "— not auto-checkable (non-numeric substitution)").font = FONT_NOTE
+                    ws.cell(
+                        r, 8,
+                        "table selection — not a live arithmetic (catalogue/grade pick); "
+                        "shown as engine text, not an in-sheet formula",
+                    ).font = FONT_NOTE
                 ws.cell(r, 1, "  = result" + _legacy_marker).font = FONT_NOTE
                 _calc_row_of_label[label] = r
                 # FORWARD TRACEABILITY (col I) — deferred until every calc in this tool has
@@ -7447,6 +7474,15 @@ def tab_calculations(wb: Workbook, state: dict, run_dir: str) -> Tuple[int, int]
             _bval = ev_s if isinstance(ev_s, (int, float)) else (res_val if isinstance(res_val, (int, float)) else None)
             xl_live = formula_to_excel(rhs, symbol_cell)
             is_selection = xl_live is None and _rhs_is_selection_style(rhs)
+            # String catalogue results (grades, part families) are selections even when
+            # the RHS parser missed them — never leave col B empty over a text pick.
+            if (
+                not is_selection
+                and xl_live is None
+                and res_val is not None
+                and not isinstance(res_val, (int, float))
+            ):
+                is_selection = True
             _label_suffix = (f"  [table selection — {_DISCLOSED_NONLIVE_MARK}]" if is_selection else "")
             ws.cell(r, 1, "  = result" + _label_suffix).font = FONT_SUB
             live_cell = ws.cell(r, 2)
@@ -7472,8 +7508,10 @@ def tab_calculations(wb: Workbook, state: dict, run_dir: str) -> Tuple[int, int]
                 _rv = res_val if isinstance(res_val, (int, float)) else _bval
                 if isinstance(_rv, (int, float)):
                     calc_results.setdefault(_tid_norm, []).append((float(_rv), f"B{r}"))
-            elif _bval is not None:
-                live_cell.value = _bval
+            elif _bval is not None or (
+                is_selection and res_val is not None and not isinstance(res_val, (int, float))
+            ):
+                live_cell.value = _bval if _bval is not None else str(res_val)
                 live_cell.fill = FILL_RESULT
                 produced_ok = True
                 _rv = res_val if isinstance(res_val, (int, float)) else _bval

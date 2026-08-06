@@ -37,9 +37,16 @@ export interface ScorecardSection {
 export function computeScorecardFloor(
   sections: ScorecardSection[],
 ): { floor: number; mean: number } {
-  const gating = sections.filter((s) => !s.advisory)
-  const scored = gating.length ? gating : sections
-  const scores = scored.map((s) => s.score)
+  // INTENT (2026-08-06): qualityLoopActionable=false is an EXTERNAL-EVIDENCE axis
+  // (release_readiness / homologation). It must stay visible and still bind SHIPS via
+  // dedicated ship-gate axes, but it must NOT drag the concept Bar A floor — a concept
+  // pack can score tabs ≥9 while remaining NOT_HOMOLOGATED.
+  const gating = sections.filter(
+    (s) => !s.advisory && s.qualityLoopActionable !== false,
+  )
+  const scored = gating.length ? gating : sections.filter((s) => !s.advisory)
+  const use = scored.length ? scored : sections
+  const scores = use.map((s) => s.score)
   const floor = scores.length ? Math.min(...scores) : 0
   const mean = scores.length ? scores.reduce((a, b) => a + b, 0) / scores.length : 0
   return { floor, mean: Math.round(mean * 10) / 10 }
@@ -206,14 +213,25 @@ export function shipGatingScore(section: ScorecardSection): number {
 }
 
 /**
- * Honest ship floor/mean/allPass — min/mean of shipGatingScore across every section.
+ * Honest ship floor/mean/allPass — min/mean of shipGatingScore across concept-gating sections.
  * @param passFloor - minimum score for allPass (default 9 — Tristan 2026-07-09 Excel bar).
+ *
+ * INTENT (2026-08-06): exclude qualityLoopActionable=false (release_readiness /
+ * homologation axes). Those bind SHIPS via dedicated ship-gate axes, not the concept
+ * Bar A floor — a NOT_HOMOLOGATED pack can still have every tab ≥9.
  */
 export function computeHonestShipFloor(
   sections: ScorecardSection[],
   passFloor: number = 9,
 ): { floor: number; mean: number; allPass: boolean } {
-  const scores = sections.map(shipGatingScore)
+  // Exclude LLM advisory sections AND external-evidence axes (qualityLoopActionable=false).
+  // Concept Bar A is deterministic engineering truth only.
+  const gating = sections.filter(
+    (s) => !s.advisory && s.qualityLoopActionable !== false,
+  )
+  const use = gating.length ? gating : sections.filter((s) => !s.advisory)
+  const finalUse = use.length ? use : sections
+  const scores = finalUse.map(shipGatingScore)
   const floor = scores.length ? Math.min(...scores) : 0
   const mean = scores.length
     ? Math.round((scores.reduce((a, b) => a + b, 0) / scores.length) * 10) / 10

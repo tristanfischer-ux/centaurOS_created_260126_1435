@@ -241,6 +241,78 @@ def copy_firmware(twin: Path, pack: Path) -> list[str]:
     return copied
 
 
+def _tab_floor_status(
+    twin: Path,
+    pack: Path,
+    *,
+    floor: float,
+) -> dict[str, Any]:
+    """Read tab-scorecard summary; return floor verdict for send-pack gating."""
+    sc = _read_json(twin / "tab-scorecard.json") or _read_json(pack / "tab-scorecard.json")
+    if not isinstance(sc, dict):
+        return {"ok": False, "reason": "no tab-scorecard.json", "min_score": None, "floor": floor}
+    summary = sc.get("summary") if isinstance(sc.get("summary"), dict) else {}
+    min_score = summary.get("min_score")
+    min_tab = summary.get("min_tab")
+    fail_tabs = list(summary.get("fail_tabs") or [])
+    try:
+        ms = float(min_score) if min_score is not None else None
+    except (TypeError, ValueError):
+        ms = None
+    ok = ms is not None and ms + 1e-9 >= float(floor) and not fail_tabs
+    # also treat any tab with score < floor as fail when tabs dict present
+    if ok and isinstance(sc.get("tabs"), dict):
+        for name, row in sc["tabs"].items():
+            if not isinstance(row, dict):
+                continue
+            try:
+                s = float(row.get("score"))
+            except (TypeError, ValueError):
+                continue
+            if s + 1e-9 < float(floor):
+                ok = False
+                fail_tabs.append(name)
+                if ms is None or s < ms:
+                    ms = s
+                    min_tab = name
+    return {
+        "ok": ok,
+        "min_score": ms,
+        "min_tab": min_tab,
+        "fail_tabs": sorted(set(fail_tabs)),
+        "floor": float(floor),
+        "reason": (
+            None
+            if ok
+            else f"tab floor {ms}/10 < {floor} (worst: {min_tab}); fails={fail_tabs[:8]}"
+        ),
+    }
+
+
+def write_draft_tab_floor_note(
+    pack: Path,
+    status: dict[str, Any],
+    *,
+    pack_revision: str,
+) -> Path:
+    """Honest DRAFT note when tab floor is below the send gate."""
+    path = pack / "00-DRAFT-TAB-FLOOR-NOTE.txt"
+    lines = [
+        f"DRAFT TAB-FLOOR NOTE — {pack_revision}",
+        "",
+        f"Required floor: ≥ {status.get('floor')}/10 on every scored tab.",
+        f"Current min: {status.get('min_score')}  (worst tab: {status.get('min_tab')})",
+        f"Failing / below-floor tabs: {', '.join(status.get('fail_tabs') or []) or '(none listed)'}",
+        "",
+        "This pack ships as concept DRAFT until the floor is met.",
+        "ship_ok remains false while the floor fails or race/HIL evidence is open.",
+        "Do not treat a beautiful electromagnetics/ folder as a green send gate.",
+        "",
+    ]
+    path.write_text("\n".join(lines), encoding="utf-8")
+    return path
+
+
 def apply_send_pack_chrome(
     twin: Path | str,
     pack: Path | str,
@@ -252,10 +324,31 @@ def apply_send_pack_chrome(
     include_3d: bool = True,
     include_firmware: bool = True,
     rewrite_em_paths: bool = True,
+    tab_floor: Optional[float] = None,
+    enforce_tab_floor: Optional[bool] = None,
 ) -> dict[str, Any]:
+    """Apply navigation chrome. Tab floor gate:
+
+    - ``ANVIL_TAB_FLOOR`` env (default 9) sets the numeric floor.
+    - ``ANVIL_TAB_FLOOR_ENFORCE=1`` makes a below-floor pack a hard error
+      (return includes ``tab_floor_block: true``; callers may refuse zip).
+    - Below floor always writes ``00-DRAFT-TAB-FLOOR-NOTE.txt``.
+    """
+    import os
+
     twin_p = Path(twin)
     pack_p = Path(pack)
     pack_p.mkdir(parents=True, exist_ok=True)
+
+    if tab_floor is None:
+        try:
+            tab_floor = float(os.environ.get("ANVIL_TAB_FLOOR", "9"))
+        except ValueError:
+            tab_floor = 9.0
+    if enforce_tab_floor is None:
+        enforce_tab_floor = os.environ.get("ANVIL_TAB_FLOOR_ENFORCE", "").strip() in (
+            "1", "true", "TRUE", "yes", "YES",
+        )
 
     sc = _read_json(twin_p / "tab-scorecard.json") or _read_json(pack_p / "tab-scorecard.json")
     if ship_ok is None and isinstance(sc, dict):
@@ -265,9 +358,18 @@ def apply_send_pack_chrome(
         elif isinstance(sc.get("summary"), dict):
             ship_ok = bool(sc["summary"].get("all_pass")) and float(
                 sc["summary"].get("min_score") or 0
-            ) >= 8
+            ) >= float(tab_floor)
 
-    report: dict[str, Any] = {"pack": str(pack_p), "actions": []}
+    floor_status = _tab_floor_status(twin_p, pack_p, floor=float(tab_floor))
+    if not floor_status["ok"]:
+        # Never claim ship_ok over a failed tab floor
+        ship_ok = False
+
+    report: dict[str, Any] = {
+        "pack": str(pack_p),
+        "actions": [],
+        "tab_floor": floor_status,
+    }
     write_readme_first(
         pack_p,
         product_title=product_title,
@@ -293,6 +395,25 @@ def apply_send_pack_chrome(
         n = rewrite_em_honesty_prose(pack_p)
         if n:
             report["actions"].append(f"rewrote_em_honesty_paths:{n} files")
+
+    # Tab floor honesty
+    if floor_status["ok"]:
+        draft_note = pack_p / "00-DRAFT-TAB-FLOOR-NOTE.txt"
+        if draft_note.is_file():
+            draft_note.unlink()
+            report["actions"].append("removed DRAFT tab-floor note (floor met)")
+        report["actions"].append(
+            f"tab_floor_ok:min={floor_status.get('min_score')}≥{tab_floor}"
+        )
+    else:
+        write_draft_tab_floor_note(pack_p, floor_status, pack_revision=pack_revision)
+        report["actions"].append(
+            f"tab_floor_DRAFT:min={floor_status.get('min_score')}<{tab_floor}"
+        )
+        if enforce_tab_floor:
+            report["tab_floor_block"] = True
+            report["actions"].append("ANVIL_TAB_FLOOR_ENFORCE blocked send")
+
     # Cover contract v2 — illustrated HTML + figure PDF when renders/drawings exist.
     # Do not overwrite a handcrafted multi-MB illustrated cover (e.g. FE narrative pack).
     existing_ill = pack_p / "00-COVER-NARRATIVE-illustrated.html"
@@ -321,6 +442,18 @@ def apply_send_pack_chrome(
                 report["illustrated"] = ill
             except Exception as exc:  # never block chrome for cover polish
                 report["actions"].append(f"illustrated_cover_skipped:{exc}")
+
+    # Ship adversarial / council summary when twin has one (bio-style pack honesty)
+    for name in (
+        "ADVERSARIAL-MANUFACTURER-REVIEW.md",
+        "ADVERSARIAL-DOMAIN-REVIEW.md",
+        "ADVERSARIAL-COUNCIL-SYNTHESIS.json",
+    ):
+        src = twin_p / name
+        if src.is_file() and not (pack_p / name).is_file():
+            shutil.copy2(src, pack_p / name)
+            report["actions"].append(f"copied:{name}")
+
     report["ship_ok"] = ship_ok
     return report
 

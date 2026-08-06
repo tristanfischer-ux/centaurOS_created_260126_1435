@@ -205,9 +205,11 @@ Implement **P0 + FE cover prose fix (`electromagnetics/` not `em-honesty/`)** im
 | P0 FE cover prose → electromagnetics/ | **Done** (8 files rewritten on FE pack) |
 | Sprint A instrument-physics one-pagers | **Done** on bio pack (`instrument-physics/`) |
 | Sprint B FE 3d-model + firmware in pack | **Done** |
-| Sprint B FE DRAFT tab-floor note | **Done** (`00-DRAFT-TAB-FLOOR-NOTE.txt`) while floor remains &lt;8 |
+| Sprint B FE DRAFT tab-floor note | **Done** (removed once floor ≥9) |
 | Dual-class chrome smoke | **Done** |
-| FE full tab floor ≥9 remediation | **Open** (honest DRAFT note until closed) |
+| FE full tab floor ≥9 remediation | **Done** — V1.300 pack, min tab 9.0, all_pass; ship_ok still false (PCB/HIL/homologation) |
 | Illustrated multi-MB cover for bio | **Done** — `00-COVER-NARRATIVE-illustrated.html` + figure PDF via universal `build_pack_cover` v2 |
+| `ANVIL_TAB_FLOOR=9` send-pack gate | **Done** — `build_send_pack` default floor 9; DRAFT note when below; `ANVIL_TAB_FLOOR_ENFORCE=1` hard block |
+| FE domain adversarial in pack | **Done** — `ADVERSARIAL-DOMAIN-REVIEW.md` + council synthesis |
 
 *End of plan.*
