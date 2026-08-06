@@ -186,6 +186,32 @@ def test_geometry_kernel_selftest() -> None:
     print("geometry_kernel CLI selftest OK")
 
 
+def test_kernel_hero_render_selftest() -> None:
+    """Hero suite driver --selftest (no Blender required)."""
+    import subprocess
+
+    script = ROOT / "scripts" / "geometry-kernel-hero-render.py"
+    r = subprocess.run(
+        [sys.executable, str(script), "--selftest"],
+        capture_output=True,
+        text=True,
+        timeout=30,
+        cwd=str(ROOT),
+    )
+    assert r.returncode == 0, r.stderr or r.stdout
+    assert "selftest OK" in (r.stdout or "")
+    # If a live kernel hero suite already ran, prove product-dominant framing
+    hero = ROOT / "out" / "organoid-9drive-r11-allfixes" / "00-hero.png"
+    man = ROOT / "out" / "organoid-9drive-r11-allfixes" / "kernel-hero-manifest.json"
+    if hero.is_file() and man.is_file():
+        assert hero.stat().st_size > 100_000
+        doc = json.loads(man.read_text(encoding="utf-8"))
+        assert doc.get("master") == "geometry_kernel"
+        assert len(doc.get("written") or []) >= 10
+        print(f"kernel hero on disk OK: {hero.stat().st_size // 1024} KB, {len(doc['written'])} views")
+    print("kernel_hero_render selftest OK")
+
+
 def test_geometry_master_and_port_faces() -> None:
     """Kernel master mode + port-face routing + FreeCAD/OCCT smoke."""
     import os
@@ -391,6 +417,7 @@ if __name__ == "__main__":
     test_domain_product_quality_binds()
     test_geometry_kernel_selftest()
     test_geometry_master_and_port_faces()
+    test_kernel_hero_render_selftest()
     test_geometry_kernel_dual_class_emit()
     test_tab_floor_gate_pure()
     test_pack_parity_sheets_selftest()

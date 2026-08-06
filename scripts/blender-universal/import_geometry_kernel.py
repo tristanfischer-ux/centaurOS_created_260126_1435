@@ -161,18 +161,24 @@ def _bpy_build(twin: Path) -> dict[str, Any]:
         coll = bpy.data.collections[coll_name]
 
     created = 0
-    mm = 0.001  # Blender units = metres by convention in some scenes; use mm scale 0.001
+    mm = 0.001  # film plan mm → Blender metres
 
     for spec in plan.get("objects") or []:
         name = "kernel_" + str(spec.get("name") or "part")[:60]
         mesh_spec = spec.get("mesh") or {}
+        o = spec.get("origin_mm") or [0, 0, 0]
+        ox, oy, oz = float(o[0]) * mm, float(o[1]) * mm, float(o[2]) * mm
+        rpy = spec.get("rotation_rpy_deg") or [0, 0, 0]
+
         if spec.get("geometry_kind") == "path":
-            # simple polyline curve
             curve = bpy.data.curves.new(name + "_crv", type="CURVE")
             curve.dimensions = "3D"
-            curve.bevel_depth = float(spec.get("od_mm") or 4) * mm / 2
+            curve.bevel_depth = max(0.0005, float(spec.get("od_mm") or 4) * mm / 2)
+            curve.bevel_resolution = 2
             spline = curve.splines.new("POLY")
             pts = spec.get("centreline_mm") or []
+            if len(pts) < 2:
+                continue
             spline.points.add(max(0, len(pts) - 1))
             for i, pt in enumerate(pts):
                 spline.points[i].co = (
@@ -183,31 +189,34 @@ def _bpy_build(twin: Path) -> dict[str, Any]:
                 )
             obj = bpy.data.objects.new(name, curve)
         elif mesh_spec.get("type") == "cylinder":
+            dia = float(mesh_spec.get("dia_mm") or 20) * mm
+            ln = float(mesh_spec.get("len_mm") or 20) * mm
+            # depth along Z, bottom at oz
             bpy.ops.mesh.primitive_cylinder_add(
-                radius=float(mesh_spec.get("dia_mm") or 20) * mm / 2,
-                depth=float(mesh_spec.get("len_mm") or 20) * mm,
-                location=(0, 0, 0),
+                radius=max(dia / 2, 0.0005),
+                depth=max(ln, 0.001),
+                location=(ox, oy, oz + ln / 2),
             )
             obj = bpy.context.active_object
             obj.name = name
-            # cylinder is Z-centred; shift so bottom at origin like IR
-            obj.location.z = float(mesh_spec.get("len_mm") or 20) * mm / 2
         else:
-            w = float(mesh_spec.get("w_mm") or 20) * mm
-            d = float(mesh_spec.get("d_mm") or 20) * mm
-            h = float(mesh_spec.get("h_mm") or 15) * mm
-            bpy.ops.mesh.primitive_cube_add(size=1, location=(0, 0, h / 2))
+            w = max(float(mesh_spec.get("w_mm") or 20) * mm, 0.001)
+            d = max(float(mesh_spec.get("d_mm") or 20) * mm, 0.001)
+            h = max(float(mesh_spec.get("h_mm") or 15) * mm, 0.001)
+            # size=2 → verts at ±1; scale half-extents so world size = (w,d,h)
+            bpy.ops.mesh.primitive_cube_add(size=2, location=(ox, oy, oz + h / 2))
             obj = bpy.context.active_object
             obj.name = name
-            obj.scale = (w, d, h)
+            obj.scale = (w / 2.0, d / 2.0, h / 2.0)
+            # bake scale so bound_box is honest
+            bpy.context.view_layer.objects.active = obj
+            obj.select_set(True)
+            try:
+                bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
+            except Exception:
+                pass
+            obj.select_set(False)
 
-        o = spec.get("origin_mm") or [0, 0, 0]
-        obj.location = (
-            float(o[0]) * mm,
-            float(o[1]) * mm,
-            float(o[2]) * mm + obj.location.z,
-        )
-        rpy = spec.get("rotation_rpy_deg") or [0, 0, 0]
         obj.rotation_euler = (
             math.radians(float(rpy[0])),
             math.radians(float(rpy[1])),
@@ -217,7 +226,6 @@ def _bpy_build(twin: Path) -> dict[str, Any]:
         obj["anvil_tag"] = str(spec.get("tag") or "")
         obj["anvil_role"] = str(spec.get("role") or "")
         if obj.name not in coll.objects:
-            # unlink from scene collection if needed
             for c in list(obj.users_collection):
                 c.objects.unlink(obj)
             coll.objects.link(obj)
