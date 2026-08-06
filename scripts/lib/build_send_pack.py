@@ -165,6 +165,7 @@ def write_folder_guide(pack: Path, *, pack_revision: str) -> Path:
         ("geometry/", "CAD master: assembly.step + IR (FreeCAD)"),
         ("geometry/assembly.step", "Open in FreeCAD — engineering model"),
         ("geometry/README.txt", "How to open STEP; holds list"),
+        ("drawings/ga-geometry-from-ir.svg", "GA projected from CAD IR (G-DRAW-SYNC)"),
         ("run-logs/", "Optional rebuild logs"),
     ]
     present = []
@@ -246,7 +247,20 @@ def copy_geometry(twin: Path, pack: Path) -> list[str]:
         shutil.rmtree(dest)
     shutil.copytree(src, dest)
     copied = [str(p.relative_to(dest)) for p in dest.rglob("*") if p.is_file()]
-    return copied[:40]
+    # G-DRAW-SYNC sheets live under twin/drawings — ship with pack drawings/
+    draw_dest = pack / "drawings"
+    for name in (
+        "ga-geometry-from-ir.svg",
+        "ga-geometry-from-ir.png",
+        "ga-geometry-from-ir.json",
+        "G-DRAW-SYNC.md",
+    ):
+        src_d = twin / "drawings" / name
+        if src_d.is_file():
+            draw_dest.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(src_d, draw_dest / name)
+            copied.append(f"drawings/{name}")
+    return copied[:50]
 
 
 def copy_3d_model(twin: Path, pack: Path) -> list[str]:

@@ -41,12 +41,28 @@ def main(argv: list[str] | None = None) -> int:
         from geometry_path_router import _selftest as t3
         from geometry_step_export import _selftest as t4
         from geometry_kernel import _selftest as t5
+        from geometry_draw_sync import _selftest as t6
 
         t1()
         t2()
         t3()
         t4()
         t5()
+        t6()
+        # film plan importer (no bpy required)
+        import subprocess
+        from pathlib import Path as _P
+
+        imp = _P(__file__).resolve().parents[0] / "blender-universal" / "import_geometry_kernel.py"
+        if not imp.is_file():
+            imp = _P(__file__).resolve().parents[1] / "scripts" / "blender-universal" / "import_geometry_kernel.py"
+        r = subprocess.run(
+            [sys.executable, str(imp), "--selftest"],
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+        assert r.returncode == 0, r.stderr or r.stdout
         print("geometry-kernel-build --selftest OK")
         return 0
 

@@ -35,6 +35,21 @@ def _pos_xyz(pos: Any) -> list[float]:
     return [0.0, 0.0, 0.0]
 
 
+def _rpy_from_manifest(man: dict) -> list[float]:
+    """Read roll/pitch/yaw deg when present; default identity (no silent invention)."""
+    for key in ("rotation_rpy_deg", "rpy_deg", "euler_deg", "rotation_deg"):
+        r = man.get(key)
+        if isinstance(r, (list, tuple)) and len(r) >= 3:
+            return [float(r[0] or 0), float(r[1] or 0), float(r[2] or 0)]
+        if isinstance(r, dict):
+            return [
+                float(r.get("roll") or r.get("r") or 0),
+                float(r.get("pitch") or r.get("p") or 0),
+                float(r.get("yaw") or r.get("y") or 0),
+            ]
+    return [0.0, 0.0, 0.0]
+
+
 def _site_min(pm: dict) -> list[float]:
     s = pm.get("site") or pm.get("bbox_mm") or {}
     if not isinstance(s, dict):
@@ -180,6 +195,7 @@ def build_assembly_from_twin(
             origin[1] - site_min[1],
             origin[2] - site_min[2],
         ]
+        rpy = _rpy_from_manifest(man)
 
         if _is_consumable(name, prin.get("status") or ""):
             ir["consumables"].append(
@@ -221,7 +237,7 @@ def build_assembly_from_twin(
                     "params_mm": params,
                     "pose": {
                         "origin_mm": origin_shifted,
-                        "rotation_rpy_deg": [0, 0, 0],
+                        "rotation_rpy_deg": rpy,
                     },
                     "material": _material(role),
                     "bom_ref": f"tag={tag}",
@@ -278,7 +294,7 @@ def build_assembly_from_twin(
                 "params_mm": params,
                 "pose": {
                     "origin_mm": origin_shifted,
-                    "rotation_rpy_deg": [0, 0, 0],
+                    "rotation_rpy_deg": rpy,
                 },
                 "material": _material(role),
                 "bom_ref": f"tag={tag}",
@@ -337,7 +353,7 @@ def build_assembly_from_twin(
         json.dumps(blender_import, indent=2) + "\n", encoding="utf-8"
     )
 
-    # STEP
+    # STEP (named CadQuery Assembly tree when available)
     step_report = {"ok": False, "skipped": True}
     step_path = gdir / "assembly.step"
     if export_step_file and export_step is not None:
@@ -346,7 +362,7 @@ def build_assembly_from_twin(
     elif export_step_file:
         step_report = {"ok": False, "error": "export_step unavailable", "skipped": False}
 
-    # Print subset (simple STL via cadquery if available)
+    # Print subset (STL + optional 3MF)
     print_report = _export_print_subset(ir, gdir)
 
     # Completeness
@@ -359,17 +375,44 @@ def build_assembly_from_twin(
     )
     save_completeness(gdir / "completeness.json", comp_report)
 
+    # G-DRAW-SYNC: drawings from IR (placement slave to kernel)
+    draw_report: dict[str, Any] = {"ok": False}
+    try:
+        from geometry_draw_sync import sync_drawings_from_ir
+
+        draw_report = sync_drawings_from_ir(twin)
+    except Exception as exc:  # pragma: no cover
+        draw_report = {"ok": False, "error": str(exc)}
+
+    # Blender film plan (slave) — always write plan; mesh build needs bpy
+    film_report: dict[str, Any] = {"ok": False}
+    try:
+        import sys as _sys
+
+        bu = str(Path(__file__).resolve().parents[1] / "blender-universal")
+        if bu not in _sys.path:
+            _sys.path.insert(0, bu)
+        from import_geometry_kernel import write_film_plan
+
+        film_path = write_film_plan(twin)
+        film_report = {"ok": True, "film_plan": str(film_path)}
+    except Exception as exc:  # pragma: no cover
+        film_report = {"ok": False, "error": str(exc)}
+
     # README for Tristan
     (gdir / "README.txt").write_text(
         "Anvil geometry (CAD master)\n"
         "─────────────────────────\n"
         "1. Open assembly.step in FreeCAD (free) — engineering model.\n"
+        "   Named product tree: solids/<tag>_… and paths/path_…\n"
         "2. assembly.json lists solids, paths, and OPEN holds.\n"
         "3. completeness.json scores BoM↔geometry coverage.\n"
-        "4. blender_import.json maps this assembly into Blender film (slave).\n"
-        "5. STEP is not supplier fab-ready and not a substitute for HIL/Gerbers.\n"
+        "4. blender_import.json + film_plan.json map this assembly into Blender film (slave).\n"
+        "   Blender must not invent principal placement when ANVIL_GEOMETRY_MASTER=kernel.\n"
+        "5. drawings/ga-geometry-from-ir.svg is G-DRAW-SYNC from this IR.\n"
+        "6. STEP is not supplier fab-ready and not a substitute for HIL/Gerbers.\n"
         f"\nCompleteness: {comp_report.get('score')}/10 · "
-        f"STEP ok={step_report.get('ok')} · "
+        f"STEP ok={step_report.get('ok')} named_tree={step_report.get('named_tree')} · "
         f"solids={comp_report.get('n_solid')} paths={comp_report.get('n_path')} "
         f"holds={comp_report.get('n_open_holds')}\n",
         encoding="utf-8",
@@ -382,6 +425,8 @@ def build_assembly_from_twin(
         "completeness": comp_report,
         "step": step_report,
         "print": print_report,
+        "draw_sync": draw_report,
+        "film": film_report,
         "n_components": len(components),
         "n_paths": len(ir.get("paths") or []),
         "n_holds": len(ir.get("holds") or []),
@@ -389,13 +434,14 @@ def build_assembly_from_twin(
 
 
 def _export_print_subset(ir: dict, gdir: Path) -> dict[str, Any]:
-    """Export simple STL for print_role parts (optional)."""
+    """Export STL (+ 3MF when CadQuery supports it) for print_role parts only."""
     try:
         import cadquery as cq
     except ImportError:
         return {"ok": False, "reason": "cadquery missing"}
     print_dir = gdir / "print"
     written = []
+    threemf = []
     for comp in ir.get("components") or []:
         if not comp.get("print_role"):
             continue
@@ -418,12 +464,33 @@ def _export_print_subset(ir: dict, gdir: Path) -> dict[str, Any]:
             else:
                 continue
             print_dir.mkdir(parents=True, exist_ok=True)
-            out = print_dir / f"{comp.get('export_name') or comp.get('tag')}.stl"
+            base = comp.get("export_name") or comp.get("tag")
+            out = print_dir / f"{base}.stl"
             cq.exporters.export(solid, str(out))
             written.append(out.name)
+            # Best-effort 3MF (not all CadQuery builds expose it)
+            try:
+                out3 = print_dir / f"{base}.3mf"
+                cq.exporters.export(solid, str(out3))
+                if out3.is_file() and out3.stat().st_size > 50:
+                    threemf.append(out3.name)
+            except Exception:
+                pass
         except Exception:
             continue
-    return {"ok": bool(written), "files": written}
+    note = (
+        "Print subset only — not whole-product printable. "
+        "Manifold check is best-effort; verify in slicer before fab."
+    )
+    if written:
+        print_dir.mkdir(parents=True, exist_ok=True)
+        (print_dir / "README.txt").write_text(note + "\n", encoding="utf-8")
+    return {
+        "ok": bool(written),
+        "files": written,
+        "threemf": threemf,
+        "note": note if written else "no print_role parts",
+    }
 
 
 def _selftest() -> None:

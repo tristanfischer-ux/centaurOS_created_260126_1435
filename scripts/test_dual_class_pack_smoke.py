@@ -210,6 +210,7 @@ def test_geometry_kernel_dual_class_emit() -> None:
         assert (twin / "geometry" / "assembly.json").is_file()
         assert (twin / "geometry" / "completeness.json").is_file()
         assert (twin / "geometry" / "blender_import.json").is_file()
+        assert (twin / "geometry" / "film_plan.json").is_file()
         ir = json.loads((twin / "geometry" / "assembly.json").read_text(encoding="utf-8"))
         assert ir.get("schema") == "anvil.geometry_assembly/1"
         assert isinstance(ir.get("components"), list)
@@ -221,13 +222,28 @@ def test_geometry_kernel_dual_class_emit() -> None:
         try:
             import cadquery  # noqa: F401
             assert step.is_file() and step.stat().st_size > 200, f"STEP missing on {twin.name}"
+            # Named CadQuery Assembly tree preferred (PRODUCT names under solids/)
+            step_txt = step.read_text(encoding="utf-8", errors="replace")[:1_200_000]
+            named = ("PRODUCT('solids'" in step_txt or 'PRODUCT("solids"' in step_txt
+                     or "Assembly_" in step_txt)
+            assert named or "MANIFOLD_SOLID_BREP" in step_txt, (
+                f"STEP has neither named assembly tree nor solid BREP on {twin.name}"
+            )
+            if named:
+                assert "PRODUCT(" in step_txt
         except ImportError:
             if step.is_file():
                 assert step.stat().st_size > 200
+        # G-DRAW-SYNC sheet from IR
+        assert (twin / "drawings" / "ga-geometry-from-ir.svg").is_file()
+        film = json.loads((twin / "geometry" / "film_plan.json").read_text(encoding="utf-8"))
+        assert film.get("master") == "geometry_kernel"
+        assert film.get("forbid_freehand_principals") is True
         ran += 1
         print(
             f"geometry dual-class OK: {twin.name} solids={len(ir.get('components') or [])} "
-            f"completeness={comp.get('score')} step_bytes={step.stat().st_size if step.is_file() else 0}"
+            f"completeness={comp.get('score')} step_bytes={step.stat().st_size if step.is_file() else 0} "
+            f"film={film.get('n_objects')} draw_sync=yes"
         )
     if ran == 0:
         print("skip: no bio/FE twin on disk for geometry dual-class")
