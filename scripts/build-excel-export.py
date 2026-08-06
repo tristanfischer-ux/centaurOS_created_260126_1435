@@ -40827,7 +40827,7 @@ def _write_deliverable_bundle(run_dir: str, slug: str) -> Optional[dict]:
                     )
                     if _jr.returncode != 0:
                         skipped.append(
-                            f"em-honesty/ (renderer exit {_jr.returncode}: "
+                            f"electromagnetics/ (renderer exit {_jr.returncode}: "
                             f"{(_jr.stderr or _jr.stdout or '')[:200]})"
                         )
                     else:
@@ -40850,7 +40850,7 @@ def _write_deliverable_bundle(run_dir: str, slug: str) -> Optional[dict]:
                     )
                     if _br.returncode != 0:
                         skipped.append(
-                            f"em-honesty/phase-b (exit {_br.returncode}: "
+                            f"electromagnetics/phase-b (exit {_br.returncode}: "
                             f"{(_br.stderr or _br.stdout or '')[:160]})"
                         )
                 # Phase C: coolant / ripple / envelopes + PDF rebuild (pages 11–13)
@@ -40864,7 +40864,7 @@ def _write_deliverable_bundle(run_dir: str, slug: str) -> Optional[dict]:
                     )
                     if _cr.returncode != 0:
                         skipped.append(
-                            f"em-honesty/phase-c (exit {_cr.returncode}: "
+                            f"electromagnetics/phase-c (exit {_cr.returncode}: "
                             f"{(_cr.stderr or _cr.stdout or '')[:200]})"
                         )
                         # Quarantine stale Phase C artefacts so they are not shipped
@@ -40891,7 +40891,7 @@ def _write_deliverable_bundle(run_dir: str, slug: str) -> Optional[dict]:
                     )
                     if _dr.returncode != 0:
                         skipped.append(
-                            f"em-honesty/phase-d (exit {_dr.returncode}: "
+                            f"electromagnetics/phase-d (exit {_dr.returncode}: "
                             f"{(_dr.stderr or _dr.stdout or '')[:200]})"
                         )
                     else:
@@ -40906,13 +40906,13 @@ def _write_deliverable_bundle(run_dir: str, slug: str) -> Optional[dict]:
                     )
                     if _er.returncode != 0:
                         skipped.append(
-                            f"em-honesty/phase-e (exit {_er.returncode}: "
+                            f"electromagnetics/phase-e (exit {_er.returncode}: "
                             f"{(_er.stderr or _er.stdout or '')[:200]})"
                         )
                     else:
                         print("[bundle] rendered phase-E partner pack (22–24)", flush=True)
             except Exception as _jack_exc:  # noqa: BLE001
-                skipped.append(f"em-honesty/ (renderer failed: {_jack_exc})")
+                skipped.append(f"electromagnetics/ (renderer failed: {_jack_exc})")
     if os.path.isdir(_jack_dir):
         _em_any = False
         for _jn in sorted(os.listdir(_jack_dir)):
@@ -40920,8 +40920,8 @@ def _write_deliverable_bundle(run_dir: str, slug: str) -> Optional[dict]:
                 continue
             _jp = os.path.join(_jack_dir, _jn)
             if os.path.isfile(_jp):
-                # Ship under em-honesty/ (customer-facing name) not _motor_stack/
-                if _cp(_jp, f"em-honesty/{_jn}"):
+                # Ship under electromagnetics/ (customer-facing evidence folder; was em-honesty/) not _motor_stack/
+                if _cp(_jp, f"electromagnetics/{_jn}"):
                     _em_any = True
             elif os.path.isdir(_jp) and _jn == "fieldplot":
                 # Full FEMM field-plot pack (Tony |B| maps + 3D landscapes + HTML)
@@ -40931,7 +40931,7 @@ def _write_deliverable_bundle(run_dir: str, slug: str) -> Optional[dict]:
                             continue
                         _src = os.path.join(_root, _fn)
                         _rel = os.path.relpath(_src, _jack_dir).replace("\\", "/")
-                        if _cp(_src, f"em-honesty/{_rel}"):
+                        if _cp(_src, f"electromagnetics/{_rel}"):
                             _em_any = True
         # Also pull fieldplot_pack/ if present beside jack_em_pack (source of truth)
         _fp_src = os.path.join(run_dir, "_motor_stack", "fieldplot_pack")
@@ -40941,7 +40941,7 @@ def _write_deliverable_bundle(run_dir: str, slug: str) -> Optional[dict]:
                     continue
                 _src = os.path.join(_fp_src, _fn)
                 if os.path.isfile(_src):
-                    if _cp(_src, f"em-honesty/fieldplot/{_fn}"):
+                    if _cp(_src, f"electromagnetics/fieldplot/{_fn}"):
                         _em_any = True
         # companion JSON screens used by phase-C/D figures
         for _sj in (
@@ -40963,7 +40963,7 @@ def _write_deliverable_bundle(run_dir: str, slug: str) -> Optional[dict]:
         ):
             _sjp = os.path.join(run_dir, "_motor_stack", _sj)
             if os.path.isfile(_sjp):
-                _cp(_sjp, f"em-honesty/{_sj}")
+                _cp(_sjp, f"electromagnetics/{_sj}")
         _asks = os.path.join(run_dir, "JLR-FE-FRONT-FPK-PARTNER-ASKS-DRAFT-2026-08-04.md")
         if os.path.isfile(_asks):
             _cp(_asks, "JLR-FE-FRONT-FPK-PARTNER-ASKS-DRAFT-2026-08-04.md")
@@ -41011,19 +41011,19 @@ def _write_deliverable_bundle(run_dir: str, slug: str) -> Optional[dict]:
                 "  scripts/motor-stack/render_phase_d_kit_screens.py\n"
                 "  scripts/motor-stack/em_fia_fieldplot_pack.py\n"
             )
-            _em_readme_path = os.path.join(bundle_dir, "em-honesty", "README.txt")
+            _em_readme_path = os.path.join(bundle_dir, "electromagnetics", "README.txt")
             os.makedirs(os.path.dirname(_em_readme_path), exist_ok=True)
             try:
                 with open(_em_readme_path, "w", encoding="utf-8") as _erf:
                     _erf.write(_em_readme)
-                included.append("em-honesty/README.txt")
+                included.append("electromagnetics/README.txt")
             except Exception as _ere:  # noqa: BLE001
-                skipped.append(f"em-honesty/README.txt ({_ere})")
+                skipped.append(f"electromagnetics/README.txt ({_ere})")
         else:
-            skipped.append("em-honesty/ (jack_em_pack dir empty)")
+            skipped.append("electromagnetics/ (jack_em_pack dir empty)")
     else:
         skipped.append(
-            "em-honesty/ (absent — no _motor_stack/jack_em_pack; "
+            "electromagnetics/ (absent — no _motor_stack/jack_em_pack; "
             "run render_path_b_jack_em_pack.py after Path B)"
         )
 
@@ -41095,7 +41095,7 @@ def _write_deliverable_bundle(run_dir: str, slug: str) -> Optional[dict]:
         if not _desc:
             if _rel.startswith("renders/"):
                 _desc = _RENDER_CAPTIONS.get(_base, "Product render (Blender)")
-            elif _rel.startswith("em-honesty/"):
+            elif _rel.startswith("electromagnetics/"):
                 _desc = _EM_HONESTY_CAPTIONS.get(
                     _base, "EM honesty figure (Path B kit-case maths)"
                 )
