@@ -41237,6 +41237,33 @@ def _write_deliverable_bundle(run_dir: str, slug: str) -> Optional[dict]:
     except Exception as _me:  # noqa: BLE001
         skipped.append(f"MANIFEST.txt ({_me})")
 
+    # ── 5z. ANVIL SEND-PACK CHROME (P0) + instrument-physics (P1) ─────────────
+    try:
+        from build_send_pack import apply_send_pack_chrome  # noqa: WPS433
+        from pathlib import Path as _PathChrome
+        _chrome = apply_send_pack_chrome(
+            _PathChrome(run_dir),
+            _PathChrome(bundle_dir),
+            product_title=deliverable_stem(_bundle_state, run_dir).replace("-", " ").title(),
+            pack_revision=f"V{deliverable_version(run_dir)}",
+            brand="Anvil",
+        )
+        for _a in _chrome.get("actions") or []:
+            included.append(str(_a))
+        print(f"  · send-pack chrome: {_chrome.get('actions')}", flush=True)
+    except Exception as _ch_exc:  # noqa: BLE001
+        skipped.append(f"send-pack chrome ({_ch_exc})")
+        print(f"  · send-pack chrome skipped: {_ch_exc}", flush=True)
+    try:
+        from instrument_physics_pack import build_instrument_physics_pack  # noqa: WPS433
+        from pathlib import Path as _PathPhys
+        _phys = build_instrument_physics_pack(_PathPhys(run_dir), _PathPhys(bundle_dir))
+        if _phys.get("written"):
+            included.extend(f"instrument-physics/{w}" for w in _phys["written"])
+            print(f"  · instrument-physics: {len(_phys['written'])} one-pager(s)", flush=True)
+    except Exception as _ph_exc:  # noqa: BLE001
+        skipped.append(f"instrument-physics ({_ph_exc})")
+
     # ── 6. ZIP THE WHOLE FOLDER ────────────────────────────────────────────────
     zip_ok = False
     try:

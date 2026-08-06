@@ -48,6 +48,8 @@ run "instrument_plant_gate selftest"          "$PY" scripts/lib/instrument_plant
 run "topology_prune selftest"                 "$PY" scripts/lib/topology_prune.py
 run "catalogue_function_class selftest"       "$PY" scripts/lib/catalogue_function_class.py
 run "instrument_connection_kinds selftest"    "$PY" scripts/lib/instrument_connection_kinds.py
+run "build_send_pack selftest"                "$PY" scripts/lib/build_send_pack.py
+run "instrument_physics_pack selftest"        "$PY" scripts/lib/instrument_physics_pack.py
 run "test_pack_customer_evidence_dir"         "$PY" scripts/test_pack_customer_evidence_dir.py
 run "test_pack_layout_schema"                 "$PY" scripts/test_pack_layout_schema.py
 run "test_dual_class_pack_smoke"              "$PY" scripts/test_dual_class_pack_smoke.py

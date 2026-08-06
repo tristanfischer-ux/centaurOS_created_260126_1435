@@ -22,13 +22,27 @@ OPTIONAL_DOMAIN_DIRS: Final[tuple[str, ...]] = (
     "drawings",
     "pcb",
     ELECTROMAGNETICS_DIR,
+    "instrument-physics",
     "multiphysics",
+    "3d-model",
+    "firmware",
     "run-logs",
 )
 
-# Always expected on a send pack (when excel export completed).
+# Always expected on a send pack (when excel export completed / chrome applied).
 REQUIRED_SEND_FILES: Final[tuple[str, ...]] = (
     "MANIFEST.txt",
+    "README-FIRST.txt",
+    "FOLDER-GUIDE.txt",
+)
+
+# Optional always-nice chrome (copied when twin has them).
+OPTIONAL_CHROME_FILES: Final[tuple[str, ...]] = (
+    "tab-scorecard.json",
+    "quality-scorecard.json",
+    "00-COVER-NARRATIVE.pdf",
+    "00-COVER-NARRATIVE.html",
+    "00-COVER-CLICK-INDEX.html",
 )
 
 # Preferred workbook names (any one is enough).
@@ -122,4 +136,18 @@ def validate_pack_root(pack_dir) -> list[str]:
         problems.append("missing MANIFEST.txt")
     if not has_workbook:
         problems.append("missing workbook (dossier.xlsx or dated .xlsx)")
+    # Soft chrome: recommend but do not fail legacy packs without README-FIRST
+    # until build_send_pack has been applied (tests may require explicitly).
+    return problems
+
+
+def validate_send_pack_chrome(pack_dir) -> list[str]:
+    """Stricter chrome check for packs that claim Anvil P0 navigation parity."""
+    from pathlib import Path
+
+    pack = Path(pack_dir)
+    problems = validate_pack_root(pack)
+    for name in REQUIRED_SEND_FILES:
+        if not (pack / name).is_file():
+            problems.append(f"missing chrome file: {name}")
     return problems

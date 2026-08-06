@@ -103,9 +103,27 @@ def test_capability_matrix_pure() -> None:
         assert d3["run_motor_phases"] is True
 
 
+def test_send_pack_chrome_if_present() -> None:
+    """P0 chrome on latest packs when build_send_pack has been applied."""
+    from pack_layout import validate_send_pack_chrome
+    for glob_pat in ("**/*formula-e*design-pack", "**/*benchtop*design-pack"):
+        pack = _latest_pack(glob_pat)
+        if not pack:
+            continue
+        if not (pack / "README-FIRST.txt").is_file():
+            print(f"skip chrome strict: {pack.name} (pre-P0 pack)")
+            continue
+        problems = validate_send_pack_chrome(pack)
+        assert not problems, f"chrome: {pack.name}: {problems}"
+        assert "em-honesty" not in (pack / "README-FIRST.txt").read_text()
+        print(f"chrome OK: {pack.name}")
+
+
 if __name__ == "__main__":
     test_forbidden_segment_helper()
     test_capability_matrix_pure()
     test_motor_pack_if_present()
     test_instrument_pack_if_present()
+    test_send_pack_chrome_if_present()
     print("test_dual_class_pack_smoke OK")
+
