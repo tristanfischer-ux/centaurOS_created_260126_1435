@@ -62,13 +62,19 @@ def connection_ghost_majority(
 ) -> bool:
     """True when ledger connections dominate rendered connection-trace rows.
 
-    Matches the scoring rule in build-excel-export.py: ghost majority only when
-    ledger count ≥ min_ledger AND ledger > ratio × rendered rows. Instruments
-    with pruned gold-spine ledgers (count < min_ledger) do not trip this.
+    Canonical implementation: topology_prune.connection_ghost_majority.
+    Kept here so pack_layout tests need no extra import.
     """
-    n_rows = max(int(n_rendered_rows), 1)
-    n_led = int(n_ledger_connections)
-    return n_led >= min_ledger and n_led > n_rows * ratio
+    try:
+        from topology_prune import connection_ghost_majority as _impl
+        return _impl(
+            n_ledger_connections, n_rendered_rows,
+            min_ledger=min_ledger, ratio=ratio,
+        )
+    except ImportError:
+        n_rows = max(int(n_rendered_rows), 1)
+        n_led = int(n_ledger_connections)
+        return n_led >= min_ledger and n_led > n_rows * ratio
 
 
 # Plant-economic driver keys that must not score as live Inputs on an

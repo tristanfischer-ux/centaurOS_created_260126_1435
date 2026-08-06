@@ -42,6 +42,16 @@ echo "━━━ Engine regression guards (deterministic; blocks a regression) �
 #    where source-rule fixes land; this is the deterministic enforcement of the CORE FIX PRINCIPLE)
 run "requirements_bom.py --selftest"          "$PY" scripts/requirements_bom.py --selftest
 run "build-excel-export.py --selftest"        "$PY" scripts/build-excel-export.py --selftest
+# Anvil universality (2026-08-06) — pack layout, dual-class smoke, plant gate, topology
+run "em_capability selftest"                  "$PY" scripts/lib/em_capability.py
+run "instrument_plant_gate selftest"          "$PY" scripts/lib/instrument_plant_gate.py
+run "topology_prune selftest"                 "$PY" scripts/lib/topology_prune.py
+run "test_pack_customer_evidence_dir"         "$PY" scripts/test_pack_customer_evidence_dir.py
+run "test_pack_layout_schema"                 "$PY" scripts/test_pack_layout_schema.py
+run "test_dual_class_pack_smoke"              "$PY" scripts/test_dual_class_pack_smoke.py
+run "test_connection_trace_ghost_ratio"       "$PY" scripts/test_connection_trace_ghost_ratio.py
+run "test_instrument_no_plant_lcoe_frame"     "$PY" scripts/test_instrument_no_plant_lcoe_frame.py
+run "test_cover_relative_links"               "$PY" scripts/test_cover_relative_links.py
 run "excel_closure_blocks.py --selftest"      "$PY" scripts/lib/excel_closure_blocks.py --selftest
 run "homologation_honesty.py --selftest"      "$PY" scripts/lib/homologation_honesty.py --selftest
 run "physics_plausibility.py --selftest"      "$PY" scripts/lib/physics_plausibility.py --selftest

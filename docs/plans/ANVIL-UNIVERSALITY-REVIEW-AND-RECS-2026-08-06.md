@@ -199,8 +199,8 @@ Closing Inputs + Connection + Verification + Checks raises the floor; mirrors fo
 
 ### Safe change order (remaining backlog — do not skip tests)
 
-1. Capability-driven electromagnetics interface (motor phases out of universal exporter).  
-2. Dual-class CI smoke (FE + instrument) on every pack-layout change.  
-3. Instrument plant-driver gate before densify (U5 hard gate, not only score recovery).  
-4. Topology prune library shared (not twin-local edits).  
-5. Keep `ANVIL_TAB_FLOOR=9` as send-pack gate once PCB fab-ready axis is class-aware.
+1. [x] Capability-driven electromagnetics interface — `scripts/lib/em_capability.py`; exporter gates jack phases.  
+2. [x] Dual-class CI smoke — `scripts/test_dual_class_pack_smoke.py` (FE + bioreactor packs on disk).  
+3. [x] Instrument plant-driver gate before densify — `scripts/lib/instrument_plant_gate.py` wired in `build()`.  
+4. [x] Topology prune library shared — `scripts/lib/topology_prune.py`; parts_ledger delegates.  
+5. Keep `ANVIL_TAB_FLOOR=9` as send-pack gate once PCB fab-ready axis is class-aware (open).

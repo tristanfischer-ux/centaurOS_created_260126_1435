@@ -28437,9 +28437,15 @@ def _sc_connection(wb, ws, state, run_dir):
         # INTENT (2026-07-14): gold-spine Connection trace showed ~7 rows while the
         # ledger still carried 52 ghost plant-style connections — scoring 10 on the
         # filtered table alone is Goodhart. Cap when the ledger dwarfs the sheet.
+        # Rule lives in topology_prune.connection_ghost_majority (Anvil U6 shared).
         _n_led_cx = len(_pl2.get("connections") or [])
         _n_rows = max(len(st_rows), len(rows), 1)
-        if _n_led_cx >= 20 and _n_led_cx > _n_rows * 3:
+        try:
+            from topology_prune import connection_ghost_majority as _ghost_maj  # noqa: WPS433
+            _ghost_trip = _ghost_maj(_n_led_cx, _n_rows)
+        except Exception:  # noqa: BLE001
+            _ghost_trip = _n_led_cx >= 20 and _n_led_cx > _n_rows * 3
+        if _ghost_trip:
             comps.append((
                 "rendered connection rows cover the ledger (no ghost majority)",
                 _n_rows, min(_n_led_cx, _n_rows * 3),
@@ -31285,11 +31291,28 @@ def build(run_dir: str, out_path: str) -> dict:
                     pass
     except Exception as _san_exc:  # noqa: BLE001 — never block export on sanitiser
         print(f"  · requirementsBom identity sanitiser skipped: {_san_exc}")
+    # INSTRUMENT PLANT-DRIVER GATE (Anvil U5, 2026-08-06): quarantine sale_price /
+    # feedstock / LCOE / plant capacity keys before Inputs densify so instruments
+    # cannot score orphan plant economics. Mutates in-memory state only for this
+    # export unless quarantine wrote vault (state still written if we already
+    # rewrote above; here we keep vault on the in-memory object for scoring).
+    try:
+        from instrument_plant_gate import quarantine_plant_drivers  # noqa: WPS433
+        _pg = quarantine_plant_drivers(state, mutate=True)
+        if _pg.get("quarantined"):
+            print(
+                f"  · instrument plant-driver gate: quarantined "
+                f"{len(_pg['quarantined'])} plant key(s): "
+                f"{', '.join(_pg['quarantined'][:8])}"
+                + ("…" if len(_pg['quarantined']) > 8 else ""),
+                flush=True,
+            )
+    except Exception as _pg_exc:  # noqa: BLE001 — never block export on gate import
+        print(f"  · instrument plant-driver gate skipped: {_pg_exc}")
     # INTENT (P6 / cold-v17): restore state.pcb from sidecar when a nested chain
     # race wiped it — before Verification / PCB tab / Gate-38 mirrors read state.
     if _ensure_pcb_from_sidecar(state, run_dir):
-        print("  · restored state.pcb from pcb-stage-result.json (race/wipe guard)")
-    # INTENT (2026-07-30): restore motorMultiphysics + cadAuthority from twin
+        print("  · restored state.pcb from pcb-stage-result.json (race/wipe guard)")    # INTENT (2026-07-30): restore motorMultiphysics + cadAuthority from twin
     # sidecar (OPEN solver/CAD stubs). See JLR-FE-FRONT-FPK-MOTOR-MULTIPHYSICS.md.
     if _ensure_motor_multiphysics_from_sidecar(state, run_dir):
         print("  · restored motorMultiphysics/cadAuthority from motor-multiphysics.json")
@@ -40643,11 +40666,26 @@ def _write_deliverable_bundle(run_dir: str, slug: str) -> Optional[dict]:
                 continue
             _cp(_rp, f"renders/{_rn}")
 
-    # ── 5c. EM HONESTY PACK (Path B kit-case maths for Jack) ───────────────────
-    # INTENT (2026-08-04 Tristan): dual-bar / torque-sweep / air-gap / geometry /
-    # hero-callout figures must land in the design-pack zip automatically, not
-    # only under _motor_stack/jack_em_pack/. Source of truth is Path B JSON;
-    # renderer is scripts/motor-stack/render_path_b_jack_em_pack.py.
+    # ── 5c. ELECTROMAGNETICS PACK (capability-driven; was “EM honesty” nickname) ─
+    # INTENT (2026-08-04 Tristan / Anvil U2 2026-08-06): dual-bar / torque-sweep /
+    # air-gap figures land in electromagnetics/ only when the twin has motor EM
+    # capability (Path B / jack_em_pack). Instruments never invent field plots.
+    # Renderer: scripts/motor-stack/render_path_b_jack_em_pack.py.
+    try:
+        from em_capability import (  # noqa: WPS433
+            electromagnetics_pack_applicable,
+            twin_has_jack_em_pack as _em_has_jack,
+        )
+        _em_capability = electromagnetics_pack_applicable(run_dir, _bundle_state)
+    except Exception as _em_cap_exc:  # noqa: BLE001
+        _em_capability = {
+            "applicable": True,
+            "run_motor_phases": True,
+            "reason": f"em_capability import failed — legacy path ({_em_cap_exc})",
+        }
+        def _em_has_jack(_rd: str) -> bool:  # type: ignore
+            return os.path.isdir(os.path.join(_rd, "_motor_stack", "jack_em_pack"))
+
     _EM_HONESTY_CAPTIONS = {
         "00-verdict-one-pager.png": (
             "EM honesty — Jack verdict one-pager (dual-bar arithmetic; ship_ok false)"
@@ -40763,8 +40801,19 @@ def _write_deliverable_bundle(run_dir: str, slug: str) -> Optional[dict]:
         "motor-stack",
         "render_phase_e_partner_pack.py",
     )
+    # Capability gate: do not run motor-only phases for instruments / non-EM twins.
+    if not _em_capability.get("run_motor_phases") and not (
+        _em_capability.get("applicable") or _em_has_jack(run_dir)
+    ):
+        skipped.append(
+            f"electromagnetics/ ({_em_capability.get('reason', 'not applicable')})"
+        )
     # Auto-build if Path B exists and pack is missing or older than inputs
-    if os.path.isfile(_path_b_art) and os.path.isfile(_render_jack):
+    elif (
+        _em_capability.get("run_motor_phases")
+        and os.path.isfile(_path_b_art)
+        and os.path.isfile(_render_jack)
+    ):
         _need_render = not os.path.isdir(_jack_dir)
         _need_phase_c = bool(_need_render)
         _need_phase_d = bool(_need_render)

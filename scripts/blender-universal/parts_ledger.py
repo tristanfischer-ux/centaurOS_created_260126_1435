@@ -39,6 +39,18 @@ from __future__ import annotations
 import json
 import os
 import re
+
+# Shared Anvil topology prune (U6) — single rule for ledger + excel scoring.
+try:
+    from topology_prune import prune_instrument_ghost_connections as _shared_prune_ghost
+except ImportError:
+    try:
+        import sys as _sys
+        from pathlib import Path as _P
+        _sys.path.insert(0, str(_P(__file__).resolve().parents[1] / "lib"))
+        from topology_prune import prune_instrument_ghost_connections as _shared_prune_ghost
+    except ImportError:
+        _shared_prune_ghost = None
 import sys
 from pathlib import Path
 
@@ -832,6 +844,9 @@ def _prune_instrument_ghost_connections(
 
     @returns (pruned_connections, n_dropped)
     """
+    if _shared_prune_ghost is not None:
+        return _shared_prune_ghost(equipment, connections)
+
     if not connections or not equipment:
         return connections, 0
     by_norm = {_norm(e.get("name") or ""): e for e in equipment if e.get("name")}
