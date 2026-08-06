@@ -2507,6 +2507,29 @@ def main() -> int:
             print(f"[parts-ledger] instrument ghost prune: dropped {n_ghost_drop} "
                   f"absorbed-host / unresolved ties → {len(connections)} principal "
                   f"connection(s) (Connection trace honesty)")
+        # Universal non-physical edge filter (Anvil): no power into TIM/vents/labels,
+        # no fluid into debug headers — manufacturer-adversarial, class-agnostic.
+        try:
+            from instrument_connection_kinds import (  # noqa: WPS433
+                prune_nonphysical_instrument_edges as _prune_nonphys,
+            )
+        except ImportError:
+            try:
+                import sys as _sys2
+                from pathlib import Path as _P2
+                _sys2.path.insert(0, str(_P2(__file__).resolve().parents[1] / "lib"))
+                from instrument_connection_kinds import (  # noqa: WPS433
+                    prune_nonphysical_instrument_edges as _prune_nonphys,
+                )
+            except ImportError:
+                _prune_nonphys = None
+        if _prune_nonphys is not None:
+            connections, n_nonphys = _prune_nonphys(
+                equipment, connections, is_instrument=True)
+            if n_nonphys:
+                print(f"[parts-ledger] instrument non-physical edge prune: dropped "
+                      f"{n_nonphys} power-into-passive / fluid-into-electronics "
+                      f"ties → {len(connections)} net(s)")
 
     # ── reconciliations / summaries ──
     by_drawing = {}

@@ -31309,6 +31309,21 @@ def build(run_dir: str, out_path: str) -> dict:
             )
     except Exception as _pg_exc:  # noqa: BLE001 — never block export on gate import
         print(f"  · instrument plant-driver gate skipped: {_pg_exc}")
+    # CATALOGUE FUNCTION-CLASS AUDIT (Anvil, manufacturer adversarial): log (do not
+    # hard-block export) when a role name contradicts the pinned MPN class — e.g.
+    # fan-as-stirrer, ADC-as-flow. Universal noun rules; any product class.
+    try:
+        from catalogue_function_class import audit_parts_iterable  # noqa: WPS433
+        _id_findings = audit_parts_iterable(state.get("requirementsBom") or [])
+        _id_findings += audit_parts_iterable(state.get("partVerifications") or [])
+        if _id_findings:
+            print(
+                f"  · catalogue function-class audit: {len(_id_findings)} identity "
+                f"conflict(s) — e.g. {_id_findings[0].get('issue', '')[:120]}",
+                flush=True,
+            )
+    except Exception as _cf_exc:  # noqa: BLE001
+        print(f"  · catalogue function-class audit skipped: {_cf_exc}")
     # INTENT (P6 / cold-v17): restore state.pcb from sidecar when a nested chain
     # race wiped it — before Verification / PCB tab / Gate-38 mirrors read state.
     if _ensure_pcb_from_sidecar(state, run_dir):

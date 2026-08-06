@@ -204,3 +204,19 @@ Closing Inputs + Connection + Verification + Checks raises the floor; mirrors fo
 3. [x] Instrument plant-driver gate before densify — `scripts/lib/instrument_plant_gate.py` wired in `build()`.  
 4. [x] Topology prune library shared — `scripts/lib/topology_prune.py`; parts_ledger delegates.  
 5. Keep `ANVIL_TAB_FLOOR=9` as send-pack gate once PCB fab-ready axis is class-aware (open).
+
+### 8.1 Universality of manufacturer-adversarial fixes (2026-08-06)
+
+Bioreactor adversarial work is **data + noun-keyed rules**, not a bioreactor fork:
+
+| Pattern | Shared module | Applies to |
+|---|---|---|
+| Plant LCOE off instruments | `instrument_plant_gate.py` | any `isInstrumentDevice` |
+| Ghost + non-physical edges | `topology_prune.py` + `instrument_connection_kinds.py` | any instrument ledger |
+| Fan≠stirrer, ADC≠flow, LED≠OD | `catalogue_function_class.py` | any BoM / PV line |
+| EM pack only with motor stack | `em_capability.py` | any twin; Path-B glob not FE-only |
+| Customer EM path | `pack_layout.ELECTROMAGNETICS_DIR` | all packs |
+| Dual-class pack smoke | `test_dual_class_pack_smoke.py` | motor + instrument globs |
+| Invariant suite | `test_anvil_universality_invariants.py` | plant keeps sale_price; instrument does not |
+
+**Not** universal (and must stay twin/data): specific MPNs, μ_max values, vessel volume, cover prose. Those are product content.

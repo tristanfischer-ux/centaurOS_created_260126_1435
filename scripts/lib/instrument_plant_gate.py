@@ -34,16 +34,30 @@ _BAG_PATHS: Final[tuple[tuple[str, ...], ...]] = (
     ("engineeringContract", "quantities"),
 )
 
-# Keys that may remain on instrument capital path (unit cost, not plant LCOE).
+# Keys that may remain on instrument capital / product path (not plant LCOE).
+# UNIVERSAL: cost + product performance quantities — never sale_price / feedstock / lcoe.
 _INSTRUMENT_CAPITAL_ALLOW: Final[frozenset[str]] = frozenset({
     "unit_cost_ceiling_gbp",
     "bom_cost_midpoint_gbp",
     "bom_cost_floor_gbp",
     "raw_materials_bom_gbp",
     "assembled_bom_total_gbp",
+    "grand_total_gbp",
     "working_volume_ml",
+    "working_volume_min_ml",
     "culture_temperature_c",
+    "culture_temperature_degc",
+    "vessel_working_volume_ml",
+    "vessel_working_volume_min_ml",
+    "culture_thermal_setpoint_achieved_c",
 })
+
+# Prefixes that are product performance (keep) vs plant-econ (already in forbidden set).
+_INSTRUMENT_KEEP_PREFIXES: Final[tuple[str, ...]] = (
+    "working_volume", "culture_temp", "vessel_", "optical_", "agitation_",
+    "peak_heater", "peak_electrical", "enclosure_", "temperature_stability",
+    "bom_cost", "assembled_bom", "unit_cost", "raw_materials",
+)
 
 
 def _get_bag(state: dict, path: tuple[str, ...]) -> Any:
@@ -114,6 +128,8 @@ def quarantine_plant_drivers(
         for k in list(bag.keys()):
             kl = str(k).lower()
             if kl in _INSTRUMENT_CAPITAL_ALLOW or str(k) in _INSTRUMENT_CAPITAL_ALLOW:
+                continue
+            if any(kl.startswith(pref) for pref in _INSTRUMENT_KEEP_PREFIXES):
                 continue
             if kl in INSTRUMENT_FORBIDDEN_PLANT_DRIVERS or any(
                 kl == f or kl.startswith(f + "_") for f in INSTRUMENT_FORBIDDEN_PLANT_DRIVERS

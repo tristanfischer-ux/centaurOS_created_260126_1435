@@ -33,17 +33,17 @@ def test_forbidden_segment_helper() -> None:
     assert not is_forbidden_pack_path(f"{ELECTROMAGNETICS_DIR}/x.png")
 
 
-def test_fe_pack_if_present() -> None:
-    pack = _latest_pack("**/20260805-2049-V1.299-formula-e-front-mgu-design-pack")
+def test_motor_pack_if_present() -> None:
+    """Any motor/MGU design pack — not only one FE revision stamp."""
+    pack = _latest_pack("**/*formula-e*design-pack")
     if pack is None:
-        pack = _latest_pack("**/*formula-e-front-mgu-design-pack")
+        pack = _latest_pack("**/*mgu*design-pack")
     if pack is None or not pack.is_dir():
-        print("skip: no FE design pack on disk")
+        print("skip: no motor design pack on disk")
         return
     problems = validate_pack_root(pack)
-    assert not problems, f"FE pack layout: {problems}"
+    assert not problems, f"motor pack layout: {problems}"
     assert not (pack / "em-honesty").exists()
-    # FE with Path B should ship electromagnetics when pack was built post-rename
     if (pack / ELECTROMAGNETICS_DIR).is_dir():
         assert any((pack / ELECTROMAGNETICS_DIR).iterdir())
     twin = pack.parent
@@ -51,35 +51,33 @@ def test_fe_pack_if_present() -> None:
         str(twin),
         {"product_class": "formula_e_front_mgu", "isInstrumentDevice": False},
     )
-    # Twin may still hold motor stack even if pack was slim
-    print(f"FE pack OK: {pack.name} em_decision={decision['applicable']}")
+    print(f"motor pack OK: {pack.name} em_decision={decision['applicable']}")
 
 
-def test_bioreactor_pack_if_present() -> None:
-    pack = _latest_pack("**/20260806-0402-V1.10-benchtop-bioreactor-design-pack")
+def test_instrument_pack_if_present() -> None:
+    """Any instrument design pack (bioreactor, colorimeter, …) — class-agnostic."""
+    pack = _latest_pack("**/*benchtop*design-pack")
     if pack is None:
-        pack = _latest_pack("**/*benchtop-bioreactor-design-pack")
+        pack = _latest_pack("**/*instrument*design-pack")
     if pack is None or not pack.is_dir():
-        print("skip: no bioreactor design pack on disk")
+        print("skip: no instrument design pack on disk")
         return
     problems = validate_pack_root(pack)
-    assert not problems, f"bioreactor pack layout: {problems}"
+    assert not problems, f"instrument pack layout: {problems}"
     assert not (pack / "em-honesty").exists()
-    # Instrument: electromagnetics/ should be absent (or N/A only)
     em = pack / ELECTROMAGNETICS_DIR
     if em.is_dir():
         names = {p.name for p in em.iterdir()}
-        # May only contain README-not-applicable — never field plots
         for bad in ("01-dual-torque-bars.png", "FE-FRONT-PATH-B-EM-HONESTY-PACK.pdf"):
-            assert bad not in names, f"instrument pack must not invent {bad}"
+            assert bad not in names, f"instrument pack must not invent motor field plots: {bad}"
     twin = pack.parent
     decision = electromagnetics_pack_applicable(
         str(twin),
-        {"isInstrumentDevice": True, "product_class": "benchtop_bioreactor"},
+        {"isInstrumentDevice": True, "product_class": "benchtop_instrument"},
     )
     assert decision["applicable"] is False
     assert decision["run_motor_phases"] is False
-    print(f"bioreactor pack OK: {pack.name}")
+    print(f"instrument pack OK: {pack.name}")
 
 
 def test_capability_matrix_pure() -> None:
@@ -108,6 +106,6 @@ def test_capability_matrix_pure() -> None:
 if __name__ == "__main__":
     test_forbidden_segment_helper()
     test_capability_matrix_pure()
-    test_fe_pack_if_present()
-    test_bioreactor_pack_if_present()
+    test_motor_pack_if_present()
+    test_instrument_pack_if_present()
     print("test_dual_class_pack_smoke OK")

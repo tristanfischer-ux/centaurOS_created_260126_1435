@@ -24,7 +24,26 @@ def twin_has_motor_stack(run_dir: str) -> bool:
 
 
 def twin_has_path_b_artefact(run_dir: str, filename: str = PATH_B_DEFAULT) -> bool:
-    return os.path.isfile(os.path.join(run_dir, MOTOR_STACK_DIR, filename))
+    """True when any Path-B / kit-case EM solve artefact exists under _motor_stack/.
+
+    UNIVERSAL: not only the FE-front DEC-009 filename — any ``*PATH_B*.json`` or
+    ``*path_b*.json`` kit-case solve counts so future motor classes need not rename.
+    """
+    stack = os.path.join(run_dir, MOTOR_STACK_DIR)
+    if os.path.isfile(os.path.join(stack, filename)):
+        return True
+    if not os.path.isdir(stack):
+        return False
+    try:
+        for name in os.listdir(stack):
+            low = name.lower()
+            if not low.endswith(".json"):
+                continue
+            if "path_b" in low or "path-b" in low or "kit_case" in low and "em_" in low:
+                return True
+    except OSError:
+        return False
+    return False
 
 
 def twin_has_jack_em_pack(run_dir: str) -> bool:

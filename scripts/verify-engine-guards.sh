@@ -46,9 +46,12 @@ run "build-excel-export.py --selftest"        "$PY" scripts/build-excel-export.p
 run "em_capability selftest"                  "$PY" scripts/lib/em_capability.py
 run "instrument_plant_gate selftest"          "$PY" scripts/lib/instrument_plant_gate.py
 run "topology_prune selftest"                 "$PY" scripts/lib/topology_prune.py
+run "catalogue_function_class selftest"       "$PY" scripts/lib/catalogue_function_class.py
+run "instrument_connection_kinds selftest"    "$PY" scripts/lib/instrument_connection_kinds.py
 run "test_pack_customer_evidence_dir"         "$PY" scripts/test_pack_customer_evidence_dir.py
 run "test_pack_layout_schema"                 "$PY" scripts/test_pack_layout_schema.py
 run "test_dual_class_pack_smoke"              "$PY" scripts/test_dual_class_pack_smoke.py
+run "test_anvil_universality_invariants"      "$PY" scripts/test_anvil_universality_invariants.py
 run "test_connection_trace_ghost_ratio"       "$PY" scripts/test_connection_trace_ghost_ratio.py
 run "test_instrument_no_plant_lcoe_frame"     "$PY" scripts/test_instrument_no_plant_lcoe_frame.py
 run "test_cover_relative_links"               "$PY" scripts/test_cover_relative_links.py
