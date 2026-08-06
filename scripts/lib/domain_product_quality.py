@@ -208,8 +208,52 @@ def evaluate_domain_product_quality(
             "(does not alone force a 4; release_readiness owns HIL/Gerbers)"
         )
 
+    # ── 5. Geometry completeness (when CAD kernel has run) ─────────────────
+    # Does not invent geometry; only binds when geometry/completeness.json exists.
+    geo_score = None
+    if run_dir:
+        import json as _json
+        import os as _os
+
+        geo_path = _os.path.join(run_dir, "geometry", "completeness.json")
+        if _os.path.isfile(geo_path):
+            try:
+                with open(geo_path, encoding="utf-8") as fh:
+                    geo = _json.load(fh)
+            except (OSError, _json.JSONDecodeError):
+                geo = None
+            if isinstance(geo, dict):
+                try:
+                    geo_score = float(geo.get("score")) if geo.get("score") is not None else None
+                except (TypeError, ValueError):
+                    geo_score = None
+                if geo.get("binding_high") or int(geo.get("high_count") or 0) > 0:
+                    high += 1
+                    score = min(score, 4.0)
+                    defects.append(
+                        "GEOMETRY HIGH: "
+                        + ("; ".join((geo.get("defects") or [])[:2])
+                           or "principals missing solid/path/hold")
+                    )
+                elif geo_score is not None and geo_score < 8.0:
+                    med += 1
+                    score = min(score, float(geo_score))
+                    defects.append(
+                        f"GEOMETRY MED: completeness {geo_score}/10 "
+                        f"({geo.get('detail') or 'see geometry/completeness.json'})"
+                    )
+                # Soft: STEP expected but missing when completeness file exists
+                step_ok = geo.get("step_ok")
+                if step_ok is False:
+                    med += 1
+                    score = min(score, 7.0)
+                    defects.append(
+                        "GEOMETRY MED: assembly.step missing or empty "
+                        "(open FreeCAD path incomplete)"
+                    )
+
     score = max(0.0, round(score, 1))
-    return {
+    out: dict[str, Any] = {
         "name": "domain_product_quality",
         "score": score,
         "defects": defects[:12],
@@ -223,6 +267,9 @@ def evaluate_domain_product_quality(
             f"({high} HIGH, {med} MED product defects)"
         ),
     }
+    if geo_score is not None:
+        out["geometry_completeness_score"] = geo_score
+    return out
 
 
 def prove_catch_selftest() -> None:

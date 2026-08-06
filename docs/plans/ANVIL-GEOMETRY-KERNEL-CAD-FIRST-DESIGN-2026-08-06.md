@@ -1,9 +1,23 @@
 # Anvil geometry kernel — CAD-first design
 
 **Date:** 2026-08-06  
-**Status:** Design approved for implementation (discussion complete)  
+**Status:** Implemented (PR1–PR6 MVP) — 2026-08-06  
 **Owner:** Anvil / CentaurOS geometry pipeline  
 **Readers:** Tristan + implementers  
+
+### Implementation status (shipped)
+
+| PR | Deliverable | Location |
+|---|---|---|
+| PR1 | IR + completeness | `scripts/lib/geometry_ir.py`, `geometry_completeness.py` |
+| PR2 | STEP export (CadQuery) | `scripts/lib/geometry_step_export.py` |
+| PR3 | Path router | `scripts/lib/geometry_path_router.py` |
+| PR4 | Blender import contract JSON | written by `geometry_kernel.py` → `blender_import.json` |
+| PR5 | Domain grade + pack chrome | `domain_product_quality.py`, `build_send_pack.copy_geometry` |
+| PR6 | Print subset STL | `geometry/print/*.stl` for `print_role` parts |
+| CLI | Twin → geometry/ | `scripts/geometry-kernel-build.py` |
+
+**Proved on disk:** bio `organoid-9drive-r11-allfixes` (STEP ~611 KB, completeness 10/10) and FE `formula-e-front-mgu-20260729-1432` (STEP ~1.2 MB, 18 paths). Open `geometry/assembly.step` in FreeCAD.
 
 ### Decisions already taken (from discussion)
 

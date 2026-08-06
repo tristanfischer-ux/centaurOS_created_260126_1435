@@ -69,10 +69,27 @@ def _dual_grade_lines(twin: Path, pack: Path, floor_status: Optional[dict] = Non
         lines.append(
             f"  · Release readiness (homologation / Gerbers / HIL): {release}/10"
         )
+    # Geometry completeness when CAD kernel has run
+    geo = _read_json(twin / "geometry" / "completeness.json") or _read_json(
+        pack / "geometry" / "completeness.json"
+    )
+    if isinstance(geo, dict) and geo.get("score") is not None:
+        lines.append(
+            f"  · Geometry completeness (BoM↔3D / STEP): {geo.get('score')}/10 "
+            f"(solids={geo.get('n_solid')} paths={geo.get('n_path')} "
+            f"holds={geo.get('n_open_holds')})"
+        )
     lines.append(
         "  A high tab floor does NOT mean manufacturer-ready. "
         "Read ADVERSARIAL-*.md and open holds before any purchase order."
     )
+    if (twin / "geometry" / "assembly.step").is_file() or (
+        pack / "geometry" / "assembly.step"
+    ).is_file():
+        lines.append(
+            "  CAD master: geometry/assembly.step — open in FreeCAD (free). "
+            "Blender renders are film, not layout authority."
+        )
     lines.append("")
     return lines
 
@@ -145,6 +162,9 @@ def write_folder_guide(pack: Path, *, pack_revision: str) -> Path:
         ("pcb/", "Draft boards + fab package"),
         ("firmware/", "Virtual MCU bring-up (not HIL)"),
         ("3d-model/", "GLB/USDZ review meshes"),
+        ("geometry/", "CAD master: assembly.step + IR (FreeCAD)"),
+        ("geometry/assembly.step", "Open in FreeCAD — engineering model"),
+        ("geometry/README.txt", "How to open STEP; holds list"),
         ("run-logs/", "Optional rebuild logs"),
     ]
     present = []
@@ -213,6 +233,20 @@ def rewrite_em_honesty_prose(pack: Path) -> int:
             path.write_text(new, encoding="utf-8")
             n += 1
     return n
+
+
+def copy_geometry(twin: Path, pack: Path) -> list[str]:
+    """Copy CAD-first geometry/ (STEP master + IR + completeness) into the pack."""
+    src = twin / "geometry"
+    dest = pack / "geometry"
+    if not src.is_dir():
+        return []
+    # Always refresh from twin when kernel has run (master is twin geometry/)
+    if dest.is_dir():
+        shutil.rmtree(dest)
+    shutil.copytree(src, dest)
+    copied = [str(p.relative_to(dest)) for p in dest.rglob("*") if p.is_file()]
+    return copied[:40]
 
 
 def copy_3d_model(twin: Path, pack: Path) -> list[str]:
@@ -440,6 +474,21 @@ def apply_send_pack_chrome(
     sc_copied = copy_scorecards(twin_p, pack_p)
     if sc_copied:
         report["actions"].append(f"scorecards:{','.join(sc_copied)}")
+    # CAD master (STEP) — always copy when twin/geometry exists
+    cg = copy_geometry(twin_p, pack_p)
+    if cg:
+        report["actions"].append(f"geometry:{len(cg)} files")
+        report["geometry_step"] = (pack_p / "geometry" / "assembly.step").is_file()
+    # Optional hard gate: ANVIL_REQUIRE_STEP=1 fails pack without STEP
+    if os.environ.get("ANVIL_REQUIRE_STEP", "").strip() in ("1", "true", "TRUE", "yes"):
+        step_ok = (pack_p / "geometry" / "assembly.step").is_file() or (
+            twin_p / "geometry" / "assembly.step"
+        ).is_file()
+        if not step_ok:
+            report["step_block"] = True
+            report["actions"].append("ANVIL_REQUIRE_STEP blocked send (no assembly.step)")
+            ship_ok = False
+
     if include_3d:
         c3 = copy_3d_model(twin_p, pack_p)
         if c3:

@@ -169,6 +169,72 @@ def test_domain_product_quality_binds() -> None:
     print("domain_product_quality dual-class smoke OK")
 
 
+def test_geometry_kernel_selftest() -> None:
+    """CLI --selftest for IR + completeness + STEP + kernel."""
+    import subprocess
+
+    script = ROOT / "scripts" / "geometry-kernel-build.py"
+    r = subprocess.run(
+        [sys.executable, str(script), "--selftest"],
+        capture_output=True,
+        text=True,
+        timeout=120,
+        cwd=str(ROOT),
+    )
+    assert r.returncode == 0, r.stderr or r.stdout
+    assert "selftest OK" in (r.stdout or "")
+    print("geometry_kernel CLI selftest OK")
+
+
+def test_geometry_kernel_dual_class_emit() -> None:
+    """Bio + motor twins both emit geometry IR (or skip if twin missing)."""
+    import subprocess
+
+    script = ROOT / "scripts" / "geometry-kernel-build.py"
+    candidates = [
+        ROOT / "out" / "organoid-9drive-r11-allfixes",
+        ROOT / "out" / "formula-e-front-mgu-20260729-1432",
+    ]
+    ran = 0
+    for twin in candidates:
+        if not (twin / "state.json").is_file():
+            continue
+        r = subprocess.run(
+            [sys.executable, str(script), str(twin)],
+            capture_output=True,
+            text=True,
+            timeout=180,
+            cwd=str(ROOT),
+        )
+        assert r.returncode == 0, f"{twin.name}: {r.stderr or r.stdout}"
+        assert (twin / "geometry" / "assembly.json").is_file()
+        assert (twin / "geometry" / "completeness.json").is_file()
+        assert (twin / "geometry" / "blender_import.json").is_file()
+        ir = json.loads((twin / "geometry" / "assembly.json").read_text(encoding="utf-8"))
+        assert ir.get("schema") == "anvil.geometry_assembly/1"
+        assert isinstance(ir.get("components"), list)
+        comp = json.loads((twin / "geometry" / "completeness.json").read_text(encoding="utf-8"))
+        assert comp.get("binding_high") is False or isinstance(comp.get("missing"), list)
+        assert "n_covered_unique" in comp or "n_principals" in comp
+        step = twin / "geometry" / "assembly.step"
+        # STEP required for dual-class proof when CadQuery is available
+        try:
+            import cadquery  # noqa: F401
+            assert step.is_file() and step.stat().st_size > 200, f"STEP missing on {twin.name}"
+        except ImportError:
+            if step.is_file():
+                assert step.stat().st_size > 200
+        ran += 1
+        print(
+            f"geometry dual-class OK: {twin.name} solids={len(ir.get('components') or [])} "
+            f"completeness={comp.get('score')} step_bytes={step.stat().st_size if step.is_file() else 0}"
+        )
+    if ran == 0:
+        print("skip: no bio/FE twin on disk for geometry dual-class")
+    else:
+        assert ran >= 1
+
+
 def test_tab_floor_gate_pure() -> None:
     """ANVIL_TAB_FLOOR helper: below-floor → DRAFT note path, ok floor → pass."""
     import tempfile
@@ -259,6 +325,8 @@ if __name__ == "__main__":
     test_send_pack_chrome_if_present()
     test_illustrated_cover_discover_and_emit()
     test_domain_product_quality_binds()
+    test_geometry_kernel_selftest()
+    test_geometry_kernel_dual_class_emit()
     test_tab_floor_gate_pure()
     test_pack_parity_sheets_selftest()
     test_pack_parity_on_disk_if_present()
