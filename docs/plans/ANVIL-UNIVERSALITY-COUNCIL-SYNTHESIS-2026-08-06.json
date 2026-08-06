@@ -1,0 +1,146 @@
+{
+  "date": "2026-08-06",
+  "verdict": "PARTIAL",
+  "seats": {
+    "terra": {
+      "verdict": "PARTIAL",
+      "one_line": "Anvil has universal intent and some shared controls, but it remains only partially universal because FE-front-specific pipeline care is not yet encoded as mandatory, capability-driven and independently tested pack contracts for instruments and plants.",
+      "must_fix_count": 7,
+      "must_fix": [
+        {
+          "id": "U5",
+          "issue": "Make product-class framing a hard gate before scoring Inputs & Assumptions; quarantine or reject plant-economic drivers for instrument devices unless explicitly wired to an instrument capital model.",
+          "why": "The organoid bioreactor floor of 1.2 demonstrates that Anvil currently permits irrelevant plant assumptions to enter an instrument dossier and scorecard. A universal engine must apply common evidence contracts while selecting valid class-specific content.",
+          "test": "Implement test_instrument_no_plant_lcoe_frame.py using an instrument fixture containing sale-price, feedstock, annual-volume or LCOE rows; assert these rows are rejected, quarantined, or explicitly evidenced as part of a capital model, and assert they cannot appear in the instrument Financial model."
+        },
+        {
+          "id": "U6",
+          "issue": "Prune, classify, or separately score consumable and ghost ledger topology before evaluating connection-trace completeness for instruments.",
+          "why": "A score of 3.3 caused by one rendered connection against 36 ledger edges is a category error where the ledger is treated as an electrical or fluidic topology source without class-aware filtering. This prevents otherwise valid instrument packs from meeting the common score floor.",
+          "test": "Implement test_connection_trace_ghost_ratio.py with an instrument ledger fixture containing real nets plus consumables, procurement-only lines and non-rendered administrative edges; assert only topology-relevant edges count towards trace coverage and that unclassified ghost edges fail explicitly."
+        },
+        {
+          "id": "U4",
+          "issue": "Promote cover PDF, cover HTML and relative-link click index into a shared pack-build stage.",
+          "why": "The FE-front cover was manually assembled, so a high-quality customer navigation layer is not reproducible across product classes. Universal pack content requires a common generated cover contract, not agent-specific care.",
+          "test": "Implement test_cover_relative_links.py that builds a fixture pack through scripts/lib/build_pack_cover.py, parses all local HTML href values, and confirms each resolves within the pack root without absolute machine paths."
+        },
+        {
+          "id": "U3",
+          "issue": "Make detailed general-arrangement generation a declared, common pack-stage contract rather than an optional FE-front invocation.",
+          "why": "A supposedly universal drawing module is insufficient if individual twin pipelines can bypass it. Product classes may have distinct drawing content, but each must satisfy a common drawing deliverable and evidence gate.",
+          "test": "Add a multi-class drawing-stage test for Formula E and organoid fixtures that asserts the pack either contains drawings/general-arrangement.png generated through the shared stage or contains an explicit, approved not-applicable record with a class rationale."
+        },
+        {
+          "id": "U7",
+          "issue": "Centralise PACK_LAYOUT_V1 and require every pack builder to consume it, with dual-class smoke-pack validation.",
+          "why": "Replacing em-honesty/ with electromagnetics/ fixes one customer-facing path, but does not prove that all builders share layout rules or that instrument and plant packs remain valid. Current pack consistency is still dependent on individual pipeline behaviour.",
+          "test": "Implement test_pack_layout_schema.py and a dual-class smoke job that builds or validates Formula E and organoid packs, asserts PACK_LAYOUT_V1 compliance, required cover and manifest files, valid conditional evidence folders, and absence of forbidden path segments including em-honesty/."
+        },
+        {
+          "id": "U2",
+          "issue": "Split motor-specific jack EM phases from the universal exporter into a capability-driven electromagnetics interface.",
+          "why": "Motor-specific phases embedded in a universal exporter make the architecture FE-front shaped. A universal engine must select EM evidence from declared product capabilities, allow genuinely non-EM products to omit it or provide a not-applicable note, and avoid fabricated field plots.",
+          "test": "Add capability-matrix pack tests covering a motor with EM evidence, an instrument without EM capability, and a product with screen-driven multiphysics; assert valid conditional directories and prohibit motor-only phases from running for non-motor fixtures."
+        },
+        {
+          "id": "U8",
+          "issue": "Enforce ANVIL_TAB_FLOOR=9 at send-pack time and close the bioreactor's evidence defects without score inflation.",
+          "why": "Stage discipline alone does not establish universality if one class can ship with a 1.2 dossier floor while another receives bespoke remediation. The common quality bar must be mechanically enforced for every scored tab, excluding only formally defined mirrors and out-of-scope tabs.",
+          "test": "Add a send-pack gate regression with failing and passing scorecard fixtures; assert any scored tab below 9 blocks shipment, mirrors and formally OOS tabs are treated according to registry rules, and source-evidence failures cannot be overridden by edited scores."
+        }
+      ],
+      "safe_change_order": [
+        "Define PACK_LAYOUT_V1, conditional-folder rules and forbidden path segments in one shared module; migrate current builders without changing evidence content.",
+        "Add independent layout-schema and customer-path regressions, then validate existing Formula E and organoid packs or fixtures.",
+        "Implement the shared cover-build stage and relative-link click index; require it for all send packs.",
+        "Introduce capability declarations for electromagnetics, PCB, multiphysics and drawings; extract motor-specific jack EM phases behind the EM capability interface.",
+        "Make the detailed general-arrangement stage part of the common drawing contract, with explicit approved not-applicable handling where genuinely required.",
+        "Add instrument-versus-plant frame validation before workbook densification and scoring; remove or properly wire the bioreactor's orphan plant drivers.",
+        "Implement topology classification and connection-trace pruning; repair the bioreactor's rendered and ledger topology evidence.",
+        "Resolve bioreactor verification HARD opens, PCB PnP evidence, overview invariants and BoM required-cell gaps from source artefacts rather than score edits.",
+        "Enable ANVIL_TAB_FLOOR=9 as a mandatory send-pack gate and rerun Formula E plus organoid dual-class smoke packs after each product-class-affecting change.",
+        "Ship the bioreactor only after every scored tab is at least 9.0 and the generated pack contains the schema-compliant cover PDF, HTML and relative links."
+      ],
+      "tests_required": [
+        "test_pack_customer_evidence_dir.py: retain and run on every change; reject em-honesty/ and other internal-only customer path segments.",
+        "test_pack_layout_schema.py: validate PACK_LAYOUT_V1, dossier and manifest presence, conditional evidence-folder handling, renders and drawings requirements, and forbidden paths.",
+        "Dual-class smoke-pack test: build or validate Formula E front MGU and organoid bioreactor packs from independent fixtures or cached twins.",
+        "test_instrument_no_plant_lcoe_frame.py: ensure plant LCOE and operational-finance drivers cannot contaminate an instrument financial frame.",
+        "test_connection_trace_ghost_ratio.py: ensure procurement, consumable and administrative ledger lines cannot dominate physical connection-trace scoring.",
+        "test_cover_relative_links.py: ensure generated cover HTML and click-index links resolve only beneath the pack root and do not contain local absolute paths.",
+        "Capability-matrix exporter test: motor EM, non-EM instrument and multiphysics-capable product each receive valid conditional content without fabricated artefacts.",
+        "Common drawing-stage test: confirm all applicable classes invoke the shared GA contract or emit a justified not-applicable record.",
+        "Send-pack tab-floor gate test: block packs with any scored tab below 9.0 while applying registered mirror and out-of-scope exclusions only.",
+        "Bioreactor regression fixture: preserve failures for orphan drivers, ghost topology, verification HARD opens and incomplete BoM cells until source-backed remediation passes."
+      ]
+    },
+    "grok": {
+      "verdict": "PARTIAL",
+      "one_line": "Anvil is partly universal in ship-path discipline but still an FE-front-strong specialist until instrument framing, topology prune, shared cover, and dual-class layout gates land.",
+      "must_fix_count": 6,
+      "must_fix": [
+        {
+          "id": "U5",
+          "issue": "Tab floor remains class-sensitive; instruments still admit orphan plant drivers",
+          "why": "Inputs & Assumptions scored 1.2 on the bioreactor from 14 unwired plant-style drivers, so the shared score contract is not product-class safe",
+          "test": "test_instrument_no_plant_lcoe_frame.py"
+        },
+        {
+          "id": "U6",
+          "issue": "Connection-trace / parts-ledger topology is not class-pruned for instruments",
+          "why": "Ghost ledger edges (1 rendered vs 36 ledger) dominate scoring and block a genuine floor of 9",
+          "test": "test_connection_trace_ghost_ratio.py"
+        },
+        {
+          "id": "U2",
+          "issue": "EM render pipeline inside the universal exporter is still motor/FE-front shaped",
+          "why": "jack_em_pack phases B\u2013E only make sense for traction kits, so non-motor classes cannot share the same evidence path honestly",
+          "test": "test_pack_layout_schema.py"
+        },
+        {
+          "id": "U4",
+          "issue": "Cover narrative and relative-link pack are manual, not a shared Anvil stage",
+          "why": "FE-front covers were built ad hoc; universality requires one cover builder for every class",
+          "test": "test_cover_relative_links.py"
+        },
+        {
+          "id": "U3",
+          "issue": "Detailed GA exists under blender-universal but is not always invoked",
+          "why": "Twins that skip draw_ga_detailed.py produce uneven drawings/ quality across product classes",
+          "test": "test_pack_layout_schema.py"
+        },
+        {
+          "id": "U7",
+          "issue": "No multi-class pack layout selftest (FE + instrument + plant)",
+          "why": "Without dual-class smoke, regressions can re-introduce class nicknames or missing cover/layout artefacts",
+          "test": "test_pack_layout_schema.py"
+        }
+      ],
+      "safe_change_order": [
+        "Land PACK_LAYOUT_V1 in one module and route every pack builder through it (no path literals elsewhere)",
+        "Keep class-conditional content only: motors fill electromagnetics/; instruments omit or add README-not-applicable.txt \u2014 never invent nicknames",
+        "Gate instrument vs plant frame before Inputs & Assumptions scoring; quarantine plant drivers and plant LCOE rows on instrument financial models",
+        "Prune or classify ghost ledger edges/consumables before connection-trace scoring on gold-spine instruments",
+        "Add build_pack_cover.py as a first-class stage (cover PDF/HTML + relative click index)",
+        "Invoke draw_ga_detailed.py consistently from the shared drawings path for all twins that ship GA",
+        "Enforce ANVIL_TAB_FLOOR=9 on send packs for scored tabs only (mirrors/OOS excluded by existing rules)",
+        "Run dual-class smoke (formula_e_front_mgu + organoid_bioreactor), then close bioreactor scored tabs to \u2265 9.0 and ship pack + cover"
+      ],
+      "tests_required": [
+        "test_pack_customer_evidence_dir.py",
+        "test_pack_layout_schema.py",
+        "test_instrument_no_plant_lcoe_frame.py",
+        "test_connection_trace_ghost_ratio.py",
+        "test_cover_relative_links.py",
+        "dual-class smoke pack (FE front + organoid bioreactor)",
+        "existing gate-registry / falsifiability / discipline selftests"
+      ]
+    }
+  },
+  "agreed": [
+    "Anvil is PARTIAL: shared controls exist; FE-front depth is not yet mandatory for all classes",
+    "Instrument frame (no plant drivers) and topology prune are P0 for bioreactor-class care",
+    "Cover pack stage and dual-class layout tests are required before claiming UNIVERSAL"
+  ]
+}

@@ -2413,6 +2413,22 @@ def _verdict_sections(state: dict, run_dir: str = "") -> Tuple[Dict[str, dict], 
         if s.get("advisory"):
             advisory.setdefault(nm, ent)
             continue
+        # INTENT (2026-08-06 Anvil universality): release_readiness and any other
+        # qualityLoopActionable=false section are EXTERNAL-EVIDENCE axes. They must
+        # remain visible and still bind SHIPS via dedicated ship-gate axes (PCB fab
+        # readiness, homologation), but they must NOT drag the Bar A concept floor
+        # (and therefore Exec Summary / Quality & Audit mirrors) to 4 on an honest
+        # concept pack. A concept can score tabs ≥9 while remaining NOT_HOMOLOGATED.
+        if s.get("qualityLoopActionable") is False:
+            # Keep visible as advisory annotation — never a silent drop.
+            defects = list(ent.get("defects") or [])
+            defects.insert(
+                0,
+                f"release-evidence axis (score {v}/10) — does not floor concept Bar A; "
+                f"binds SHIPS via ship-gate axes only",
+            )
+            advisory.setdefault(nm, {**ent, "defects": defects})
+            continue
         if nm in facts:   # same FACT section twice → the MIN (worst) wins
             prev = facts[nm]["score"]
             if prev is None or (v is not None and v < prev):

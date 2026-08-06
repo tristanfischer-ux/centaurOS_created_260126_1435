@@ -1890,7 +1890,102 @@ _BRIEF_ACHIEVED_ALIASES: Dict[str, Tuple[str, ...]] = {
         "max_rotor_speed_rpm",
         "mgu_base_speed_rpm",
     ),
+    # Benchtop bioreactor / instrument culture metrics (Anvil universality 2026-08-06).
+    # Brief keys with source=brief are brief-only identities; bind distinct achieved
+    # vessel / thermal quantities so Checks cannot greenwash by tautology.
+    "working_volume_ml": (
+        "vessel_working_volume_ml",
+        "culture_vessel_fill_volume_ml",
+        "vessel_nominal_fill_ml",
+    ),
+    "working_volume_min_ml": (
+        "vessel_working_volume_min_ml",
+        "culture_vessel_min_fill_ml",
+        "vessel_minimum_operable_ml",
+    ),
+    "culture_temperature_c": (
+        "culture_thermal_setpoint_achieved_c",
+        "culture_temperature_setpoint_achieved_c",
+        "closed_loop_culture_temp_c",
+    ),
+    "culture_temperature_degc": (
+        "culture_thermal_setpoint_achieved_c",
+        "culture_temperature_setpoint_achieved_c",
+        "closed_loop_culture_temp_c",
+    ),
+    "bom_cost_midpoint_gbp": (
+        "assembled_bom_total_gbp",
+        "raw_materials_bom_gbp",
+        "grand_total_gbp",
+    ),
+    "bom_cost_floor_gbp": (
+        "assembled_bom_total_gbp",
+        "raw_materials_bom_gbp",
+        "grand_total_gbp",
+    ),
 }
+
+
+def _inject_bom_cost_for_brief_checks(
+    state: dict, run_dir: str, q: Dict[str, Any], metrics: List[Any],
+) -> Dict[str, Any]:
+    """Inject assembled BoM total as achieved for bom_cost_* brief metrics.
+
+    Mirrors build-excel-export._inject_bom_cost_achieved so Checks / Overview /
+    Exec Summary use the same truth as the Verification spine (ONE-matcher).
+    Prefer requirementsBom Σ, then costStack.raw_materials_bom_gbp, then
+    parts-ledger grand_total_gbp.
+    """
+    bom_total: Optional[float] = None
+    detail = ""
+    rb = state.get("requirementsBom")
+    if isinstance(rb, list) and rb:
+        try:
+            bom_total = round(sum(
+                float((r or {}).get("line_gbp", 0) or 0)
+                for r in rb if isinstance(r, dict)
+            ), 2)
+            if bom_total and bom_total > 0:
+                detail = f"requirementsBom Σ line_gbp = £{bom_total:.2f}"
+        except (TypeError, ValueError):
+            bom_total = None
+    if not bom_total or bom_total <= 0:
+        cs = state.get("costStack") or {}
+        try:
+            raw = cs.get("raw_materials_bom_gbp")
+            if raw is not None and float(raw) > 0:
+                bom_total = float(raw)
+                detail = f"costStack.raw_materials_bom_gbp = £{bom_total:.2f}"
+        except (TypeError, ValueError):
+            pass
+    if not bom_total or bom_total <= 0:
+        pl = _load_json(os.path.join(run_dir, "parts-ledger.json")) or {}
+        try:
+            gt = pl.get("grand_total_gbp")
+            if gt is not None and float(gt) > 0:
+                bom_total = float(gt)
+                detail = f"parts-ledger grand_total_gbp = £{bom_total:.2f}"
+        except (TypeError, ValueError):
+            pass
+    if not bom_total or bom_total <= 0:
+        return q
+    cost_rx = re.compile(r"bom_cost|(?:total|assembled|build)_cost.*gbp", re.I)
+    inject: Dict[str, Any] = {}
+    # Always publish a canonical achieved key for alias binding.
+    inject["assembled_bom_total_gbp"] = {
+        "value": bom_total, "unit": "GBP", "family": "cost",
+        "source": "derived", "source_detail": detail,
+    }
+    for m in metrics:
+        if not isinstance(m, dict):
+            continue
+        mk = str(m.get("key_metric") or m.get("metric") or m.get("name") or "").strip()
+        if mk and cost_rx.search(mk) and mk not in q:
+            inject[mk] = {
+                "value": bom_total, "unit": "GBP", "family": "cost",
+                "source": "derived", "source_detail": detail,
+            }
+    return {**q, **inject} if inject else q
 
 
 def _checks_brief_compliance(state: dict, run_dir: str) -> List[Check]:
@@ -1902,12 +1997,13 @@ def _checks_brief_compliance(state: dict, run_dir: str) -> List[Check]:
     failed). Class-agnostic — any archetype whose brief carries structured target metrics."""
     out: List[Check] = []
     oc = state.get("orchestratorContract") or {}
-    q: Dict[str, Any] = oc.get("quantities") or {}
-    if not q:
-        return out
+    q: Dict[str, Any] = dict(oc.get("quantities") or {})
     pb = state.get("parsedBrief") or _load_json(os.path.join(run_dir, "1-parsed-brief.json")) or {}
     metrics = ((((pb or {}).get("constraints") or {}).get("target_performance") or {}).get("metrics")) or []
     if not metrics:
+        return out
+    q = _inject_bom_cost_for_brief_checks(state, run_dir, q, metrics)
+    if not q:
         return out
     qidx = [(k, _btoks(k), _ufam((q[k] or {}).get("unit") if isinstance(q[k], dict) else ""))
             for k in q]
