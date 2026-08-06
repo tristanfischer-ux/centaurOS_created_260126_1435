@@ -151,8 +151,21 @@
 | ANVIL_TAB_FLOOR=9 | Pack marked DRAFT (floor 8 &lt; 9) — correct |
 | Downloads | `Anvil-Benchtop-Bioreactor-V1.19-design-pack.zip` |
 
-### Open after this pass (Sprint 3 — geometry / shop floor)
+### Sprint 3 — geometry / shop floor (2026-08-06)
 
-D1 exploded BoM callouts, D2 Blender origin, D3 OD path on GA, D4 service diagram, U2/U3 detailed GA always-on. These need render/GA passes, not score-theatre.
+| ID | Status | Universal code |
+|---|---|---|
+| D1 BoM callouts | **Done** | `draw_pack_parity_sheets.py` → `ga-bom-callouts.png` |
+| D2 Floating Z | **Done (drawing frame)** | `drawing-placement-frame.json` origin-shifts sheets; CAD world unchanged |
+| D3 OD path on GA | **Done** | `ga-optical-path.png` when optical sensing present |
+| D4 Service access | **Done** | `service-access.png` for sealed instruments |
+| U3 always-on | **Done** | Wired into `generate_drawing_set.py` + excel pack bundle |
+
+**Entry points (every new project):**
+1. `python3 scripts/blender-universal/draw_pack_parity_sheets.py <twin>`
+2. Automatic via `generate_drawing_set.py` after GA
+3. Automatic via `build-excel-export` send-pack stage (copies into zip)
+
+Residual: full Blender exploded BOM photoreal callouts + STEP export still concept holds.
 
 *End of plan + outcome.*

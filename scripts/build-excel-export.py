@@ -41323,6 +41323,49 @@ def _write_deliverable_bundle(run_dir: str, slug: str) -> Optional[dict]:
     except Exception as _me:  # noqa: BLE001
         skipped.append(f"MANIFEST.txt ({_me})")
 
+    # ── 5y. PACK-PARITY DRAWING SHEETS (Sprint 3 — universal) ────────────────
+    # BoM callouts / optical path / service access / placement frame. Capability-
+    # gated inside the module. Runs before chrome so drawings/ is populated.
+    try:
+        import subprocess as _sp_par
+        _par_script = os.path.join(
+            os.path.dirname(os.path.abspath(__file__)),
+            "blender-universal", "draw_pack_parity_sheets.py",
+        )
+        if os.path.isfile(_par_script):
+            _pr = _sp_par.run(
+                [sys.executable, _par_script, run_dir],
+                capture_output=True, text=True, timeout=120,
+            )
+            if _pr.returncode == 0:
+                print("  · pack-parity drawings: BoM callouts / optical / service", flush=True)
+                # Copy new drawing sheets into the bundle drawings/ folder
+                _src_d = os.path.join(run_dir, "drawings")
+                _dst_d = os.path.join(bundle_dir, "drawings")
+                if os.path.isdir(_src_d):
+                    os.makedirs(_dst_d, exist_ok=True)
+                    for _fn in (
+                        "ga-bom-callouts.svg", "ga-bom-callouts.png",
+                        "ga-optical-path.svg", "ga-optical-path.png",
+                        "service-access.svg", "service-access.png",
+                        "PACK-PARITY-INDEX.md", "pack-parity-manifest.json",
+                        "drawing-placement-frame.json",
+                    ):
+                        _s = os.path.join(_src_d, _fn)
+                        if os.path.isfile(_s):
+                            import shutil as _sh_par
+                            _sh_par.copy2(_s, os.path.join(_dst_d, _fn))
+                            included.append(f"drawings/{_fn}")
+            else:
+                print(
+                    f"  · pack-parity drawings rc={_pr.returncode}: "
+                    f"{(_pr.stderr or _pr.stdout or '')[-120:]}",
+                    flush=True,
+                )
+    except Exception as _par_exc:  # noqa: BLE001
+        skipped.append(f"pack-parity drawings ({_par_exc})")
+        print(f"  · pack-parity drawings skipped: {_par_exc}", flush=True)
+
     # ── 5z. ANVIL SEND-PACK CHROME (P0) + instrument-physics (P1) ─────────────
     try:
         from build_send_pack import apply_send_pack_chrome  # noqa: WPS433

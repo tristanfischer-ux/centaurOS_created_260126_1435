@@ -822,6 +822,26 @@ def generate_drawing_set(state_path: str | Path,
     except Exception as _det_exc:  # noqa: BLE001
         log.append(f"  draw_ga_detailed.py: skipped ({type(_det_exc).__name__})")
 
+    # UNIVERSAL (2026-08-06 Sprint 3): pack-parity sheets — BoM callouts, optical
+    # path (when sensing), service access (sealed products), drawing origin frame.
+    # Capability-gated inside the module; no product_class table.
+    try:
+        _par = _THIS / "draw_pack_parity_sheets.py"
+        if _par.is_file() and (out_dir / "state.json").is_file():
+            _pr = subprocess.run(
+                [_venv_python(), str(_par), str(out_dir)],
+                capture_output=True, text=True, timeout=120,
+            )
+            if _pr.returncode == 0:
+                log.append("  draw_pack_parity_sheets.py: BoM callouts / optical / service")
+            else:
+                log.append(
+                    f"  draw_pack_parity_sheets.py: rc={_pr.returncode} "
+                    f"{(_pr.stderr or _pr.stdout or '')[-140:]}"
+                )
+    except Exception as _par_exc:  # noqa: BLE001
+        log.append(f"  draw_pack_parity_sheets.py: skipped ({type(_par_exc).__name__})")
+
     # T-20 / T-25 — conditional detail sheets. Gate on contract signals via each
     # script's should_emit(state); skip silently when not applicable. These need
     # ONLY state.json (no CAD artifacts) — same philosophy as the BFD.

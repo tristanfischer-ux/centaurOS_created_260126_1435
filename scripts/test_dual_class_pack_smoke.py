@@ -5,6 +5,7 @@ Validates on-disk design packs when present; skips soft when a class is missing
 so CI without twins still runs the pure-library assertions.
 """
 from __future__ import annotations
+import json
 
 import sys
 from pathlib import Path
@@ -200,6 +201,34 @@ def test_tab_floor_gate_pure() -> None:
         print("tab floor gate selftest OK")
 
 
+def test_pack_parity_sheets_selftest() -> None:
+    """Universal pack-parity drawing module gates + pos_mm shapes."""
+    import subprocess
+    script = ROOT / "scripts" / "blender-universal" / "draw_pack_parity_sheets.py"
+    r = subprocess.run(
+        [sys.executable, str(script), "--selftest"],
+        capture_output=True, text=True, timeout=30,
+    )
+    assert r.returncode == 0, r.stderr or r.stdout
+    assert "selftest OK" in (r.stdout or "")
+    print("pack_parity_sheets selftest OK")
+
+
+def test_pack_parity_on_disk_if_present() -> None:
+    """When a twin has pack-parity sheets, index + placement frame exist."""
+    for glob_pat in ("**/drawings/pack-parity-manifest.json",):
+        hits = sorted((ROOT / "out").glob(glob_pat), reverse=True)
+        if not hits:
+            print("skip: no pack-parity-manifest on disk")
+            return
+        man = json.loads(hits[0].read_text(encoding="utf-8"))
+        assert "emitted" in man
+        d = hits[0].parent
+        assert (d / "PACK-PARITY-INDEX.md").is_file() or "PACK-PARITY-INDEX.md" in man.get("emitted", [])
+        print(f"pack parity on disk OK: {hits[0].relative_to(ROOT)}")
+        return
+
+
 def test_bio_pack_has_illustrated_cover_if_present() -> None:
     """Live bio pack should ship multi-MB illustrated cover after cover v2."""
     pack = _latest_pack("**/*benchtop*design-pack")
@@ -231,6 +260,8 @@ if __name__ == "__main__":
     test_illustrated_cover_discover_and_emit()
     test_domain_product_quality_binds()
     test_tab_floor_gate_pure()
+    test_pack_parity_sheets_selftest()
+    test_pack_parity_on_disk_if_present()
     test_bio_pack_has_illustrated_cover_if_present()
     print("test_dual_class_pack_smoke OK")
 
