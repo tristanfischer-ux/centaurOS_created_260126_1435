@@ -1,6 +1,13 @@
+import type { Metadata } from 'next'
 import { MarketingNav } from '@/components/marketing/marketing-nav'
 import { MarketingFooter } from '@/components/marketing/marketing-footer'
 import { NewsletterSignup } from '@/components/content/newsletter-signup'
+
+// INTENT (D1, 2026-08-14): /blog/* belongs to the withdrawn fractional-executive
+// marketplace — noindex alongside /experts. Hardware essays live at /insights.
+export const metadata: Metadata = {
+    robots: { index: false, follow: false },
+}
 
 /**
  * Layout for public content pages (blog, resources).

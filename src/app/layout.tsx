@@ -119,6 +119,23 @@ const JSON_LD = {
       name: "Fractional Forge",
       publisher: { "@id": "https://fractionalforge.app/#organization" },
     },
+    {
+      "@type": "Service",
+      "@id": "https://fractionalforge.app/#design-dossier",
+      name: "Design Dossier",
+      serviceType: "Engineering design and costing study",
+      description:
+        "A costed, physics-checked engineering design for a hardware product: a buildable design, a costed bill-of-materials ledger, engineering drawings, a financial model and a risk register — delivered as an auditable Excel workbook within a few business days, reviewed by senior engineers from Fractional Forge's partner network. The first Dossier is free.",
+      provider: { "@id": "https://fractionalforge.app/#organization" },
+      areaServed: ["United Kingdom", "Europe"],
+      offers: {
+        "@type": "Offer",
+        price: 0,
+        priceCurrency: "GBP",
+        description: "The first Design Dossier is free.",
+        url: "https://fractionalforge.app/brief",
+      },
+    },
   ],
 };
 

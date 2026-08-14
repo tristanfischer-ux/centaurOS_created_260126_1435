@@ -1,8 +1,4 @@
 import type { MetadataRoute } from 'next'
-import { getDirectoryExpertSlugs, getDirectoryLocations } from '@/actions/directory'
-import { DIRECTORY_ROLE_CATEGORIES, locationToSlug } from '@/lib/directory/types'
-import type { DirectoryRoleSlug } from '@/lib/directory/types'
-import { createAdminClient } from '@/lib/supabase/admin'
 import { getArticleSlugs } from '@/lib/insights-articles'
 
 // INTENT: Force dynamic so sitemap is generated at request time, not during build.
@@ -13,12 +9,11 @@ export const dynamic = 'force-dynamic'
 /**
  * Generates a dynamic sitemap for search engine indexing.
  *
- * @description Includes:
- * 1. Static marketing pages (/, /experts, /blog)
- * 2. Role category pages (/experts/fractional-cmo, etc.)
- * 3. Long-tail role + location pages (/experts/fractional-cmo/london)
- * 4. Individual expert profile pages (/expert/[slug])
- * 5. Published blog posts (/blog/[slug])
+ * @description Hardware-only pages (D1, 2026-08-14): the fractional-executive
+ * marketplace (/experts, /expert/*, /blog/*) is withdrawn from the sitemap and
+ * noindexed — it confused the entity model answer engines build for
+ * "Fractional Forge = the front end for hardware". The code remains in the
+ * repo so the marketplace can return later.
  *
  * @security Only public pages included. No authenticated routes.
  */
@@ -26,25 +21,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://fractionalforge.app'
     const now = new Date()
 
-    // Static pages
     const staticPages: MetadataRoute.Sitemap = [
         {
             url: appUrl,
             lastModified: now,
             changeFrequency: 'weekly',
             priority: 1.0,
-        },
-        {
-            url: `${appUrl}/experts`,
-            lastModified: now,
-            changeFrequency: 'daily',
-            priority: 0.9,
-        },
-        {
-            url: `${appUrl}/blog`,
-            lastModified: now,
-            changeFrequency: 'daily',
-            priority: 0.8,
         },
         {
             url: `${appUrl}/pricing`,
@@ -137,73 +119,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         },
     ]
 
-    // Role category pages (known set)
-    const rolePages: MetadataRoute.Sitemap = Object.keys(DIRECTORY_ROLE_CATEGORIES).map(
-        (roleSlug) => ({
-            url: `${appUrl}/experts/${roleSlug}`,
-            lastModified: now,
-            changeFrequency: 'daily' as const,
-            priority: 0.8,
-        })
-    )
-
-    // Dynamic: individual expert profiles
-    let expertPages: MetadataRoute.Sitemap = []
-    try {
-        const slugs = await getDirectoryExpertSlugs()
-        expertPages = slugs.map((slug) => ({
-            url: `${appUrl}/expert/${slug}`,
-            lastModified: now,
-            changeFrequency: 'weekly' as const,
-            priority: 0.7,
-        }))
-    } catch (error) {
-        console.error('[Sitemap] Failed to fetch expert slugs:', error)
-    }
-
-    // Dynamic: long-tail role + location pages
-    let locationPages: MetadataRoute.Sitemap = []
-    try {
-        const locations = await getDirectoryLocations()
-        const roleKeys = Object.keys(DIRECTORY_ROLE_CATEGORIES) as DirectoryRoleSlug[]
-
-        locationPages = roleKeys.flatMap((roleSlug) =>
-            locations.map((loc) => ({
-                url: `${appUrl}/experts/${roleSlug}/${locationToSlug(loc.location_name)}`,
-                lastModified: now,
-                changeFrequency: 'weekly' as const,
-                priority: 0.6,
-            }))
-        )
-    } catch (error) {
-        console.error('[Sitemap] Failed to fetch locations:', error)
-    }
-
-    // Dynamic: published blog posts
-    let blogPages: MetadataRoute.Sitemap = []
-    try {
-        const adminClient = createAdminClient()
-        const { data: posts } = await adminClient.rpc('list_published_content', {
-            p_content_type: 'blog',
-            p_limit: 500,
-            p_offset: 0,
-        })
-        if (posts) {
-            // SECURITY: Filter out posts without slugs to prevent invalid sitemap entries (#15)
-            blogPages = posts
-                .filter((post: { publish_metadata: Record<string, unknown> }) =>
-                    (post.publish_metadata as Record<string, unknown>)?.slug)
-                .map((post: { publish_metadata: Record<string, unknown>; created_at: string }) => ({
-                    url: `${appUrl}/blog/${(post.publish_metadata as Record<string, unknown>).slug}`,
-                    lastModified: new Date((post.publish_metadata as Record<string, unknown>)?.published_at as string || post.created_at),
-                    changeFrequency: 'weekly' as const,
-                    priority: 0.7,
-                }))
-        }
-    } catch (error) {
-        console.error('[Sitemap] Failed to fetch published blog posts:', error)
-    }
-
     // Native Insights articles (republished HFN essays)
     const articlePages: MetadataRoute.Sitemap = getArticleSlugs().map((slug) => ({
         url: `${appUrl}/insights/${slug}`,
@@ -212,5 +127,5 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         priority: 0.7,
     }))
 
-    return [...staticPages, ...rolePages, ...expertPages, ...locationPages, ...blogPages, ...articlePages]
+    return [...staticPages, ...articlePages]
 }

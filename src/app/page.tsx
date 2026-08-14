@@ -5,6 +5,9 @@ export const metadata: Metadata = {
   title: "Fractional Forge — the front end for hardware",
   description:
     "Fractional Forge helps deep-tech and hardware founders get funded — and built. We bring the commercial strategy, the capital, and a curated network of Europe’s best manufacturing partners — so you can run like a software company. Your first Design Dossier is free.",
+  alternates: {
+    canonical: "https://fractionalforge.app/",
+  },
 };
 
 const HTML = `<style>

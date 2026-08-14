@@ -1,5 +1,13 @@
+import type { Metadata } from 'next'
 import { MarketingNav } from '@/components/marketing/marketing-nav'
 import { MarketingFooter } from '@/components/marketing/marketing-footer'
+
+// INTENT (D1, 2026-08-14): the fractional-executive marketplace is withdrawn
+// from search/AI indexes — it confuses the "Fractional Forge = hardware" entity
+// model answer engines build. Code kept so it can return later.
+export const metadata: Metadata = {
+    robots: { index: false, follow: false },
+}
 
 /**
  * Layout for the public expert directory.
