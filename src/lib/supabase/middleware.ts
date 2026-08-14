@@ -30,6 +30,7 @@ const PUBLIC_ROUTES = [
     '/demo',  // Public demo page
     '/brief-demo',  // Public CO2 brief-editor demo (no auth) — temporary, client demos
     '/brief',  // Public concierge brief intake (the homepage "Get your brief" CTA)
+    '/project',  // Customer project-status pages /project/[token] — the unguessable token IS the credential (§6.4); RLS-deny-all + service-role reads behind it
     '/blog',  // Public blog (content group)
     '/api/admin/dashboard',  // Standalone admin dashboard (own password gate)
     '/api/admin/snapshot-pdf',  // Agent-callable PDF download (CRON_SECRET Bearer at route)

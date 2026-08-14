@@ -120,11 +120,13 @@ const nextConfig: NextConfig = {
 
   // Tree-shake heavy barrel-export packages for smaller bundles
   experimental: {
-    // INTENT: Raise server action body size limit from 1MB default to 8MB.
+    // INTENT: Raise server action body size limit from 1MB default.
     // Module image generation sends hero product image (~2MB base64) + module
-    // crop per call. Complex products with large hero images need >4MB.
+    // crop per call. The dossier pipeline (§6) additionally uploads customer
+    // brief attachments (≤15MB) and finished Dossier workbooks (≤50MB)
+    // through server actions, so 64mb covers the worst case.
     serverActions: {
-      bodySizeLimit: "8mb",
+      bodySizeLimit: "64mb",
     },
     // SECURITY: framer-motion removed — optimizePackageImports breaks its
     // constructor exports in production builds, causing "Object is not a

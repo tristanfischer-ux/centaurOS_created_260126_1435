@@ -9,7 +9,7 @@
  */
 
 import { useState, type FormEvent } from "react"
-import { submitBrief } from "@/actions/brief"
+import { submitDossierBrief } from "@/actions/dossier-projects"
 import { MarketingNav } from "@/components/marketing/marketing-nav"
 import { MarketingFooter } from "@/components/marketing/marketing-footer"
 
@@ -56,9 +56,11 @@ export function BriefIntake() {
   const [email, setEmail] = useState("")
   const [sector, setSector] = useState("")
   const [company, setCompany] = useState("")
+  const [nda, setNda] = useState(false)
   const [sending, setSending] = useState(false)
   const [error, setError] = useState("")
   const [done, setDone] = useState(false)
+  const [trackToken, setTrackToken] = useState("")
   const firstName = name.trim().split(" ")[0] || "there"
 
   async function onSubmit(e: FormEvent<HTMLFormElement>) {
@@ -70,10 +72,18 @@ export function BriefIntake() {
     }
     setSending(true)
     try {
-      const res = await submitBrief({ idea, name, email, sector, company })
+      const fd = new FormData(e.currentTarget)
+      fd.set("idea", idea)
+      fd.set("name", name)
+      fd.set("email", email)
+      fd.set("sector", sector)
+      fd.set("company", company)
+      if (nda) fd.set("nda", "on")
+      const res = await submitDossierBrief(fd)
       if (res.error) {
         setError(res.error)
       } else {
+        setTrackToken(res.token ?? "")
         setDone(true)
         window.scrollTo({ top: 0, behavior: "smooth" })
       }
@@ -113,6 +123,14 @@ export function BriefIntake() {
                     <input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required placeholder="jane@yourcompany.com" />
                   </div>
                 </div>
+                <div>
+                  <label htmlFor="attachment">Attach a file <span className="hint">(optional &mdash; a spec, sketch or deck; PDF, Office, image or zip, up to 15&nbsp;MB)</span></label>
+                  <input id="attachment" name="attachment" type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.txt,.png,.jpg,.jpeg,.zip" />
+                </div>
+                <label style={{ display: "flex", gap: "10px", alignItems: "flex-start", fontWeight: 500, fontSize: "14.5px", cursor: "pointer" }}>
+                  <input type="checkbox" checked={nda} onChange={(e) => setNda(e.target.checked)} style={{ width: "auto", marginTop: "4px" }} />
+                  <span>I&rsquo;d like an NDA before we go further &mdash; Tristan will send one over before the work starts.</span>
+                </label>
                 <div className="row2">
                   <div>
                     <label htmlFor="sector">Sector</label>
@@ -141,6 +159,9 @@ export function BriefIntake() {
               <div className="check">&#10003;</div>
               <h1>Thanks, {firstName} &mdash; your brief&rsquo;s in.</h1>
               <p className="sub">Anvil will build your Design Dossier &mdash; an auditable Excel workbook &mdash; and once a senior engineer from our partner network has reviewed it, I&rsquo;ll email it to <strong>{email}</strong>, within a few business days.</p>
+              {trackToken && (
+                <p className="sub">Track its progress any time on your private status page (also in your confirmation email): <a href={`/project/${trackToken}`}><strong>your project tracker &rarr;</strong></a></p>
+              )}
               <p className="sub">Want to talk it through first? Grab a slot:</p>
               <a className="btn" href="https://calendly.com/tristan-fischer-wjlf/30min" target="_blank" rel="noopener" style={{ maxWidth: "320px", margin: "14px auto 0" }}>Book a 30-min call</a>
               <p className="sign">&mdash; Tristan, Founder, Fractional Forge</p>
