@@ -56,8 +56,9 @@ export default function HowWeWorkPage() {
                 Describe your idea in a short brief — a paragraph to a page. We
                 build your Design Dossier: an auditable engineering-and-costing
                 model, delivered as an Excel workbook, where every number traces
-                back to a formula you can check. A senior engineer reviews the
-                whole thing before it reaches you, usually within a day.
+                back to a formula you can check. A senior engineer from our
+                partner network reviews the whole thing before it reaches you,
+                within a few business days.
               </p>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-3xl">
@@ -149,7 +150,7 @@ export default function HowWeWorkPage() {
               Tell us what you&apos;re building
             </h2>
             <p className="text-muted-foreground max-w-lg mx-auto">
-              Your first Design Dossier is free, and I&apos;ll send it within a day.
+              Your first Design Dossier is free, and I&apos;ll send it within a few business days.
             </p>
             <div className="flex flex-col sm:flex-row gap-3 justify-center">
               <Link

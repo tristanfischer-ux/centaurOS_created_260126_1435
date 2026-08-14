@@ -45,7 +45,7 @@ export const metadata: Metadata = {
     default: "Fractional Forge — the front end for hardware",
     template: "%s | Fractional Forge",
   },
-  description: "Fractional Forge helps deep-tech and hardware founders get funded — and built. We bring the commercial strategy, the capital (introducer/success-fee), and a curated network of Europe's best engineering and manufacturing partners. Every Design Dossier is reviewed by a senior engineer before you see it. Your first is free.",
+  description: "The front end for hardware. Anvil turns your project brief into a costed, buildable engineering design in a few business days; senior engineers from our curated partner network review it; the same network can build it. And we help you raise the capital too (introducer/success-fee). Your first Design Dossier is free.",
   metadataBase: new URL("https://fractionalforge.app"),
   manifest: "/manifest.json",
   icons: {
@@ -66,13 +66,13 @@ export const metadata: Metadata = {
     locale: "en_GB",
     siteName: "Fractional Forge",
     title: "Fractional Forge — the front end for hardware",
-    description: "Fractional Forge helps deep-tech and hardware founders get funded — and built. We bring the commercial strategy, the capital (introducer/success-fee), and a curated network of Europe's best engineering and manufacturing partners. Every Design Dossier is reviewed by a senior engineer before you see it. Your first is free.",
+    description: "The front end for hardware. Anvil turns your project brief into a costed, buildable engineering design in a few business days; senior engineers from our curated partner network review it; the same network can build it. And we help you raise the capital too (introducer/success-fee). Your first Design Dossier is free.",
     url: "https://fractionalforge.app",
   },
   twitter: {
     card: "summary_large_image",
     title: "Fractional Forge — the front end for hardware",
-    description: "Fractional Forge helps deep-tech and hardware founders get funded — and built. We bring the commercial strategy, the capital (introducer/success-fee), and a curated network of Europe's best engineering and manufacturing partners. Every Design Dossier is reviewed by a senior engineer before you see it. Your first is free.",
+    description: "The front end for hardware. Anvil turns your project brief into a costed, buildable engineering design in a few business days; senior engineers from our curated partner network review it; the same network can build it. And we help you raise the capital too (introducer/success-fee). Your first Design Dossier is free.",
   },
   robots: {
     index: true,
@@ -93,7 +93,7 @@ const JSON_LD = {
       url: "https://fractionalforge.app",
       logo: "https://fractionalforge.app/icons/icon-192x192.png",
       description:
-        "The front end for hardware. Fractional Forge helps deep-tech and hardware founders get funded and built: commercial strategy, capital (introducer/success-fee), and a curated network of Europe's best engineering and manufacturing partners. Every Design Dossier is reviewed by a senior engineer.",
+        "The front end for hardware. Anvil turns a hardware founder's project brief into a costed, buildable engineering design; senior engineers from a curated network of design and engineering partner firms review it; the same partner network builds it. Capital-raising support on an introducer/success-fee basis. Every Design Dossier is reviewed by senior engineers from the partner network.",
       slogan: "The front end for hardware",
       areaServed: ["United Kingdom", "Europe"],
       founder: { "@id": "https://fractionalforge.app/#tristan-fischer" },

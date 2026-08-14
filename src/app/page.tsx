@@ -4,7 +4,7 @@ import { HeroNavScroll } from "./nav-scroll";
 export const metadata: Metadata = {
   title: "Fractional Forge — the front end for hardware",
   description:
-    "Fractional Forge helps deep-tech and hardware founders get funded — and built. We bring the commercial strategy, the capital, and a curated network of Europe’s best manufacturing partners — so you can run like a software company. Your first Design Dossier is free.",
+    "A costed, buildable engineering design in a few days — free, and reviewed by senior engineers from our partner network, who can then build it. From there we help you raise the capital too. Anvil designs and costs it; fractional experts review it; contract manufacturers build it.",
   alternates: {
     canonical: "https://fractionalforge.app/",
   },
@@ -245,14 +245,14 @@ const HTML = `<style>
   <div class="wrap nav-inner">
     <a class="brand" href="#"><span class="flame"><svg viewBox="0 0 24 24"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></svg></span> Fractional&nbsp;Forge</a>
     <nav class="nav-links">
-      <a href="#founders">For founders</a>
-      <a href="#partners">For partners</a>
       <a href="#how">How it works</a>
       <a href="#examples">What&rsquo;s inside</a>
+      <a href="/sample-package">Example package</a>
+      <a href="#partners">For partners</a>
       <a href="/insights">Insights</a>
       <a href="#about">About</a>
     </nav>
-    <a class="btn btn-primary" href="/brief">Work with us</a>
+    <a class="btn btn-primary" href="/brief">Get your free Design Dossier</a>
   </div>
 </header>
 
@@ -261,13 +261,13 @@ const HTML = `<style>
   <div class="wrap hero-grid">
     <div class="hero-copy">
       <span class="eyebrow">For deep-tech &amp; hardware founders</span>
-      <h1>The front end for hardware. Get funded &mdash; and built.</h1>
-      <p class="sub">Fractional Forge helps deep-tech and hardware founders get funded &mdash; and built. We bring the commercial strategy, the capital, and a curated network of Europe&rsquo;s best manufacturing and design partners &mdash; so you can run like a software company instead of drowning in engineering and manufacturing.</p>
+      <h1>The front end for hardware.</h1>
+      <p class="sub">A costed, buildable engineering design in a few days &mdash; free, and reviewed by senior engineers from our partner network, who can then build it. From there we help you raise the capital too.</p>
       <div class="hero-cta">
-        <a class="btn btn-primary btn-lg" href="/brief">Work with us</a>
-        <a class="btn btn-ghost btn-lg" href="#partners">Become a build partner</a>
+        <a class="btn btn-primary btn-lg" href="/brief">Get your free Design Dossier</a>
+        <a class="btn btn-ghost btn-lg" href="/sample-package">See a real example &rarr;</a>
       </div>
-      <p class="hero-trust"><span class="dot"></span> Strategy and capital up front, a curated build network behind you &mdash; and your first Design Dossier free.</p>
+      <p class="hero-trust"><span class="dot"></span> Anvil designs and costs it, our partner network&rsquo;s engineers review it &mdash; and the same network can build it.</p>
     </div>
     <div class="hero-visual">
       <img class="hero-img" src="/images/site/hero-illustration.webp" alt="A software-style control panel piped into an industrial process plant — the front end for hardware" width="1500" height="661" />
@@ -283,7 +283,7 @@ const HTML = `<style>
     <div class="cred-stat"><b>6 sectors</b><span>solar &middot; wind &middot; tidal &middot; batteries &middot; vertical farming &middot; carbon capture</span></div>
     <div class="cred-stat"><b>Ex-Citigroup</b><span>&amp; Shell Ventures &middot; took a company public on AIM</span></div>
   </div>
-  <p class="wrap cred-by">Founded by <strong>Tristan Fischer</strong> &mdash; a decade building Fischer Farms into one of the world&rsquo;s largest vertical farms. Every Design Dossier is reviewed by a senior engineer.</p>
+  <p class="wrap cred-by">Founded by <strong>Tristan Fischer</strong> &mdash; a decade building Fischer Farms into one of the world&rsquo;s largest vertical farms. Every Design Dossier is reviewed by a senior engineer from our partner network.</p>
 </section>
 
 <!-- THESIS: why hardware is harder than software -->
@@ -306,31 +306,32 @@ const HTML = `<style>
   <div class="wrap">
     <div class="s-head">
       <span class="eyebrow">How it works</span>
-      <h2>Three things, so you can behave like a software company.</h2>
-      <p class="muted" style="margin-top:12px">We&rsquo;re the commercial front end and the orchestration layer for hardware. You stay product-, sales- and marketing-led; a curated build network does the rest.</p>
+      <h2>Three parts, one chain: designed, reviewed, built.</h2>
+      <p class="muted" style="margin-top:12px">One brief goes in; a costed design comes out, checked by the engineers who can then build it. You stay product-, sales- and customer-led.</p>
     </div>
     <div class="steps">
       <div class="step">
         <div class="n">1</div>
-        <h3>Strategy &amp; commercial</h3>
-        <p>We sharpen what you&rsquo;re building, for whom, and why they buy &mdash; the positioning, the route to market, and the team you need.</p>
-        <p>It starts on day one with a free <strong>Design Dossier</strong>: an auditable engineering-and-costing model where every number traces back to a formula you can check.</p>
+        <h3>Anvil &mdash; the engine</h3>
+        <p><strong>Anvil</strong> turns your project brief into a costed, physics-checked <strong>Design Dossier</strong> in a few business days: a buildable design, a costed bill-of-materials ledger, engineering drawings, a financial model and a risk register.</p>
+        <p>Every number is a formula you can check. Your first Dossier is free.</p>
         <p><a href="#whats-in">See what&rsquo;s inside &darr;</a></p>
       </div>
       <div class="step">
         <div class="n">2</div>
-        <h3>Capital</h3>
-        <p>We raise the money. A curated investor network and an introducer / success-fee model &mdash; <strong>no raise, no fee</strong> &mdash; plus grants and non-dilutive routes.</p>
-        <p>A built-in manufacturing story makes you far more fundable.</p>
+        <h3>Fractional experts &mdash; the review</h3>
+        <p>Before you see it, the Dossier is reviewed by senior engineers from our curated network of design and engineering partner firms.</p>
+        <p>Not an anonymous sign-off &mdash; the same firms that build hardware for a living put their eyes on your design.</p>
       </div>
       <div class="step">
         <div class="n">3</div>
-        <h3>Build</h3>
-        <p>A curated, tiered network of Europe&rsquo;s best design houses and contract manufacturers &mdash; plus a fractional bench of senior manufacturing engineers.</p>
+        <h3>Contract manufacturing &mdash; the build</h3>
+        <p>When you&rsquo;re ready, the same curated partner network builds it &mdash; from prototypes to mid-volume production.</p>
         <p>So you don&rsquo;t build a factory to ship a product.</p>
-        <p><a href="#partners">For manufacturing partners &rarr;</a></p>
+        <p><a href="#partners">Meet the partner network &rarr;</a></p>
       </div>
     </div>
+    <p style="margin-top:28px;font-size:16px;color:var(--ink-soft);max-width:72ch">And when you&rsquo;re raising: we help with the capital too &mdash; fundraising on an introducer / success-fee basis (<strong>no raise, no fee</strong>), plus grants and non-dilutive routes. A costed, engineer-reviewed design with a route to build makes you far more fundable.</p>
   </div>
 </section>
 
@@ -340,8 +341,9 @@ const HTML = `<style>
     <div class="s-head">
       <span class="eyebrow">Start here &mdash; the Design Dossier</span>
       <h2>Your day-one on-ramp: a full Design Dossier, free.</h2>
-      <p class="muted" style="margin-top:12px">Describe your idea in a short brief &mdash; a paragraph is enough to start, and the more you tell it, the more precisely it hits your spec. Anvil, the engine inside Fractional Forge, builds your Design Dossier: an auditable Excel workbook &mdash; a buildable design, a costed bill-of-materials ledger, the true cost and a live financial model, the engineering drawings, and the risks and codes it must meet. Every number is a live formula you can trace, and it checks itself against a ship gate.</p>
-      <p style="margin-top:16px;font-weight:700;color:var(--ink);font-size:16.5px">About a day, not a quarter &mdash; a Design Dossier compresses the two-to-three months and &pound;20k&ndash;&pound;40k of upfront engineering study into one auditable workbook.</p>
+      <p class="muted" style="margin-top:12px">Describe your idea in a short brief &mdash; a paragraph is enough to start, and the more you tell it, the more precisely it hits your spec. Anvil, the engine inside Fractional Forge, builds your Design Dossier: an auditable Excel workbook &mdash; a buildable design, a costed bill-of-materials ledger, the true cost and a live financial model, the engineering drawings, and the risks and codes it must meet. Every number is a live formula you can trace, and Anvil runs independent checks on its own work before it ships.</p>
+      <p style="margin-top:16px;font-weight:700;color:var(--ink);font-size:16.5px">A few business days, not a quarter &mdash; a Design Dossier compresses the two-to-three months and &pound;20k&ndash;&pound;40k of an upfront engineering study* into one auditable workbook.</p>
+      <p class="muted" style="margin-top:8px;font-size:13px">*Compared with a typical early feasibility / FEED-style scoping study for an industrial product: concept design, equipment sizing, budget costing and a first risk register.</p>
     </div>
     <div class="feat">
       <div class="card"><h3>A buildable design</h3><p>Your idea broken into modules, with every principal part sized and dimensioned &mdash; geometry that audits itself.</p></div>
@@ -351,7 +353,7 @@ const HTML = `<style>
       <div class="card"><h3>Worked calculations</h3><p>Every key number recomputed live in the sheet and checked &mdash; hand-verifiable, not a black box.</p></div>
       <div class="card"><h3>Risk &amp; regulatory</h3><p>A hazard and risk register, and the codes and standards the design was actually sized to.</p></div>
       <div class="card"><h3>Holds &amp; open questions</h3><p>The honest open-items list: what&rsquo;s assumed, what&rsquo;s excluded, and the exact questions to confirm with us.</p></div>
-      <div class="card"><h3>It checks itself</h3><p>A quality-audit surface scoring every section, live invariant checks, an independent sense-check, and a ship verdict.</p></div>
+      <div class="card"><h3>It checks itself</h3><p>Component specs validated against datasheets, load-vs-rating sizing checks, standards checked for your market, cross-document consistency checks &mdash; then a quality scorecard and ship verdict.</p></div>
     </div>
   </div>
 </section>
@@ -389,10 +391,10 @@ const HTML = `<style>
       <div class="card"><h3>Traceable costs</h3><p>Inputs &amp; assumptions &rarr; calculations &rarr; quantities &rarr; bill-of-materials ledger &rarr; cost waterfall &rarr; financial model. Every number is a formula.</p></div>
       <div class="card"><h3>Engineering drawings</h3><p>General arrangement, P&amp;ID, block-flow, single-line, HVAC and electrical &mdash; plus 3D renders of the build.</p></div>
       <div class="card"><h3>Risk &amp; open questions</h3><p>What you&rsquo;ll need to certify, the holds and exclusions, and the questions still to resolve &mdash; stated plainly, not buried.</p></div>
-      <div class="card"><h3>It checks itself</h3><p>A scorecard, sense-check, connection trace and audit run before delivery &mdash; then a senior engineer reviews the whole workbook. It&rsquo;s built to be checked: it makes an expert think, and catches what a busy team would miss.</p></div>
+      <div class="card"><h3>It checks itself</h3><p>A scorecard, sense-check, connection trace and audit run before delivery &mdash; then a senior engineer from our partner network reviews the whole workbook. It&rsquo;s built to be checked: it makes an expert think, and catches what a busy team would miss.</p></div>
     </div>
     <div style="text-align:center;margin-top:30px;display:flex;gap:12px;justify-content:center;flex-wrap:wrap"><a class="btn btn-ghost btn-lg" href="https://jyarhvinengfyrwgtskq.supabase.co/storage/v1/object/public/dossiers/example-water-treatment-dossier.xlsx">See a real example workbook &mdash; Excel &darr;</a><a class="btn btn-ghost btn-lg" href="/cost/water-treatment-plant">Read a worked cost breakdown &rarr;</a></div>
-    <p class="ex-note">A worked example (a water-treatment plant): open it and change an assumption to watch the model recompute. Also built for grid-scale battery storage, vertical farms, CO&#8322; capture and power-to-liquid aviation fuel. Yours covers your idea.</p>
+    <p class="ex-note">A worked example (a water-treatment plant): open it and change an assumption to watch the model recompute. The same engine has been pointed at grid-scale battery storage, vertical farms, CO&#8322; capture and power-to-liquid aviation fuel. Yours covers your idea.</p>
   </div>
 </section>
 
@@ -412,7 +414,7 @@ const HTML = `<style>
       </ul>
       <div>
         <p class="muted" style="margin-bottom:20px">Most founders we work with are deep in the science and the engineering. We take the commercial, the capital and the build off your plate &mdash; so you can run the company, not the workshop.</p>
-        <a class="btn btn-primary btn-lg" href="/brief">Tell us what you&rsquo;re building &rarr;</a>
+        <a class="btn btn-primary btn-lg" href="/brief">Get your free Design Dossier &rarr;</a>
       </div>
     </div>
   </div>
@@ -422,9 +424,10 @@ const HTML = `<style>
 <section class="s partners" id="partners">
   <div class="wrap">
     <div class="s-head">
-      <span class="eyebrow">For manufacturing partners</span>
-      <h2>Become one of our build partners.</h2>
-      <p class="lead">We&rsquo;re assembling a small, curated panel of best-in-class build and engineering partners across Europe &mdash; deliberately just three per tier of complexity, from design and prototyping through to mid-volume and complex-systems integration.</p>
+      <span class="eyebrow">The partner network &mdash; pillars two and three</span>
+      <h2>The engineers who review your Dossier can build it too.</h2>
+      <p class="lead">Our partner network isn&rsquo;t decoration &mdash; it <em>is</em> the second and third parts of the model. A small, curated panel of best-in-class design houses, engineering firms and contract manufacturers across Europe: their senior engineers review every Design Dossier, and their factories and workshops take the build. Deliberately just three per tier of complexity, from design and prototyping through to mid-volume and complex-systems integration.</p>
+      <p class="pnote" style="margin-top:14px">We name partners here only once they&rsquo;ve formally joined &mdash; logos and one-liners appear as each firm confirms. The panel is being assembled now.</p>
     </div>
     <ul class="offer">
       <li><b>Funded deal flow</b><span>De-risked, funded, commercially-led product companies ready to build &mdash; orders that fill your lines, not just leads.</span></li>
@@ -432,9 +435,8 @@ const HTML = `<style>
       <li><b>An equity option</b><span>On selected companies, a small equity stake in exchange for favourable build terms: real upside and locked-in future builds.</span></li>
     </ul>
     <div class="pact">
-      <a class="btn btn-primary btn-lg" href="mailto:tristan.fischer@fractionalforge.app?subject=Joining%20the%20Fractional%20Forge%20build%20panel">Talk to us about joining the panel &rarr;</a>
+      <a class="btn btn-ghost btn-lg" href="mailto:tristan.fischer@fractionalforge.app?subject=Joining%20the%20Fractional%20Forge%20build%20panel">Talk to us about joining the panel &rarr;</a>
     </div>
-    <p class="pnote">We name partners only once they&rsquo;ve joined &mdash; the panel is being assembled now.</p>
   </div>
 </section>
 
@@ -444,14 +446,14 @@ const HTML = `<style>
     <div class="s-head">
       <span class="eyebrow">For teams who quote</span>
       <h2>Quote faster than anyone &mdash; and win more.</h2>
-      <p class="muted" style="margin-top:12px">If your team assesses briefs and quotes for customers, the same engine turns a project brief into a costed, engineer-checked proposal in about a day &mdash; so you&rsquo;re back to the client before your competitors have finished scoping. The fastest credible quote usually wins the contract.</p>
+      <p class="muted" style="margin-top:12px">If your team assesses briefs and quotes for customers, Anvil turns a project brief into a costed, engineer-checked proposal in days, not months &mdash; so you&rsquo;re back to the client before your competitors have finished scoping. The fastest credible quote usually wins the contract.</p>
     </div>
     <div class="axis-grid">
-      <div class="axis"><span class="axis-k">Days, not months</span><p>A brief becomes a costed, engineer-checked proposal in about a day &mdash; and hours for work like something you&rsquo;ve done before.</p></div>
+      <div class="axis"><span class="axis-k">Days, not months</span><p>A brief becomes a costed, engineer-checked proposal in days &mdash; faster still for work like something you&rsquo;ve done before.</p></div>
       <div class="axis"><span class="axis-k">Win the near-misses</span><p>Get a credible number back first. On most tenders the fastest sound quote takes the contract.</p></div>
       <div class="axis"><span class="axis-k">Right, not just fast</span><p>First-principles physics flags what a busy team can miss &mdash; and a human signs off every quote before it goes out.</p></div>
     </div>
-    <div style="margin-top:30px"><a class="btn btn-primary btn-lg" href="/contact">Talk to us about your team &rarr;</a></div>
+    <div style="margin-top:30px"><a class="btn btn-ghost btn-lg" href="/contact">Talk to us about your team &rarr;</a></div>
   </div>
 </section>
 
@@ -461,8 +463,8 @@ const HTML = `<style>
     <div class="s-head">
       <span class="eyebrow">Why you can trust the work</span>
       <h2>Real physics. Real data. Not a black box.</h2>
-      <p class="muted" style="margin-top:12px">The Design Dossier isn&rsquo;t a chatbot guessing numbers. Its engineering review runs <strong>231 calculation tools</strong> built on the same peer-reviewed, open physics libraries professional engineers use &mdash; and checks every part against live, real-world data. Each Dossier shows its workings <em>and</em> its sources.</p>
-      <p class="muted" style="margin-top:14px">Because it works from first principles, it flags what an experienced team can miss &mdash; a flow rate that ignores pipe friction, a heat load that forgets the pumps are warming the water. It will argue with the spec, and it&rsquo;s usually right.</p>
+      <p class="muted" style="margin-top:12px">The Design Dossier isn&rsquo;t a chatbot guessing numbers. Anvil&rsquo;s engineering review runs <strong>over 200 calculation tools</strong> built on the same peer-reviewed, open physics libraries professional engineers use &mdash; and checks every part against real-world data. Each Dossier shows its workings <em>and</em> its sources.</p>
+      <p class="muted" style="margin-top:14px">Because it works from first principles, Anvil flags what an experienced team can miss &mdash; a flow rate that ignores pipe friction, a heat load that forgets the pumps are warming the water. It will argue with the spec &mdash; and every disagreement is shown with its working, so you can check who&rsquo;s right. It&rsquo;s a rigorous first pass, not a guarantee &mdash; which is why every number is shown, and why senior engineers from our partner network review each Dossier before it ships.</p>
     </div>
     <div class="hood-grid">
       <div class="hood-col">
@@ -475,19 +477,19 @@ const HTML = `<style>
           <div class="chip"><b>OpenDSS &amp; PandaPower</b><span>Grid power-flow &middot; IEC 60909</span></div>
           <div class="chip"><b>IAPWS-IF97</b><span>Steam &amp; water properties &middot; intl. standard</span></div>
         </div>
-        <p class="hood-note">231 calculation tools across battery, thermal, fluids, power, chemical-process and structural domains &mdash; all open and citable.</p>
+        <p class="hood-note">Over 200 calculation tools across battery, thermal, fluids, power, chemical-process and structural domains &mdash; all open and citable. The full list is available on request.</p>
       </div>
       <div class="hood-col">
         <h3>Checked against real-world data</h3>
-        <p class="lead">Every part and price is grounded in live sources, not invented:</p>
+        <p class="lead">Every part and price is cross-checked against real sources:</p>
         <ul class="hood-list">
-          <li><b>Live component pricing</b> &mdash; Mouser, Digi-Key, Farnell &amp; LCSC</li>
-          <li><b>36,000-part</b> reference library with real manufacturer part numbers</li>
-          <li><b>30,000 UK &amp; EU suppliers</b> &mdash; matched per module</li>
-          <li><b>Jurisdiction standards</b> &mdash; BS EN, IEC, G99, UL, NFPA</li>
+          <li><b>Continuously-refreshed component pricing</b> &mdash; from Mouser, Digi-Key, Farnell &amp; LCSC catalogues</li>
+          <li><b>36,000-part</b> reference library with real manufacturer part numbers &mdash; cross-checked against distributor catalogues to catch invented part numbers before they reach you</li>
+          <li><b>A database of 30,000+ UK &amp; EU suppliers</b> &mdash; filtered and matched to your module&rsquo;s category</li>
+          <li><b>Jurisdiction standards</b> &mdash; BS EN, IEC, G99, UL, NFPA &mdash; checked against your target market</li>
           <li><b>Curated materials pricing</b> &mdash; steel, copper, aluminium, composites</li>
         </ul>
-        <p class="hood-note">35 data sources in total &mdash; over 5 million reference records, refreshed continuously.</p>
+        <p class="hood-note">35 data sources in total &mdash; over 5 million reference records, kept current. Then a senior engineer from our partner network reviews the whole workbook before you see it.</p>
       </div>
     </div>
   </div>
@@ -533,9 +535,9 @@ const HTML = `<style>
           <li>Architecture, a traceable bill-of-materials ledger &amp; full costs</li>
           <li>Engineering drawings and a live financial model</li>
           <li>Manufacturer shortlist and investor matches</li>
-          <li>Reviewed by a senior engineer before you see it</li>
+          <li>Reviewed by a senior engineer from our partner network before you see it</li>
         </ul>
-        <a class="btn btn-primary" href="/brief">Start a brief</a>
+        <a class="btn btn-primary" href="/brief">Get your free Design Dossier</a>
       </div>
       <div class="plan">
         <span class="tag-pill tag-grey">Work with me</span>
@@ -550,7 +552,7 @@ const HTML = `<style>
         <a class="btn btn-ghost" href="https://calendly.com/tristan-fischer-wjlf/30min" target="_blank" rel="noopener">Book a call</a>
       </div>
     </div>
-    <p class="price-note"><b>No self-serve, for now.</b> Every Dossier is hand-built and reviewed by a senior engineer &mdash; a self-serve version is on the way. Anything beyond the free Dossier is scoped to your project; there&rsquo;s no standard price list, because no two hardware companies are the same.</p>
+    <p class="price-note"><b>No self-serve, for now.</b> Every Dossier is hand-built and reviewed by a senior engineer from our partner network &mdash; a self-serve version is on the roadmap. We take on a small number of engagements each quarter. Anything beyond the free Dossier is scoped to your project; there&rsquo;s no standard price list, because no two hardware companies are the same.</p>
   </div>
 </section>
 
@@ -572,7 +574,11 @@ const HTML = `<style>
     </details>
     <details>
       <summary>How accurate are the costs and the investor list?</summary>
-      <div class="body">The Design Dossier is a rigorous first pass, not a guarantee. Costs are indicative and the maths is shown so you can check every number &mdash; and a senior engineer reviews the whole workbook before you see it.</div>
+      <div class="body">The Design Dossier is a rigorous first pass, not a guarantee. Costs are indicative and the maths is shown so you can check every number &mdash; and a senior engineer from our partner network reviews the whole workbook before you see it.</div>
+    </details>
+    <details>
+      <summary>Is my brief confidential?</summary>
+      <div class="body">Yes. Your brief is reviewed by a senior engineer from our partner network, never used to train any model, and never shared with a manufacturing or investor partner without your explicit consent. An NDA is available on request &mdash; just ask.</div>
     </details>
     <details>
       <summary>Who owns the IP I create?</summary>
@@ -584,14 +590,14 @@ const HTML = `<style>
 <!-- FINAL CTA -->
 <section class="final" id="get-started">
   <div class="wrap">
-    <h2>Get funded &mdash; and built.</h2>
-    <p>Two ways in: tell us what you&rsquo;re building, or join the curated build panel.</p>
+    <h2>Designed, reviewed, built.</h2>
+    <p>Two ways in: tell us what you&rsquo;re building, or join the curated partner network.</p>
     <div class="paths">
       <div class="plan">
         <span class="tag-pill tag-ember">Founders</span>
         <h3 style="margin-top:12px">Tell us what you&rsquo;re building.</h3>
-        <p>Write a short brief and get your first Design Dossier free &mdash; the architecture, the costs, the risks, and investors who&rsquo;ve backed similar products.</p>
-        <a class="btn btn-primary" href="/brief">Get your brief &rarr;</a>
+        <p>Write a short brief and get your first Design Dossier free &mdash; a costed, buildable design reviewed by senior engineers from our partner network, who can then build it.</p>
+        <a class="btn btn-primary" href="/brief">Get your free Design Dossier &rarr;</a>
       </div>
       <div class="plan">
         <span class="tag-pill tag-grey">Manufacturing partners</span>
@@ -607,7 +613,7 @@ const HTML = `<style>
   <div class="wrap foot-grid">
     <div class="foot-brand">
       <span class="brand" style="font-size:18px"><span class="flame"><svg viewBox="0 0 24 24"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></svg></span> Fractional Forge</span>
-      <p>The front end for hardware. We help deep-tech and hardware founders get funded &mdash; and built: commercial strategy, capital, and a curated network of Europe&rsquo;s best engineering and manufacturing partners. Every Design Dossier is reviewed by a senior engineer.</p>
+      <p>The front end for hardware. Anvil turns your brief into a costed, buildable design; senior engineers from our curated partner network review it; the same network can build it. And we help you raise the capital too. Your first Design Dossier is free.</p>
     </div>
     <div class="foot-col">
       <h4>Explore</h4>
@@ -629,9 +635,69 @@ const HTML = `<style>
 
 `;
 
+// Mirrors the rendered FAQ in the HTML above — keep the two in step.
+const FAQ_JSON_LD = {
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  mainEntity: [
+    {
+      "@type": "Question",
+      name: "Is Fractional Forge just the Dossier?",
+      acceptedAnswer: {
+        "@type": "Answer",
+        text: "No — the Design Dossier is how we start. From there we work on your commercial strategy, raise capital on an introducer / success-fee basis, and connect you to a curated network of European manufacturing partners so you don't have to build your own factory.",
+      },
+    },
+    {
+      "@type": "Question",
+      name: "How does the build network work?",
+      acceptedAnswer: {
+        "@type": "Answer",
+        text: "We're assembling a curated, tiered panel of European design houses and contract manufacturers — deliberately just three per tier of complexity. When your product is ready to build, we match you to the right partner for your stage and complexity. We name partners only once they've joined.",
+      },
+    },
+    {
+      "@type": "Question",
+      name: "I'm a manufacturer — how do I join?",
+      acceptedAnswer: {
+        "@type": "Answer",
+        text: "We bring you de-risked, funded, commercially-led companies ready to build. If you're a best-in-class design house or contract manufacturer in Europe, get in touch about joining the panel.",
+      },
+    },
+    {
+      "@type": "Question",
+      name: "How accurate are the costs and the investor list?",
+      acceptedAnswer: {
+        "@type": "Answer",
+        text: "The Design Dossier is a rigorous first pass, not a guarantee. Costs are indicative and the maths is shown so you can check every number — and a senior engineer from our partner network reviews the whole workbook before you see it.",
+      },
+    },
+    {
+      "@type": "Question",
+      name: "Is my brief confidential?",
+      acceptedAnswer: {
+        "@type": "Answer",
+        text: "Yes. Your brief is reviewed by a senior engineer from our partner network, never used to train any model, and never shared with a manufacturing or investor partner without your explicit consent. An NDA is available on request — just ask.",
+      },
+    },
+    {
+      "@type": "Question",
+      name: "Who owns the IP I create?",
+      acceptedAnswer: {
+        "@type": "Answer",
+        text: "You do. 100%. Fractional Forge provides the tools, the Dossier and the introductions, but all intellectual property, designs and ideas belong entirely to you. This is baked into our terms.",
+      },
+    },
+  ],
+};
+
 export default function HomePage() {
   return (
     <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(FAQ_JSON_LD) }}
+      />
       <div dangerouslySetInnerHTML={{ __html: HTML }} />
       <HeroNavScroll />
     </>

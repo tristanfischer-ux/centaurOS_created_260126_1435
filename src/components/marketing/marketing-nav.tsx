@@ -21,10 +21,10 @@ import { Button } from '@/components/ui/button'
 import { useState, useEffect } from 'react'
 
 const NAV_LINKS = [
-    { href: '/#founders', label: 'For founders' },
-    { href: '/#partners', label: 'For partners' },
     { href: '/#how', label: 'How it works' },
     { href: '/#examples', label: "What's inside" },
+    { href: '/sample-package', label: 'Example package' },
+    { href: '/#partners', label: 'For partners' },
     { href: '/insights', label: 'Insights' },
     { href: '/about', label: 'About' },
 ] as const
@@ -111,7 +111,7 @@ export function MarketingNav({ isAuthed = false }: MarketingNavProps = {}) {
                             size="sm"
                             className="bg-international-orange text-white hover:bg-international-orange-hover"
                         >
-                            {isAuthed ? 'Open app' : 'Work with us'}
+                            {isAuthed ? 'Open app' : 'Get your free Design Dossier'}
                         </Button>
                     </Link>
                 </div>
@@ -143,7 +143,7 @@ export function MarketingNav({ isAuthed = false }: MarketingNavProps = {}) {
                                 className="mb-3 flex min-h-[48px] items-center justify-center rounded-md bg-international-orange text-center text-sm font-bold text-primary-foreground transition-colors hover:bg-international-orange-hover"
                                 onClick={() => setMobileMenuOpen(false)}
                             >
-                                {isAuthed ? 'Open app' : 'Work with us'}
+                                {isAuthed ? 'Open app' : 'Get your free Design Dossier'}
                             </Link>
                             {NAV_LINKS.map((link) => (
                                 <Link

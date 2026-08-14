@@ -44,6 +44,7 @@ const CSS = `
 .ff-intake .btn:disabled{opacity:.6;cursor:default;}
 .ff-intake .fineprint{font-size:13.5px;color:var(--muted);margin:6px 0 0;text-align:center;}
 .ff-intake .err{color:#b91c1c;font-size:14px;font-weight:600;}
+.ff-intake .confid{margin-top:10px;font-size:13px;color:var(--muted);background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:10px 13px;line-height:1.55;}
 .ff-intake .done{text-align:center;}
 .ff-intake .check{width:64px;height:64px;border-radius:50%;background:var(--green-soft);color:var(--green);display:flex;align-items:center;justify-content:center;font-size:34px;font-weight:800;margin:0 auto 20px;border:1px solid #b7ebd1;}
 .ff-intake .sign{margin-top:22px;font-weight:700;color:var(--ink);}
@@ -94,12 +95,13 @@ export function BriefIntake() {
             <div className="card">
               <span className="eyebrow">Get your Design Dossier</span>
               <h1>Tell me about your idea.</h1>
-              <p className="sub">A short brief is all I need &mdash; a paragraph is enough to start, and the more you tell me, the more precisely it hits your spec. Anvil builds your Design Dossier: an auditable Excel workbook with the architecture, a costed bill-of-materials ledger, a full financial model, the licences and regulations you&rsquo;ll face, the risks to watch, and a built-in self-audit &mdash; every number a formula you can trace. A senior engineer reviews it before I send it, within a day. No account, and your first one is free.</p>
+              <p className="sub">A short brief is all I need &mdash; a paragraph is enough to start, and the more you tell me, the more precisely it hits your spec. Anvil builds your Design Dossier: an auditable Excel workbook with the architecture, a costed bill-of-materials ledger, a full financial model, the licences and regulations you&rsquo;ll face, the risks to watch, and a built-in self-audit &mdash; every number a formula you can trace. A senior engineer from our partner network reviews it before I send it, within a few business days. No account, and your first one is free.</p>
               <form onSubmit={onSubmit}>
                 <div>
                   <label htmlFor="idea">Your idea <span className="req">*</span> <span className="hint">&mdash; what it does, who it&rsquo;s for, roughly how big.</span></label>
                   <textarea id="idea" value={idea} onChange={(e) => setIdea(e.target.value)} required
                     placeholder="e.g. A 3.5 MWh containerised battery energy-storage system for UK grid-scale frequency response, grid-tied at 11 kV, target install cost under £400/kWh, deployable within 5 days of delivery..." />
+                  <p className="confid">Your brief is confidential. It&rsquo;s reviewed by a senior engineer from our partner network, never used to train any model, and never shared with a manufacturing or investor partner without your explicit consent. An NDA is available on request &mdash; just ask.</p>
                 </div>
                 <div className="row2">
                   <div>
@@ -138,7 +140,7 @@ export function BriefIntake() {
             <div className="card done">
               <div className="check">&#10003;</div>
               <h1>Thanks, {firstName} &mdash; your brief&rsquo;s in.</h1>
-              <p className="sub">Anvil will build your Design Dossier &mdash; an auditable Excel workbook &mdash; and once a senior engineer has reviewed it, I&rsquo;ll email it to <strong>{email}</strong>, usually within a day.</p>
+              <p className="sub">Anvil will build your Design Dossier &mdash; an auditable Excel workbook &mdash; and once a senior engineer from our partner network has reviewed it, I&rsquo;ll email it to <strong>{email}</strong>, within a few business days.</p>
               <p className="sub">Want to talk it through first? Grab a slot:</p>
               <a className="btn" href="https://calendly.com/tristan-fischer-wjlf/30min" target="_blank" rel="noopener" style={{ maxWidth: "320px", margin: "14px auto 0" }}>Book a 30-min call</a>
               <p className="sign">&mdash; Tristan, Founder, Fractional Forge</p>

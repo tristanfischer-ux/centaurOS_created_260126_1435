@@ -22,7 +22,7 @@ import { MarketingFooter } from "@/components/marketing/marketing-footer"
 export const metadata: Metadata = {
   title: "About",
   description:
-    "Fractional Forge helps deep-tech and hardware founders get funded and built — strategy, capital, and a curated network of Europe's best engineering and manufacturing partners. Every Design Dossier is reviewed by a senior engineer.",
+    "Fractional Forge helps deep-tech and hardware founders get funded and built — strategy, capital, and a curated network of Europe's best engineering and manufacturing partners. Every Design Dossier is reviewed by senior engineers from the partner network.",
 }
 
 export default function AboutPage() {
@@ -52,7 +52,7 @@ export default function AboutPage() {
                 We are building the AWS for atoms.
               </p>
               <p>
-                Software founders rent infrastructure on AWS and focus on product. Hardware founders have no equivalent — they&apos;re expected to build factories, source suppliers and navigate procurement alone. Fractional Forge provides the missing layer: strategy and commercialisation, starting with a first-principles Design Dossier; capital, through fundraising and grants on an introducer/success-fee basis; and build, via a curated network of Europe&apos;s best engineering firms and a fractional bench of senior engineers. Every dossier is reviewed by a senior engineer before the founder sees it.
+                Software founders rent infrastructure on AWS and focus on product. Hardware founders have no equivalent — they&apos;re expected to build factories, source suppliers and navigate procurement alone. Fractional Forge provides the missing layer: strategy and commercialisation, starting with a first-principles Design Dossier; capital, through fundraising and grants on an introducer/success-fee basis; and build, via a curated network of Europe&apos;s best engineering firms and a fractional bench of senior engineers. Every dossier is reviewed by a senior engineer from the partner network before the founder sees it.
               </p>
             </div>
           </section>
@@ -142,7 +142,7 @@ export default function AboutPage() {
               Start your Design Dossier
             </h2>
             <p className="text-muted-foreground max-w-lg mx-auto">
-              Describe your idea in a short brief — your first Design Dossier is free, and I&apos;ll send it within a day.
+              Describe your idea in a short brief — your first Design Dossier is free, and I&apos;ll send it within a few business days.
             </p>
             <Link
               href="/brief"

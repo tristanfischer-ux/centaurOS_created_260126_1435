@@ -39,11 +39,11 @@ export function MarketingFooter() {
                             </span>
                         </Link>
                         <p className="max-w-sm text-sm leading-relaxed text-muted-foreground">
-                            The front end for hardware. We help deep-tech and
-                            hardware founders get funded — and built: commercial
-                            strategy, capital, and a curated network of Europe&rsquo;s
-                            best engineering and manufacturing partners. Every
-                            Design Dossier is reviewed by a senior engineer.
+                            The front end for hardware. Anvil turns your brief
+                            into a costed, buildable design; senior engineers
+                            from our curated partner network review it; the same
+                            network can build it. And we help you raise the
+                            capital too. Your first Design Dossier is free.
                         </p>
                     </div>
 

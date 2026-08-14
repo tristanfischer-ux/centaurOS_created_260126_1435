@@ -186,7 +186,9 @@ export default function SamplePackagePage() {
                 Sensors, edge compute, and remote connectivity in an everyday
                 irrigation controller — the smart-product wave at work. This
                 complete engineering package was generated from a paragraph of
-                plain English. Twenty-minute first pass, hours of detail after.
+                plain English. Twenty-minute first pass, hours of detail after
+                &mdash; then engineer review, and delivery within a few business
+                days.
               </p>
             </div>
 
@@ -556,7 +558,7 @@ export default function SamplePackagePage() {
               Describe your idea in a short brief. We build your Design Dossier
               — an auditable, engineer-checked workbook with the modules, a
               costed bill of materials, and matched UK and European
-              manufacturers — and I send it within a day.
+              manufacturers — and I send it within a few business days.
             </p>
             <Link
               href="/brief"
