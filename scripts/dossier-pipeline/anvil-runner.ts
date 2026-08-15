@@ -2,7 +2,7 @@
  * @file Anvil auto-runner — the local leg of the §6 concierge pipeline.
  *
  * Watches dossier_projects for new briefs, pulls each one down to this
- * machine, runs Anvil (serial-design-chain-v2) for the FIRST PASS, stages the
+ * machine, runs the one Anvil engine (`one_engine.py`) for the FIRST PASS, stages the
  * output for Tristan's review, and advances the project to in_review.
  * Delivery back to the customer stays MANUAL: Tristan reviews the workbook,
  * then uploads it in /studio (→ ready + customer email). Anvil never touches
@@ -18,7 +18,7 @@
  * Usage:
  *   npx tsx scripts/dossier-pipeline/anvil-runner.ts --once     # one poll (launchd)
  *   npx tsx scripts/dossier-pipeline/anvil-runner.ts --watch    # poll loop (dev)
- *   ANVIL_CMD='npx tsx scripts/serial-design-chain-v2.tsx {brief} {out}'  # override
+ *   ANVIL_CMD='python3 scripts/anvil_one_engine.py --brief {brief} --execute --work {out} --repo {repo}'
  *   DRY_RUN=1  # claim + download + stage dirs, but skip the chain
  *
  * Queue layout: ~/FF-dossier-queue/<project-id>/
@@ -242,11 +242,14 @@ function runAnvil(briefPath: string, outDir: string, dir: string): boolean {
   // are substituted per-token, so paths (and any future user-adjacent values)
   // are never interpreted by a shell.
   const cmdTemplate =
-    process.env.ANVIL_CMD || 'npx tsx scripts/serial-design-chain-v2.tsx {brief} {out}'
+    process.env.ANVIL_CMD ||
+    'python3 scripts/anvil_one_engine.py --brief {brief} --execute --work {out} --repo {repo}'
   const argv = cmdTemplate
     .split(/\s+/)
     .filter(Boolean)
-    .map((tok) => (tok === '{brief}' ? briefPath : tok === '{out}' ? outDir : tok))
+    .map((tok) =>
+      tok === '{brief}' ? briefPath : tok === '{out}' ? outDir : tok === '{repo}' ? ANVIL_REPO : tok,
+    )
   log(dir, `chain: ${argv.join(' ')}  (cwd: ${ANVIL_REPO})`)
   if (process.env.DRY_RUN) {
     log(dir, 'DRY_RUN set — skipping chain')

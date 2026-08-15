@@ -21,7 +21,9 @@ FOUNDER                    WEBSITE (Vercel + Supabase)                 YOUR MAC
   │                                 │                                     │ 3. downloads brief +
   │                                 │                                     │    attachments to
   │                                 │                                     │    ~/FF-dossier-queue/<id>/
-  │                                 │                                     │ 4. runs Anvil (first pass)
+  │                                 │                                     │ 4. runs one_engine.py
+  │                                 │                                     │    (expand brief → chain
+  │                                 │                                     │     → dossier + quote + zip)
   │                                 │ status: in_review ◀─────────────────│ 5. stages workbook in
   │◀── "in engineering review" ─────│ → email to founder                  │    …/<id>/review/
   │    (tracker updates)            │ → email to YOU: "ready for review"  │
