@@ -31,6 +31,25 @@ export const PIPELINE_ORDER: DossierStatus[] = [
   'delivered',
 ]
 
+/**
+ * Server-enforced transition allow-list (council #9). setProjectStatus rejects
+ * any transition not listed here, and applies it as a compare-and-swap on the
+ * current status, so a stale /studio form can't jump a project to an arbitrary
+ * state. Anvil's own submitted→in_progress→in_review moves happen in the runner
+ * (service role) and are intentionally not customer-triggerable.
+ */
+export const ALLOWED_TRANSITIONS: Record<DossierStatus, DossierStatus[]> = {
+  submitted: ['validated', 'needs_info', 'on_hold', 'declined'],
+  validated: ['in_progress', 'needs_info', 'on_hold', 'declined'],
+  in_progress: ['in_review', 'on_hold', 'declined'],
+  in_review: ['ready', 'in_progress', 'on_hold', 'declined'],
+  ready: ['delivered', 'in_review'],
+  delivered: ['ready'],
+  needs_info: ['validated', 'submitted', 'declined', 'on_hold'],
+  on_hold: ['validated', 'in_progress', 'declined'],
+  declined: ['submitted', 'validated'],
+}
+
 /** Customer-facing 5-step tracker labels (ready + delivered share step 5). */
 export const CUSTOMER_STEPS: { key: DossierStatus; label: string }[] = [
   { key: 'submitted', label: 'Received' },

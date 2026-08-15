@@ -4,7 +4,12 @@ import { STATUS_LABELS, PIPELINE_ORDER, type DossierStatus } from '@/lib/dossier
 
 /**
  * @file /studio board — all pipeline projects, newest first (§6.5)
+ *
+ * Admin gate is enforced at the DATA layer (listProjects → assertStudioAdmin),
+ * so this render is safe even if the layout check is ever bypassed (council #1).
  */
+
+export const dynamic = 'force-dynamic'
 
 const STATUS_BADGE: Record<DossierStatus, string> = {
   submitted: 'bg-blue-100 text-blue-800',

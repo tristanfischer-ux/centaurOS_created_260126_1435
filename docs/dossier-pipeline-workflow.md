@@ -13,8 +13,10 @@ FOUNDER                    WEBSITE (Vercel + Supabase)                 YOUR MAC
   │                                 │ → email to you                      │
   │◀── tracking link by email ──────│ → email to founder                  │
   │    /project/<token>             │                                     │
+  │                                 │  1a. YOU click Validate in /studio  │
+  │                                 │ status: validated                   │
   │                                 │       2. anvil-runner polls ◀───────│ (launchd, every 10 min)
-  │                                 │          claims the brief           │
+  │                                 │          claims VALIDATED briefs     │
   │                                 │ status: in_progress ◀───────────────│
   │                                 │                                     │ 3. downloads brief +
   │                                 │                                     │    attachments to
@@ -38,17 +40,26 @@ FOUNDER                    WEBSITE (Vercel + Supabase)                 YOUR MAC
 - **Intake** — the form writes `dossier_projects`, emails you (with a
   /studio link), and emails the founder their private tracker link.
 - **First pass** — the launchd job `com.fractionalforge.anvil-runner` polls
-  every 10 minutes. For each new brief it: claims it (status →
-  `in_progress`), pulls the brief + attachments to
+  every 10 minutes and claims **validated** briefs only (so a raw anonymous
+  submission never auto-runs — your Validate click is the execution gate; this
+  also caps spend and closes the attachment-upload race). For each it: claims
+  it (status → `in_progress`), pulls the brief + attachments to
   `~/FF-dossier-queue/<project-id>/brief/`, runs
   `serial-design-chain-v2.tsx`, stages the newest `.xlsx` into
   `…/<project-id>/review/`, flips the project to `in_review`, and emails you.
+  A rolling **daily cap** (`FF_MAX_RUNS_PER_DAY`, default 20) is a runaway
+  backstop.
 - **Customer emails** — sent automatically on validated, needs-info, hold,
   decline, ready, and when you mark an NDA sent.
 
-**The NDA rule:** a brief with the NDA box ticked is NOT auto-run. It sits at
-intake until you mark the NDA **signed** in /studio — then the runner picks it
-up on its next poll.
+**The NDA rule:** a brief with the NDA box ticked is NOT auto-run, and /studio
+will not let you advance it past `validated` either, until you mark the NDA
+**signed**. Then the runner picks it up on its next poll.
+
+**Deleting a project (erasure requests):** the "Delete project and all data"
+button at the bottom of `/studio/<id>` removes the brief, every attachment and
+the dossier from storage plus the row and its history. Also delete the local
+`~/FF-dossier-queue/<id>/` folder on this Mac to complete the erasure.
 
 ## What is deliberately manual (your judgement)
 

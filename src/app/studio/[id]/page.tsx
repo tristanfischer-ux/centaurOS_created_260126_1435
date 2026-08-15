@@ -6,8 +6,11 @@ import {
   uploadDossier,
   saveInternalNotes,
   setNdaStatus,
+  deleteProject,
 } from '@/actions/dossier-projects'
 import { STATUS_LABELS, type DossierStatus } from '@/lib/dossier-pipeline/types'
+
+export const dynamic = 'force-dynamic'
 
 /**
  * @file /studio/[id] — per-project admin actions (§6.5)
@@ -238,6 +241,24 @@ export default async function StudioProjectPage({
             </li>
           ))}
         </ul>
+      </section>
+
+      {/* Danger zone — GDPR erasure (council #6) */}
+      <section className="rounded-xl border border-red-200 p-5">
+        <h2 className="mb-2 font-bold text-red-700">Delete this project</h2>
+        <p className="mb-3 text-sm text-muted-foreground">
+          Permanently removes the brief, all attachments and the dossier from storage, plus the
+          project row and its history. Use for erasure requests. This cannot be undone.
+        </p>
+        <form action={deleteProject}>
+          <input type="hidden" name="projectId" value={project.id} />
+          <button
+            type="submit"
+            className="rounded-full border border-red-300 px-4 py-2 text-sm font-semibold text-red-700 hover:bg-red-50"
+          >
+            Delete project and all data
+          </button>
+        </form>
       </section>
     </div>
   )

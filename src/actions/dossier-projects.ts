@@ -17,6 +17,7 @@
 
 import { headers } from 'next/headers'
 import { revalidatePath } from 'next/cache'
+import { after } from 'next/server'
 import { Resend } from 'resend'
 import { rateLimit, getClientIP } from '@/lib/security/rate-limit'
 import { createAdminClient } from '@/lib/supabase/admin'
@@ -26,6 +27,8 @@ import {
   BRIEFS_BUCKET,
   PROJECT_DOSSIERS_BUCKET,
   DOSSIER_STATUSES,
+  ALLOWED_TRANSITIONS,
+  PIPELINE_ORDER,
   type DossierStatus,
   type DossierProject,
 } from '@/lib/dossier-pipeline/types'
@@ -50,13 +53,26 @@ function appUrl(): string {
 }
 
 function sendEmail(opts: { to: string; subject: string; text: string; replyTo?: string }): void {
-  // Fire-and-forget with logging: the DB is the source of truth, email
-  // failure must never fail the action.
+  // Deliver AFTER the response via after() (council #3): a bare fire-and-forget
+  // promise is dropped when the serverless lambda freezes on response, so the
+  // email never sends in production. after() keeps the runtime alive until the
+  // send resolves. The DB is still the source of truth — email failure logs,
+  // never throws.
   if (!process.env.RESEND_API_KEY) return
-  const resend = new Resend(process.env.RESEND_API_KEY)
-  resend.emails
-    .send({ from: FROM, to: opts.to, subject: opts.subject, text: opts.text, replyTo: opts.replyTo })
-    .catch((err) => console.error('[DossierPipeline] email send failed:', err))
+  after(async () => {
+    try {
+      const resend = new Resend(process.env.RESEND_API_KEY)
+      await resend.emails.send({
+        from: FROM,
+        to: opts.to,
+        subject: opts.subject,
+        text: opts.text,
+        replyTo: opts.replyTo,
+      })
+    } catch (err) {
+      console.error('[DossierPipeline] email send failed:', err)
+    }
+  })
 }
 
 function safeFileName(name: string): string {
@@ -86,6 +102,13 @@ export async function submitDossierBrief(formData: FormData): Promise<{
   if (idea.length > 8000) {
     return { error: 'That brief is a little long — keep it to a paragraph or a page.' }
   }
+  // Field length caps (council #4): bound row + email-subject growth.
+  if (name.length > 200 || company.length > 200 || sector.length > 200) {
+    return { error: 'One of those fields is too long — please shorten it.' }
+  }
+  if (email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return { error: 'Please enter a valid email address.' }
+  }
 
   // SECURITY: rate limit per IP (shares the contactForm bucket)
   const headersList = await headers()
@@ -106,6 +129,7 @@ export async function submitDossierBrief(formData: FormData): Promise<{
       sector: sector || null,
       brief_text: idea,
       nda_requested: ndaRequested,
+      nda_status: ndaRequested ? 'requested' : null,
     })
     .select('*')
     .single()
@@ -201,31 +225,52 @@ async function requireStudioAdmin(): Promise<{ email: string }> {
   return { email: user.email ?? 'admin' }
 }
 
-const VALID_TRANSITION_TARGETS: DossierStatus[] = [...DOSSIER_STATUSES]
-
 export async function setProjectStatus(formData: FormData): Promise<void> {
   const { email: actor } = await requireStudioAdmin()
   const projectId = String(formData.get('projectId') ?? '')
   const to = String(formData.get('to') ?? '') as DossierStatus
-  const note = String(formData.get('note') ?? '').trim()
+  const note = String(formData.get('note') ?? '').trim().slice(0, 2000)
 
-  if (!projectId || !VALID_TRANSITION_TARGETS.includes(to)) {
+  if (!projectId || !DOSSIER_STATUSES.includes(to)) {
     throw new Error('Invalid transition')
   }
 
   const admin = createAdminClient()
-  const { data: project } = await admin
+  const { data: project, error: readErr } = await admin
     .from('dossier_projects')
     .select('*')
     .eq('id', projectId)
     .maybeSingle()
+  if (readErr) throw new Error('Could not load the project')
   if (!project) throw new Error('Project not found')
   const p = project as DossierProject
 
-  await admin
+  // Transition allow-list (council #9): reject illegal jumps.
+  if (p.status !== to && !ALLOWED_TRANSITIONS[p.status]?.includes(to)) {
+    throw new Error(`Cannot move a project from ${p.status} to ${to}`)
+  }
+
+  // NDA gate (council #8): don't advance past validated while an NDA is
+  // requested but not signed — matches the site's stated promise and the
+  // runner's own guard.
+  const advancingPastValidated =
+    PIPELINE_ORDER.indexOf(to) > PIPELINE_ORDER.indexOf('validated')
+  if (advancingPastValidated && p.nda_requested && p.nda_status !== 'signed') {
+    throw new Error('An NDA was requested and is not yet signed — mark it signed before advancing.')
+  }
+
+  // Compare-and-swap on the current status (council #9): if the row moved
+  // under us (another tab, the runner), 0 rows update and we surface it.
+  const { data: swapped, error: swapErr } = await admin
     .from('dossier_projects')
     .update({ status: to, status_updated_at: new Date().toISOString() })
     .eq('id', projectId)
+    .eq('status', p.status)
+    .select('id')
+  if (swapErr) throw new Error('Could not update the project status')
+  if (!swapped || swapped.length === 0) {
+    throw new Error('The project changed while you were looking at it — reload and try again.')
+  }
 
   await admin.from('dossier_project_events').insert({
     project_id: projectId,
@@ -326,32 +371,54 @@ export async function uploadDossier(formData: FormData): Promise<void> {
   if (!project) throw new Error('Project not found')
   const p = project as DossierProject
 
-  const path = `${p.id}/${Date.now()}-${safeFileName(file.name)}`
+  // Only deliver from a sensible state (council #9): don't force a declined /
+  // submitted / delivered project to 'ready'. in_review is the normal case;
+  // in_progress and on_hold are allowed so a manual run can be delivered.
+  if (!['in_progress', 'in_review', 'on_hold', 'ready'].includes(p.status)) {
+    throw new Error(`Can't deliver a Dossier from status "${p.status}".`)
+  }
+
+  const storagePath = `${p.id}/${Date.now()}-${safeFileName(file.name)}`
   const { error: uploadError } = await admin.storage
     .from(PROJECT_DOSSIERS_BUCKET)
-    .upload(path, file, {
+    .upload(storagePath, file, {
       contentType: file.type || 'application/octet-stream',
+      upsert: false, // never overwrite an existing object (council #storage)
     })
   if (uploadError) {
     console.error('[DossierPipeline] dossier upload failed:', uploadError)
     throw new Error('Upload failed — try again')
   }
 
-  await admin.from('dossier_project_files').insert({
+  // Record the file BEFORE advancing (council #11): a 'ready' project with no
+  // dossier row would show the customer a Ready page with no download.
+  const { error: fileErr } = await admin.from('dossier_project_files').insert({
     project_id: p.id,
     kind: 'dossier',
-    storage_path: path,
+    storage_path: storagePath,
     original_name: file.name,
     uploaded_by: actor,
   })
+  if (fileErr) {
+    // Roll back the orphaned object so a retry is clean.
+    await admin.storage.from(PROJECT_DOSSIERS_BUCKET).remove([storagePath])
+    console.error('[DossierPipeline] dossier file-row insert failed:', fileErr)
+    throw new Error('Stored the file but could not record it — please retry.')
+  }
 
-  // Auto-advance to ready (§6.5) — reuse the transition path so the event
-  // trail and the customer email happen in exactly one place.
-  const advance = new FormData()
-  advance.set('projectId', p.id)
-  advance.set('to', 'ready')
-  advance.set('note', `Dossier uploaded: ${file.name}`)
-  await setProjectStatus(advance)
+  // Advance to ready via the guarded transition path so the event trail and the
+  // customer email happen in exactly one place. If the project is already
+  // 'ready' (re-upload), skip the transition but keep the new file.
+  if (p.status !== 'ready') {
+    const advance = new FormData()
+    advance.set('projectId', p.id)
+    advance.set('to', 'ready')
+    advance.set('note', `Dossier uploaded: ${file.name}`)
+    await setProjectStatus(advance)
+  } else {
+    revalidatePath(`/studio/${p.id}`)
+    revalidatePath(`/project/${p.access_token}`)
+  }
 }
 
 const NDA_STATUSES = ['requested', 'sent', 'signed'] as const
@@ -399,6 +466,35 @@ export async function setNdaStatus(formData: FormData): Promise<void> {
   }
 
   revalidatePath(`/studio/${projectId}`)
+  revalidatePath('/studio')
+}
+
+/**
+ * Delete a project and ALL its data (council #6: a real deletion path for the
+ * privacy promise + GDPR erasure). Removes every storage object in both
+ * buckets under the project prefix, then the row (events + files cascade).
+ * The local ~/FF-dossier-queue/<id>/ copy is purged separately by the runner
+ * host — documented in docs/dossier-pipeline-workflow.md.
+ */
+export async function deleteProject(formData: FormData): Promise<void> {
+  await requireStudioAdmin()
+  const projectId = String(formData.get('projectId') ?? '')
+  if (!projectId) throw new Error('Missing project')
+  const admin = createAdminClient()
+
+  const { data: files } = await admin
+    .from('dossier_project_files')
+    .select('*')
+    .eq('project_id', projectId)
+  const briefPaths = (files ?? [])
+    .filter((f) => f.kind === 'brief_attachment')
+    .map((f) => f.storage_path)
+  const dossierPaths = (files ?? []).filter((f) => f.kind === 'dossier').map((f) => f.storage_path)
+  if (briefPaths.length) await admin.storage.from(BRIEFS_BUCKET).remove(briefPaths)
+  if (dossierPaths.length) await admin.storage.from(PROJECT_DOSSIERS_BUCKET).remove(dossierPaths)
+
+  const { error } = await admin.from('dossier_projects').delete().eq('id', projectId)
+  if (error) throw new Error('Delete failed')
   revalidatePath('/studio')
 }
 

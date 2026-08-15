@@ -108,26 +108,38 @@ interface ProjectRow {
   nda_status: string | null
 }
 
-/** Atomically claim ONE eligible project (submitted, NDA clear). */
+/**
+ * Atomically claim ONE eligible project (council #2/#15/#18/#5).
+ *
+ * Claims from 'validated', NOT 'submitted' — Tristan's Validate click in
+ * /studio is the execution gate. This stops the runner auto-processing raw
+ * anonymous submissions (cost DoS), fixes the needs_info → validated recovery
+ * path, and removes the claim-before-attachment-upload race (attachments are
+ * present by the time Tristan validates). The NDA eligibility filter is pushed
+ * into the query (before .limit) so the candidate window is never starved by
+ * NDA-pending rows ahead of runnable ones.
+ */
 async function claimNext(): Promise<ProjectRow | null> {
   const { data: candidates } = await db
     .from('dossier_projects')
     .select('*')
-    .eq('status', 'submitted')
+    .eq('status', 'validated')
+    .or('nda_requested.eq.false,nda_status.eq.signed')
     .order('created_at', { ascending: true })
     .limit(10)
 
   for (const p of (candidates ?? []) as ProjectRow[]) {
-    if (p.nda_requested && p.nda_status !== 'signed') continue // intake only until NDA signed
-    // optimistic claim: only wins if still 'submitted'
+    // Belt-and-braces NDA guard (the .or above already excludes these).
+    if (p.nda_requested && p.nda_status !== 'signed') continue
+    // optimistic claim: only wins if still 'validated'
     const { data: claimed } = await db
       .from('dossier_projects')
       .update({ status: 'in_progress', status_updated_at: new Date().toISOString() })
       .eq('id', p.id)
-      .eq('status', 'submitted')
+      .eq('status', 'validated')
       .select('id')
     if (claimed && claimed.length > 0) {
-      await recordEvent(p.id, 'submitted', 'in_progress', 'Anvil first pass started (auto-runner)')
+      await recordEvent(p.id, 'validated', 'in_progress', 'Anvil first pass started (auto-runner)')
       return p
     }
   }
@@ -243,11 +255,33 @@ async function processOne(): Promise<boolean> {
     }
 
     const staged = process.env.DRY_RUN ? null : stageForReview(outDir, dir)
-    await db
+    // Guarded transition (council #16): only advance if the project is still
+    // ours (in_progress). If Tristan moved it meanwhile, record that instead of
+    // a misleading in_review event.
+    const { data: advanced } = await db
       .from('dossier_projects')
       .update({ status: 'in_review', status_updated_at: new Date().toISOString() })
       .eq('id', p.id)
       .eq('status', 'in_progress')
+      .select('id')
+    if (!advanced || advanced.length === 0) {
+      log(dir, 'chain finished but project had moved off in_progress — output staged, no transition')
+      await recordEvent(
+        p.id,
+        'in_progress',
+        'in_progress',
+        staged
+          ? `Chain finished but project had moved — output staged (${path.basename(staged)}), no transition`
+          : 'Chain finished but project had moved — no .xlsx found, no transition'
+      )
+      await sendEmail(
+        `[Anvil] First pass done, project already moved — ${p.customer_name}`,
+        `Anvil finished project ${p.id} but its status had already changed, so no transition was applied.\n` +
+          (staged ? `Staged output: ${staged}\n` : '') +
+          `Studio: https://fractionalforge.app/studio/${p.id}\n`
+      )
+      return true
+    }
     await recordEvent(
       p.id,
       'in_progress',
@@ -274,15 +308,54 @@ async function processOne(): Promise<boolean> {
   }
 }
 
+// Daily run cap (council #2): a backstop on runaway spend/compute even though
+// the runner now only claims human-validated briefs. Counts chain runs in a
+// rolling 24h window from a small on-disk ledger.
+const MAX_RUNS_PER_DAY = Number(process.env.FF_MAX_RUNS_PER_DAY || 20)
+const RUN_LEDGER = () => path.join(QUEUE_ROOT, '.run-ledger.json')
+
+function runsInLastDay(now: number): number[] {
+  try {
+    const raw = JSON.parse(fs.readFileSync(RUN_LEDGER(), 'utf8')) as number[]
+    return raw.filter((t) => now - t < 24 * 60 * 60 * 1000)
+  } catch {
+    return []
+  }
+}
+function recordRun(now: number): void {
+  const kept = runsInLastDay(now)
+  kept.push(now)
+  fs.writeFileSync(RUN_LEDGER(), JSON.stringify(kept))
+}
+
 async function main(): Promise<void> {
   const mode = process.argv.includes('--watch') ? 'watch' : 'once'
   fs.mkdirSync(QUEUE_ROOT, { recursive: true })
 
-  if (mode === 'once') {
-    // Drain everything eligible right now, one at a time (chains are serial —
-    // two concurrent chains on one machine fight over CPU + caches).
+  const drain = async (): Promise<number> => {
     let n = 0
-    while (await processOne()) n++
+    for (;;) {
+      // Use a monotonic-ish wall clock only for the rolling window; runner is a
+      // long-lived local process, not a resumable workflow, so Date.now is fine.
+      const now = Date.now()
+      if (runsInLastDay(now).length >= MAX_RUNS_PER_DAY) {
+        console.error(`[runner] daily cap reached (${MAX_RUNS_PER_DAY}/24h) — pausing until the window clears`)
+        break
+      }
+      recordRun(now)
+      if (!(await processOne())) {
+        // no work claimed — roll back the ledger entry we speculatively wrote
+        const rolled = runsInLastDay(now).slice(0, -1)
+        fs.writeFileSync(RUN_LEDGER(), JSON.stringify(rolled))
+        break
+      }
+      n++
+    }
+    return n
+  }
+
+  if (mode === 'once') {
+    const n = await drain()
     console.error(`[runner] once: processed ${n} project(s)`)
     return
   }
@@ -290,9 +363,7 @@ async function main(): Promise<void> {
   console.error(`[runner] watch: polling every ${POLL_MS / 1000}s (queue: ${QUEUE_ROOT})`)
   for (;;) {
     try {
-      while (await processOne()) {
-        /* drain */
-      }
+      await drain()
     } catch (err) {
       console.error('[runner] poll error:', err)
     }

@@ -34,12 +34,15 @@ export async function unlockWorkbook(formData: FormData): Promise<{
     return { error: 'Too many requests just now — please try again in a few minutes.' }
   }
 
+  // supabase-js returns errors on the result, it does not throw (council #11):
+  // check `error` rather than relying on a catch that never fires. The lead
+  // list is best-effort — a DB hiccup logs but never blocks the download.
   try {
     const admin = createAdminClient()
-    await admin.from('workbook_leads').insert({ email, source, ip })
+    const { error } = await admin.from('workbook_leads').insert({ email, source, ip })
+    if (error) console.error('[WorkbookGate] lead insert failed:', error.message)
   } catch (err) {
-    // The lead list is best-effort — never block the download on a DB hiccup.
-    console.error('[WorkbookGate] lead insert failed:', err)
+    console.error('[WorkbookGate] lead insert threw:', err)
   }
 
   return { url: WORKBOOK_URL }

@@ -115,8 +115,12 @@ export function WorkbookGate({ source = 'example-workbook' }: { source?: string 
         <p style={{ marginTop: 10, fontSize: 14, fontWeight: 600, color: '#b91c1c' }}>{error}</p>
       )}
       <p style={{ marginTop: 10, fontSize: 12.5, color: '#64748b' }}>
-        A real, sanitised Design Dossier (a water-treatment plant). No account, no spam — we may
-        follow up once about your project.
+        A real, sanitised Design Dossier (a water-treatment plant). We store your email to send the
+        link and may follow up once about your project — no spam, unsubscribe any time. See our{' '}
+        <a href="/privacy" style={{ color: '#1d4ed8' }}>
+          privacy policy
+        </a>
+        .
       </p>
     </form>
   )

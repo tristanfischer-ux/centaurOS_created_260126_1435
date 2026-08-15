@@ -19,6 +19,9 @@ import { CUSTOMER_STEPS, customerStepIndex, type DossierStatus } from '@/lib/dos
  */
 
 export const dynamic = 'force-dynamic'
+// Council #13/#17: never let a shared cache hold a token-keyed page or its
+// short-lived signed download URL.
+export const fetchCache = 'force-no-store'
 
 export const metadata: Metadata = {
   title: 'Your Design Dossier — project status',
@@ -50,7 +53,6 @@ export default async function ProjectStatusPage({
   if (!view) notFound()
 
   const { project, events, dossierDownloadUrl } = view
-  const stepIndex = customerStepIndex(project.status)
   const side = SIDE_STATE_COPY[project.status]
 
   // First time each main-line status was reached (for timestamps under steps)
@@ -58,6 +60,25 @@ export default async function ProjectStatusPage({
   for (const e of events) {
     if (!reachedAt.has(e.to_status)) reachedAt.set(e.to_status, e.created_at)
   }
+
+  // Council #10: a side state (needs_info / on_hold / declined) must NOT wipe
+  // the tracker to -1 — hold the last main-line position reached, with the
+  // banner overlaid. 'delivered' completes the tracker.
+  let stepIndex = customerStepIndex(project.status)
+  if (stepIndex < 0) {
+    let furthest = 0
+    for (const e of events) {
+      const idx = customerStepIndex(e.to_status)
+      if (idx > furthest) furthest = idx
+    }
+    stepIndex = furthest
+  }
+
+  // Council #20: surface the latest Tristan-authored side-state note so a
+  // needs_info customer can see what's asked without hunting their email.
+  const sideNote = side
+    ? [...events].reverse().find((e) => SIDE_STATE_COPY[e.to_status])?.note ?? null
+    : null
 
   const fmt = (iso: string | undefined) =>
     iso
@@ -86,14 +107,29 @@ export default async function ProjectStatusPage({
             <div className="rounded-xl border border-amber-300 bg-amber-50 p-5">
               <h2 className="font-semibold text-foreground">{side.title}</h2>
               <p className="mt-1 text-sm text-muted-foreground">{side.body}</p>
+              {sideNote && (
+                <p className="mt-3 rounded-lg border border-amber-200 bg-white/60 p-3 text-sm text-foreground">
+                  <span className="font-semibold">From Tristan:</span> {sideNote}
+                </p>
+              )}
+              <p className="mt-3 text-sm">
+                <a
+                  className="font-semibold text-international-orange hover:underline"
+                  href="mailto:hello@fractionalforge.app"
+                >
+                  Reply to us →
+                </a>
+              </p>
             </div>
           ) : null}
 
           {/* 5-step tracker */}
           <ol className="space-y-0">
             {CUSTOMER_STEPS.map((step, i) => {
-              const done = stepIndex >= 0 && i < stepIndex
-              const current = stepIndex === i
+              // 'delivered' completes the whole tracker (council #10)
+              const delivered = project.status === 'delivered'
+              const done = delivered || (stepIndex >= 0 && i < stepIndex)
+              const current = !delivered && stepIndex === i
               const ts =
                 step.key === 'ready'
                   ? fmt(reachedAt.get('ready') ?? reachedAt.get('delivered'))

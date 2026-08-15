@@ -10,6 +10,8 @@
  */
 
 import { createAdminClient } from '@/lib/supabase/admin'
+import { createClient } from '@/lib/supabase/server'
+import { isAdmin } from '@/lib/admin/access'
 import {
   BRIEFS_BUCKET,
   PROJECT_DOSSIERS_BUCKET,
@@ -17,6 +19,24 @@ import {
   type DossierProjectEvent,
   type DossierProjectFile,
 } from './types'
+
+/**
+ * SECURITY (council #1, 2026-08-15): the /studio admin gate must live NEXT TO
+ * THE DATA, not only in the layout — a Next.js App Router layout is not an
+ * authorization boundary (page and layout segments render independently, so a
+ * crafted RSC request can obtain the page payload without the layout check).
+ * Every studio-only read below calls this first. Throws if not an admin.
+ * The token-keyed customer read (getProjectByToken) is deliberately NOT gated
+ * — the unguessable token IS its credential.
+ */
+async function assertStudioAdmin(): Promise<void> {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) throw new Error('Not authenticated')
+  if (!(await isAdmin(user.id))) throw new Error('Admin access required')
+}
 
 export interface ProjectView {
   project: DossierProject
@@ -41,8 +61,9 @@ export async function getProjectByToken(token: string): Promise<ProjectView | nu
   return buildView(project as DossierProject)
 }
 
-/** Studio detail: look a project up by id (admin gate is the caller's job). */
+/** Studio detail: look a project up by id. Admin-gated at the data layer. */
 export async function getProjectById(id: string): Promise<ProjectView | null> {
+  await assertStudioAdmin()
   const admin = createAdminClient()
   const { data: project } = await admin
     .from('dossier_projects')
@@ -53,8 +74,9 @@ export async function getProjectById(id: string): Promise<ProjectView | null> {
   return buildView(project as DossierProject)
 }
 
-/** Studio board: all projects, newest first. */
+/** Studio board: all projects, newest first. Admin-gated at the data layer. */
 export async function listProjects(): Promise<DossierProject[]> {
+  await assertStudioAdmin()
   const admin = createAdminClient()
   const { data } = await admin
     .from('dossier_projects')
@@ -101,8 +123,9 @@ async function buildView(project: DossierProject): Promise<ProjectView> {
   }
 }
 
-/** Studio: short-lived signed URL for an inbound brief attachment. */
+/** Studio: short-lived signed URL for an inbound brief attachment. Admin-gated. */
 export async function signedBriefUrl(file: DossierProjectFile): Promise<string | null> {
+  await assertStudioAdmin()
   const admin = createAdminClient()
   const { data } = await admin.storage
     .from(BRIEFS_BUCKET)
