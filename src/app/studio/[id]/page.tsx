@@ -69,7 +69,7 @@ export default async function StudioProjectPage({
     submitted: 'New brief. Read it, then Validate to send it to Anvil (or ask for more info / decline).',
     validated: 'Validated. The Anvil runner picks this up automatically within ~10 minutes, runs the first pass, and emails you when it’s ready to review — you don’t need to do anything. The buttons below are only for corrections or running Anvil yourself.',
     in_progress: 'Anvil is running (or you’re running it yourself). When it finishes it moves to engineering review automatically and emails you. Nothing to do unless you ran it manually.',
-    in_review: 'First pass is done and waiting for your review. Check the staged workbook, then upload the final version in “Deliver the Dossier” below to send it to the customer.',
+    in_review: 'First pass is done and waiting for your review. Check the staged DOSSIER.xlsx and Quotation.pdf in the queue review folder, then upload the final workbook in “Deliver the Dossier” below to send it to the customer.',
     ready: 'Delivered to the customer — they’ve been emailed their download link. Mark delivered once they’ve collected it.',
     needs_info: 'Waiting on the customer. They’ve been emailed your note; validate once they reply.',
     on_hold: 'Paused. Resume when you’re ready.',

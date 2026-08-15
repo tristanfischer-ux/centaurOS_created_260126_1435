@@ -281,14 +281,25 @@ function runAnvil(briefPath: string, outDir: string, dir: string): boolean {
   }
 }
 
-/** Stage the newest .xlsx from the out dir into review/ for Tristan. */
+/** Stage the formal dossier and the quote pack into review/ for Tristan. */
 function stageForReview(outDir: string, dir: string): string | null {
   const xlsx: { p: string; m: number }[] = []
+  const extras: string[] = []
   const walk = (d: string) => {
     for (const e of fs.readdirSync(d, { withFileTypes: true })) {
       const full = path.join(d, e.name)
       if (e.isDirectory()) walk(full)
-      else if (e.name.endsWith('.xlsx')) xlsx.push({ p: full, m: fs.statSync(full).mtimeMs })
+      else if (e.name === 'DOSSIER.xlsx' || e.name.endsWith('-DOSSIER.xlsx')) {
+        xlsx.push({ p: full, m: fs.statSync(full).mtimeMs + 1e15 }) // prefer the formal book
+      } else if (e.name.endsWith('.xlsx') && !e.name.startsWith('Price-Schedule')) {
+        xlsx.push({ p: full, m: fs.statSync(full).mtimeMs })
+      } else if (
+        e.name === 'Quotation.pdf' ||
+        e.name === 'Price-Schedule.xlsx' ||
+        e.name === 'Terms-of-Sale.pdf'
+      ) {
+        extras.push(full)
+      }
     }
   }
   if (fs.existsSync(outDir)) walk(outDir)
@@ -298,6 +309,9 @@ function stageForReview(outDir: string, dir: string): string | null {
   fs.mkdirSync(reviewDir, { recursive: true })
   const dest = path.join(reviewDir, path.basename(xlsx[0].p))
   fs.copyFileSync(xlsx[0].p, dest)
+  for (const extra of extras) {
+    fs.copyFileSync(extra, path.join(reviewDir, path.basename(extra)))
+  }
   return dest
 }
 

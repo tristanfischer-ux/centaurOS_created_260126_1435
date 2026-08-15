@@ -34,10 +34,10 @@ const PILLARS = [
 ]
 
 const DELIVERABLES = [
-  "A costed bill-of-materials ledger — every line with its method, confidence and source",
-  "A cost waterfall from materials to installed price",
-  "Engineering drawings: general arrangement, P&ID, block-flow, single-line",
-  "Worked calculations you can hand-check, with the library or standard cited",
+  "A supply-only quotation PDF — the number on the cover, groups A–F, terms",
+  "A price schedule workbook that matches the quotation",
+  "The formal Design Dossier (Excel) — every cost line with method, confidence and source",
+  "Engineering drawings and STEP when the design has them",
   "A risk and open-questions register — what's assumed, what's excluded",
 ]
 
@@ -63,10 +63,10 @@ export default function QuotePage() {
             </p>
             <div className="flex flex-wrap gap-3 pt-2">
               <Link
-                href="/contact"
+                href="/brief"
                 className="inline-flex items-center rounded-full bg-international-orange px-7 py-3 font-bold text-white hover:bg-international-orange-hover"
               >
-                Talk to us about your team &rarr;
+                Send a brief &rarr;
               </Link>
               <Link
                 href="/sample-package"
@@ -91,8 +91,8 @@ export default function QuotePage() {
           <section className="max-w-3xl space-y-4">
             <h2 className="text-2xl sm:text-3xl font-semibold">What lands on your desk</h2>
             <p className="text-muted-foreground">
-              An auditable Excel workbook, not a black box &mdash; the same Design Dossier we build
-              for product companies, pointed at your tender:
+              One Anvil run. The quotation sits on top of the same engine that builds the Design
+              Dossier &mdash; not a second product:
             </p>
             <ul className="space-y-2.5">
               {DELIVERABLES.map((d) => (
@@ -113,16 +113,20 @@ export default function QuotePage() {
             <h2 className="text-2xl sm:text-3xl font-semibold">How it works with your team</h2>
             <ol className="space-y-3 text-sm leading-relaxed text-muted-foreground">
               <li>
-                <b className="text-foreground">1. Send the brief.</b> The tender document, the
-                client&rsquo;s spec, or a paragraph of your own scoping.
+                <b className="text-foreground">1. Send the brief</b> on{' '}
+                <Link href="/brief" className="underline">
+                  /brief
+                </Link>
+                . The tender, the spec, or a short paragraph.
               </li>
               <li>
-                <b className="text-foreground">2. Anvil builds the first pass.</b> Design, BoM,
-                costs, drawings and calculations &mdash; typically days from brief to workbook.
+                <b className="text-foreground">2. We validate, then Anvil runs once.</b> One
+                engine expands the brief, builds the dossier, and writes the quotation. Nothing
+                starts until a human clicks Validate.
               </li>
               <li>
-                <b className="text-foreground">3. Your engineers review and sign off.</b> Every
-                number traces to a formula, so checking is fast &mdash; and the quote that goes out
+                <b className="text-foreground">3. You review the quote and the workbook.</b>{' '}
+                Quotation.pdf sits on the same numbers as DOSSIER.xlsx. The figure that goes out
                 is yours.
               </li>
             </ol>
