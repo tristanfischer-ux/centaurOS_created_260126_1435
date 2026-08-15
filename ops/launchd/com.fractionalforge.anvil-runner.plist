@@ -23,7 +23,7 @@
     <array>
         <string>/bin/zsh</string>
         <string>-lc</string>
-        <string>cd "/Users/tristanfischer/Developer/CentaurOS created 260126 1435" &amp;&amp; npx tsx scripts/dossier-pipeline/anvil-runner.ts --once</string>
+        <string>cd "/Users/tristanfischer/Developer/CentaurOS created 260126 1435" &amp;&amp; ANVIL_REPO="/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel" npx tsx scripts/dossier-pipeline/anvil-runner.ts --once</string>
     </array>
     <key>StartInterval</key>
     <integer>600</integer>

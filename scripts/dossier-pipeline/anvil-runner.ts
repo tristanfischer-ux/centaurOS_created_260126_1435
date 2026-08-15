@@ -35,6 +35,12 @@ import * as os from 'node:os'
 import * as path from 'node:path'
 
 const REPO = path.resolve(__dirname, '..', '..')
+// The Anvil engine checkout to run the chain from. Defaults to this (site)
+// repo; set ANVIL_REPO to run a different checkout's engine — e.g. the oxccu
+// "formal book" engine (its own 41,871-line exporter + modules) — in place,
+// without merging or copying anything. The site runner still owns the
+// site's Supabase/Resend; only the chain exec runs from ANVIL_REPO.
+const ANVIL_REPO = process.env.ANVIL_REPO || REPO
 const QUEUE_ROOT = process.env.FF_QUEUE_DIR || path.join(os.homedir(), 'FF-dossier-queue')
 const POLL_MS = Number(process.env.FF_POLL_MS || 5 * 60 * 1000)
 const ACTOR = 'anvil-runner'
@@ -241,14 +247,27 @@ function runAnvil(briefPath: string, outDir: string, dir: string): boolean {
     .split(/\s+/)
     .filter(Boolean)
     .map((tok) => (tok === '{brief}' ? briefPath : tok === '{out}' ? outDir : tok))
-  log(dir, `chain: ${argv.join(' ')}`)
+  log(dir, `chain: ${argv.join(' ')}  (cwd: ${ANVIL_REPO})`)
   if (process.env.DRY_RUN) {
     log(dir, 'DRY_RUN set — skipping chain')
     return true
   }
+  // The chain runs from ANVIL_REPO (its own exporter/modules). Merge that
+  // checkout's .env.local into the chain's environment (its OPENROUTER key +
+  // engine config) on top of the runner's env, so the engine sees its own
+  // config regardless of which checkout the runner itself lives in.
+  const chainEnv = { ...process.env }
+  const engineEnvPath = path.join(ANVIL_REPO, '.env.local')
+  if (fs.existsSync(engineEnvPath)) {
+    for (const line of fs.readFileSync(engineEnvPath, 'utf8').split('\n')) {
+      const m = line.match(/^\s*([A-Z0-9_]+)\s*=\s*"?([^"\n]*)"?\s*$/)
+      if (m) chainEnv[m[1]] = m[2]
+    }
+  }
   try {
     execFileSync(argv[0], argv.slice(1), {
-      cwd: REPO,
+      cwd: ANVIL_REPO,
+      env: chainEnv,
       stdio: ['ignore', fs.openSync(path.join(dir, 'chain-stdout.log'), 'a'), fs.openSync(path.join(dir, 'chain-stderr.log'), 'a')],
       timeout: Number(process.env.FF_CHAIN_TIMEOUT_MS || 6 * 60 * 60 * 1000), // 6h
     })
