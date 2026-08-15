@@ -245,8 +245,16 @@ export async function setProjectStatus(formData: FormData): Promise<void> {
   if (!project) throw new Error('Project not found')
   const p = project as DossierProject
 
+  // No-op guard (council Sol #B4): a same-status submit (e.g. a double-click or
+  // a stale tab re-posting Validate) must NOT write a self-event or re-send the
+  // customer email. Return quietly — the desired state already holds.
+  if (p.status === to) {
+    revalidatePath(`/studio/${projectId}`)
+    return
+  }
+
   // Transition allow-list (council #9): reject illegal jumps.
-  if (p.status !== to && !ALLOWED_TRANSITIONS[p.status]?.includes(to)) {
+  if (!ALLOWED_TRANSITIONS[p.status]?.includes(to)) {
     throw new Error(`Cannot move a project from ${p.status} to ${to}`)
   }
 
@@ -439,10 +447,13 @@ export async function setNdaStatus(formData: FormData): Promise<void> {
   if (!project) throw new Error('Project not found')
   const p = project as DossierProject
 
-  await admin
+  // Check the update actually landed before recording/emailing (council Sol #B5):
+  // don't tell the customer "NDA sent" if the write failed.
+  const { error: ndaErr } = await admin
     .from('dossier_projects')
     .update({ nda_status: nda, nda_requested: true })
     .eq('id', projectId)
+  if (ndaErr) throw new Error('Could not update the NDA status — please retry.')
 
   await admin.from('dossier_project_events').insert({
     project_id: projectId,
@@ -490,8 +501,16 @@ export async function deleteProject(formData: FormData): Promise<void> {
     .filter((f) => f.kind === 'brief_attachment')
     .map((f) => f.storage_path)
   const dossierPaths = (files ?? []).filter((f) => f.kind === 'dossier').map((f) => f.storage_path)
-  if (briefPaths.length) await admin.storage.from(BRIEFS_BUCKET).remove(briefPaths)
-  if (dossierPaths.length) await admin.storage.from(PROJECT_DOSSIERS_BUCKET).remove(dossierPaths)
+  // Surface storage-removal failures (council Sol #B5): a silent failure would
+  // leave confidential objects orphaned after an erasure request.
+  if (briefPaths.length) {
+    const { error } = await admin.storage.from(BRIEFS_BUCKET).remove(briefPaths)
+    if (error) throw new Error(`Deleted nothing — brief objects could not be removed: ${error.message}`)
+  }
+  if (dossierPaths.length) {
+    const { error } = await admin.storage.from(PROJECT_DOSSIERS_BUCKET).remove(dossierPaths)
+    if (error) throw new Error(`Deleted nothing — dossier objects could not be removed: ${error.message}`)
+  }
 
   const { error } = await admin.from('dossier_projects').delete().eq('id', projectId)
   if (error) throw new Error('Delete failed')

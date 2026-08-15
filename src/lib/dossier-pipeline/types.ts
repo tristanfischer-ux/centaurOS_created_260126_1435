@@ -41,12 +41,15 @@ export const PIPELINE_ORDER: DossierStatus[] = [
 export const ALLOWED_TRANSITIONS: Record<DossierStatus, DossierStatus[]> = {
   submitted: ['validated', 'needs_info', 'on_hold', 'declined'],
   validated: ['in_progress', 'needs_info', 'on_hold', 'declined'],
-  in_progress: ['in_review', 'on_hold', 'declined'],
+  // in_progress/on_hold → ready: delivering a manually-run Dossier (council
+  // Sol #B1) — uploadDossier permits these source states, so the transition
+  // map must too, or the upload throws and the project strands.
+  in_progress: ['in_review', 'ready', 'on_hold', 'declined'],
   in_review: ['ready', 'in_progress', 'on_hold', 'declined'],
   ready: ['delivered', 'in_review'],
   delivered: ['ready'],
   needs_info: ['validated', 'submitted', 'declined', 'on_hold'],
-  on_hold: ['validated', 'in_progress', 'declined'],
+  on_hold: ['validated', 'in_progress', 'ready', 'declined'],
   declined: ['submitted', 'validated'],
 }
 

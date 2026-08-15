@@ -105,7 +105,11 @@ async function buildView(project: DossierProject): Promise<ProjectView> {
   let dossierDownloadUrl: string | null = null
   if (project.status === 'ready' || project.status === 'delivered') {
     const dossier = (files ?? []).filter((f) => f.kind === 'dossier').at(-1)
-    if (dossier) {
+    // Defence-in-depth (council Sol/Grok): only ever sign an object whose path is
+    // under THIS project's prefix, so a corrupted/mismatched file row can never
+    // sign another project's object. Not exploitable via any current write path;
+    // this makes cross-project object access structurally impossible.
+    if (dossier && dossier.storage_path.startsWith(`${project.id}/`)) {
       const { data: signed } = await admin.storage
         .from(PROJECT_DOSSIERS_BUCKET)
         .createSignedUrl(dossier.storage_path, 60 * 60, {
@@ -126,6 +130,9 @@ async function buildView(project: DossierProject): Promise<ProjectView> {
 /** Studio: short-lived signed URL for an inbound brief attachment. Admin-gated. */
 export async function signedBriefUrl(file: DossierProjectFile): Promise<string | null> {
   await assertStudioAdmin()
+  // Defence-in-depth (council Grok): only sign a path under the file's own
+  // project prefix, so a mismatched file row can never sign a foreign object.
+  if (!file.storage_path.startsWith(`${file.project_id}/`)) return null
   const admin = createAdminClient()
   const { data } = await admin.storage
     .from(BRIEFS_BUCKET)

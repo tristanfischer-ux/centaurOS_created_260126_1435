@@ -42,7 +42,8 @@ const NEXT_ACTIONS: Partial<Record<DossierStatus, { to: DossierStatus; label: st
     { to: 'declined', label: 'Decline' },
   ],
   on_hold: [
-    { to: 'in_progress', label: 'Resume' },
+    { to: 'validated', label: 'Resume → re-validate (runner picks up)' },
+    { to: 'in_progress', label: 'Resume (skip runner)' },
     { to: 'declined', label: 'Decline' },
   ],
 }

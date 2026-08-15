@@ -68,22 +68,65 @@ function log(dir: string | null, msg: string): void {
   if (dir) fs.appendFileSync(path.join(dir, 'runner.log'), line + '\n')
 }
 
-async function sendEmail(subject: string, text: string): Promise<void> {
+async function sendEmail(subject: string, text: string, to: string = NOTIFY_TO): Promise<void> {
   if (!RESEND_KEY) return
   try {
-    await fetch('https://api.resend.com/emails', {
+    const res = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: { Authorization: `Bearer ${RESEND_KEY}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        from: 'Anvil Runner <tristan@fractionalforge.app>',
-        to: NOTIFY_TO,
+        from: 'Fractional Forge <tristan@fractionalforge.app>',
+        to,
         subject,
         text,
       }),
     })
+    // council (Sol #B6): check the response, not just thrown errors
+    if (!res.ok) console.error(`[runner] email non-2xx (${res.status}) to ${to}: ${await res.text()}`)
   } catch (err) {
     console.error('[runner] email failed:', err)
   }
+}
+
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://fractionalforge.app'
+
+/**
+ * Customer-facing status emails on the AUTOMATED path (council Sol #B3 / Grok #B1):
+ * the runner advances in_progress → in_review directly with the service role, so
+ * setProjectStatus's CUSTOMER_EMAILS never fire for those transitions. Send them
+ * here so the founder gets the same "in progress" / "in engineering review"
+ * notices they would on the manual path. Copy mirrors src/actions/dossier-projects.ts.
+ */
+async function emailCustomerStatus(
+  p: ProjectRow,
+  to: 'in_progress' | 'in_review',
+): Promise<void> {
+  const first = p.customer_name.split(' ')[0] || 'there'
+  const statusUrl = `${APP_URL}/project/${p.access_token}`
+  const signoff = '\n— Tristan Fischer, Founder, Fractional Forge\n'
+  const mails: Record<'in_progress' | 'in_review', { subject: string; text: string }> = {
+    in_progress: {
+      subject: 'Anvil is building your Design Dossier',
+      text:
+        `Hi ${first},\n\n` +
+        `Anvil has started the first pass on your Design Dossier. Next it goes to senior ` +
+        `engineers from our partner network for review before you see it.\n\n` +
+        `Track progress: ${statusUrl}\n` +
+        signoff,
+    },
+    in_review: {
+      subject: 'Your Design Dossier is in engineering review',
+      text:
+        `Hi ${first},\n\n` +
+        `Anvil has finished the first pass on your Design Dossier and it's now with senior ` +
+        `engineers from our partner network for review. You'll get the download link as soon ` +
+        `as it's signed off.\n\n` +
+        `Track progress: ${statusUrl}\n` +
+        signoff,
+    },
+  }
+  const m = mails[to]
+  await sendEmail(m.subject, m.text, p.customer_email)
 }
 
 async function recordEvent(projectId: string, from: string, to: string, note: string): Promise<void> {
@@ -106,6 +149,7 @@ interface ProjectRow {
   status: string
   nda_requested: boolean
   nda_status: string | null
+  access_token: string
 }
 
 /**
@@ -140,6 +184,7 @@ async function claimNext(): Promise<ProjectRow | null> {
       .select('id')
     if (claimed && claimed.length > 0) {
       await recordEvent(p.id, 'validated', 'in_progress', 'Anvil first pass started (auto-runner)')
+      await emailCustomerStatus(p, 'in_progress')
       return p
     }
   }
@@ -255,6 +300,21 @@ async function processOne(): Promise<boolean> {
     }
 
     const staged = process.env.DRY_RUN ? null : stageForReview(outDir, dir)
+
+    // No-workbook guard (council Sol #B2): the chain exited 0 but produced no
+    // .xlsx. Do NOT advance to in_review / tell the customer their Dossier is in
+    // engineering review when there's nothing to review. Keep it in_progress and
+    // alert Tristan for a manual run. (DRY_RUN intentionally has no .xlsx and
+    // still advances, for testing the state flow.)
+    if (!staged && !process.env.DRY_RUN) {
+      await recordEvent(p.id, 'in_progress', 'in_progress', 'Anvil exited 0 but produced no .xlsx — needs a manual run')
+      await sendEmail(
+        `[Anvil] No workbook produced — ${p.customer_name}${p.company ? ' · ' + p.company : ''}`,
+        `Anvil exited cleanly but staged NO .xlsx for project ${p.id}.\nOut dir: ${outDir}\nLogs: ${dir}\nStudio: https://fractionalforge.app/studio/${p.id}\n\nRun manually, then upload in /studio.`
+      )
+      return true
+    }
+
     // Guarded transition (council #16): only advance if the project is still
     // ours (in_progress). If Tristan moved it meanwhile, record that instead of
     // a misleading in_review event.
@@ -288,6 +348,7 @@ async function processOne(): Promise<boolean> {
       'in_review',
       staged ? `Anvil first pass complete — staged ${path.basename(staged)} for review` : 'Anvil first pass complete (no .xlsx found — check out dir)'
     )
+    await emailCustomerStatus(p, 'in_review')
     await sendEmail(
       `[Anvil] First pass ready for review — ${p.customer_name}${p.company ? ' · ' + p.company : ''}`,
       `Anvil finished the first pass for project ${p.id}.\n\n` +
@@ -335,20 +396,19 @@ async function main(): Promise<void> {
   const drain = async (): Promise<number> => {
     let n = 0
     for (;;) {
-      // Use a monotonic-ish wall clock only for the rolling window; runner is a
-      // long-lived local process, not a resumable workflow, so Date.now is fine.
+      // Wall clock only for the rolling window; the runner is a long-lived local
+      // process, not a resumable workflow, so Date.now is fine.
       const now = Date.now()
       if (runsInLastDay(now).length >= MAX_RUNS_PER_DAY) {
         console.error(`[runner] daily cap reached (${MAX_RUNS_PER_DAY}/24h) — pausing until the window clears`)
         break
       }
+      // Record only AFTER a run actually happened (council Grok #B3): no
+      // speculative-then-rollback, so a crash mid-poll can't leave a phantom
+      // count and an empty poll never consumes budget.
+      const didWork = await processOne()
+      if (!didWork) break
       recordRun(now)
-      if (!(await processOne())) {
-        // no work claimed — roll back the ledger entry we speculatively wrote
-        const rolled = runsInLastDay(now).slice(0, -1)
-        fs.writeFileSync(RUN_LEDGER(), JSON.stringify(rolled))
-        break
-      }
       n++
     }
     return n
