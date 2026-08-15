@@ -34,7 +34,11 @@ import {
 } from '@/lib/dossier-pipeline/types'
 
 const FROM = 'Fractional Forge <tristan@fractionalforge.app>'
-const NOTIFY_TO = 'hello@fractionalforge.app'
+// Where operator notifications land. hello@fractionalforge.app is NOT a real
+// mailbox — Resend suppresses it (every send showed last=suppressed), which is
+// why no notification ever arrived. Default to Tristan's monitored inbox;
+// override with NOTIFY_EMAIL.
+const NOTIFY_TO = process.env.NOTIFY_EMAIL || 'tristan.fischer@gmail.com'
 const MAX_ATTACHMENT_BYTES = 15 * 1024 * 1024 // 15 MB
 const ALLOWED_ATTACHMENT_TYPES = [
   'application/pdf',

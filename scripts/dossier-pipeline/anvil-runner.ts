@@ -38,7 +38,9 @@ const REPO = path.resolve(__dirname, '..', '..')
 const QUEUE_ROOT = process.env.FF_QUEUE_DIR || path.join(os.homedir(), 'FF-dossier-queue')
 const POLL_MS = Number(process.env.FF_POLL_MS || 5 * 60 * 1000)
 const ACTOR = 'anvil-runner'
-const NOTIFY_TO = process.env.FF_NOTIFY_TO || 'hello@fractionalforge.app'
+// hello@fractionalforge.app is suppressed by Resend (dead mailbox) — default to
+// Tristan's monitored inbox; override with FF_NOTIFY_TO.
+const NOTIFY_TO = process.env.FF_NOTIFY_TO || 'tristan.fischer@gmail.com'
 
 // --- env: load .env.local the same way the app sees it -----------------------
 function loadEnvLocal(): void {
