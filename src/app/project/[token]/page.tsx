@@ -26,6 +26,9 @@ export const fetchCache = 'force-no-store'
 export const metadata: Metadata = {
   title: 'Your Design Dossier — project status',
   robots: { index: false, follow: false },
+  // Council (cross-client): the token lives in this URL — never let it leak in
+  // a Referer header to any outbound link or asset.
+  referrer: 'no-referrer',
 }
 
 const SIDE_STATE_COPY: Partial<Record<DossierStatus, { title: string; body: string }>> = {
@@ -202,7 +205,7 @@ export default async function ProjectStatusPage({
               className="font-semibold text-international-orange"
               href="https://calendly.com/tristan-fischer-wjlf/30min"
               target="_blank"
-              rel="noopener"
+              rel="noopener noreferrer"
             >
               Book a 30-minute call with Tristan
             </a>{' '}
