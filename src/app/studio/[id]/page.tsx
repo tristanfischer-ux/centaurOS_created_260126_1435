@@ -5,6 +5,7 @@ import {
   setProjectStatus,
   uploadDossier,
   saveInternalNotes,
+  setNdaStatus,
 } from '@/actions/dossier-projects'
 import { STATUS_LABELS, type DossierStatus } from '@/lib/dossier-pipeline/types'
 
@@ -80,11 +81,12 @@ export default async function StudioProjectPage({
         </span>
       </div>
 
-      {/* Transitions */}
+      {/* Transitions — each with an optional note that lands in the event trail
+          and (for needs_info / on_hold / declined) in the customer email */}
       {actions.length > 0 && (
-        <div className="flex flex-wrap gap-3">
+        <div className="space-y-2">
           {actions.map((a) => (
-            <form key={a.to} action={setProjectStatus}>
+            <form key={a.to} action={setProjectStatus} className="flex flex-wrap items-center gap-3">
               <input type="hidden" name="projectId" value={project.id} />
               <input type="hidden" name="to" value={a.to} />
               <button
@@ -93,9 +95,41 @@ export default async function StudioProjectPage({
               >
                 {a.label}
               </button>
+              <input
+                type="text"
+                name="note"
+                placeholder="Optional note (goes in the history; customer sees it on needs-info / hold / decline)"
+                className="min-w-[280px] flex-1 rounded-lg border bg-muted/30 px-3 py-2 text-sm"
+              />
             </form>
           ))}
         </div>
+      )}
+
+      {/* NDA flow */}
+      {(project.nda_requested || project.nda_status) && (
+        <section className="rounded-xl border border-amber-300 bg-amber-50 p-5">
+          <h2 className="mb-2 font-bold">NDA — {project.nda_status ?? 'requested'}</h2>
+          <p className="mb-3 text-sm text-muted-foreground">
+            The customer asked for an NDA. Send it by email, then record it here — marking
+            &lsquo;sent&rsquo; emails the customer a confirmation.
+          </p>
+          <div className="flex flex-wrap gap-3">
+            {(['sent', 'signed'] as const).map((s) => (
+              <form key={s} action={setNdaStatus}>
+                <input type="hidden" name="projectId" value={project.id} />
+                <input type="hidden" name="nda" value={s} />
+                <button
+                  type="submit"
+                  disabled={project.nda_status === s}
+                  className="rounded-full border border-foreground/20 px-4 py-2 text-sm font-semibold hover:bg-muted disabled:opacity-40"
+                >
+                  Mark NDA {s}
+                </button>
+              </form>
+            ))}
+          </div>
+        </section>
       )}
 
       {/* The brief */}

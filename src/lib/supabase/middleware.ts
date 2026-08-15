@@ -47,6 +47,7 @@ const PUBLIC_ROUTES = [
     '/sample-package',    // sample dossier — the product showcase, a top conversion asset
     '/investor-readiness',// investor-readiness landing
     '/preview-landing',   // preview / campaign landing
+    '/quote',             // estimator / contractor landing (P1-a)
 ]
 
 // RED-TEAM-PIVOT-PLAN Tier 2 step 14: anonymous /investors landing. The

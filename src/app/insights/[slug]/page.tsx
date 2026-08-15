@@ -12,6 +12,7 @@ import Link from "next/link"
 import { ArrowLeft, ArrowUpRight, ArrowRight } from "lucide-react"
 import { MarketingNav } from "@/components/marketing/marketing-nav"
 import { MarketingFooter } from "@/components/marketing/marketing-footer"
+import { Breadcrumbs } from "@/components/marketing/breadcrumbs"
 import { getArticle, getArticleSlugs } from "@/lib/insights-articles"
 
 export function generateStaticParams() {
@@ -65,13 +66,7 @@ export default async function ArticlePage({
       <main className="flex-1 px-4 sm:px-6 pb-16 sm:pb-24">
         <article className="max-w-2xl mx-auto">
           <div className="pt-8 sm:pt-12">
-            <Link
-              href="/insights"
-              className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
-            >
-              <ArrowLeft className="w-4 h-4" />
-              Insights
-            </Link>
+            <Breadcrumbs trail={[{ name: "Insights", href: "/insights" }, { name: a.title }]} />
           </div>
 
           <header className="mt-6 space-y-4">

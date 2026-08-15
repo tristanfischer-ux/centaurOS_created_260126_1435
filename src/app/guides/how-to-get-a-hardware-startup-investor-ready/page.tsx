@@ -14,6 +14,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { MarketingNav } from "@/components/marketing/marketing-nav"
 import { MarketingFooter } from "@/components/marketing/marketing-footer"
+import { Breadcrumbs } from "@/components/marketing/breadcrumbs"
 
 export const metadata: Metadata = {
   title: "How to get a hardware startup investor-ready",
@@ -108,7 +109,8 @@ export default function InvestorReadyGuide() {
       <main className="flex-1 px-4 sm:px-6 pb-16 sm:pb-24">
         <div className="max-w-4xl mx-auto space-y-14 sm:space-y-20">
           {/* Hero */}
-          <section className="pt-8 sm:pt-12 space-y-5">
+          <div className="pt-8 sm:pt-12"><Breadcrumbs trail={[{ name: "Guides" }, { name: "How to get a hardware startup investor-ready", href: "/guides/how-to-get-a-hardware-startup-investor-ready" }]} /></div>
+          <section className="space-y-5">
             <Badge variant="brand" size="lg">
               How-to guide
             </Badge>

@@ -28,6 +28,7 @@ Human-curated, not self-serve. A founder describes their idea in a short brief (
 - How we work: https://fractionalforge.app/pricing
 - Investor-readiness tool: https://fractionalforge.app/investor-readiness
 - Manufacturing techniques library: https://fractionalforge.app/techniques
+- For teams who quote (estimators/contractors): https://fractionalforge.app/quote
 
 ## Company
 - Company: Fractional Forge Ltd (London, United Kingdom)

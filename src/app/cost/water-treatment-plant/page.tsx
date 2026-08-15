@@ -12,14 +12,13 @@
 
 import type { Metadata } from "next"
 import Link from "next/link"
-import { ArrowRight, Download, CheckCircle2 } from "lucide-react"
+import { ArrowRight, CheckCircle2 } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { MarketingNav } from "@/components/marketing/marketing-nav"
 import { MarketingFooter } from "@/components/marketing/marketing-footer"
-
-const EXAMPLE_XLSX =
-  "https://jyarhvinengfyrwgtskq.supabase.co/storage/v1/object/public/dossiers/example-water-treatment-dossier.xlsx"
+import { Breadcrumbs } from "@/components/marketing/breadcrumbs"
+import { WorkbookGate } from "@/components/marketing/workbook-gate"
 
 export const metadata: Metadata = {
   title: "What does an industrial water-treatment plant cost to build?",
@@ -105,7 +104,8 @@ export default function WaterTreatmentCostPage() {
       <main className="flex-1 px-4 sm:px-6 pb-16 sm:pb-24">
         <div className="max-w-4xl mx-auto space-y-14 sm:space-y-20">
           {/* Hero */}
-          <section className="pt-8 sm:pt-12 space-y-5">
+          <div className="pt-8 sm:pt-12"><Breadcrumbs trail={[{ name: "Cost guides" }, { name: "Water-treatment plant", href: "/cost/water-treatment-plant" }]} /></div>
+          <section className="space-y-5">
             <Badge variant="brand" size="lg">
               Cost guide
             </Badge>
@@ -220,13 +220,7 @@ export default function WaterTreatmentCostPage() {
               Download the sanitised example and change an assumption to watch the
               costs recompute.
             </p>
-            <a
-              href={EXAMPLE_XLSX}
-              className="inline-flex items-center gap-2 px-6 py-3 rounded-lg border border-border text-foreground font-semibold text-sm hover:bg-muted transition-colors"
-            >
-              <Download className="w-4 h-4" />
-              Download the example workbook (Excel)
-            </a>
+            <WorkbookGate source="cost-water-treatment" />
           </section>
 
           {/* What drives the cost */}

@@ -11,118 +11,54 @@ export const dynamic = 'force-dynamic'
  *
  * @description Hardware-only pages (D1, 2026-08-14): the fractional-executive
  * marketplace (/experts, /expert/*, /blog/*) is withdrawn from the sitemap and
- * noindexed — it confused the entity model answer engines build for
- * "Fractional Forge = the front end for hardware". The code remains in the
- * repo so the marketplace can return later.
+ * noindexed. lastModified is a REAL per-page date (P2-b, 2026-08-15) — the
+ * last substantive edit of each page, maintained by hand: when you materially
+ * change a page, update its date here in the same PR.
  *
  * @security Only public pages included. No authenticated routes.
  */
+
+/** route → [lastmod, changeFrequency, priority] */
+const STATIC_PAGES: Record<string, [string, 'weekly' | 'monthly' | 'yearly', number]> = {
+    '': ['2026-08-15', 'weekly', 1.0],
+    '/pricing': ['2026-08-14', 'monthly', 0.9],
+    '/about': ['2026-08-14', 'monthly', 0.7],
+    '/contact': ['2026-04-25', 'monthly', 0.7],
+    '/terms': ['2026-04-16', 'yearly', 0.3],
+    '/privacy': ['2026-04-25', 'yearly', 0.3],
+    '/brief': ['2026-08-15', 'monthly', 0.9],
+    '/quote': ['2026-08-15', 'monthly', 0.8],
+    '/story': ['2026-07-04', 'monthly', 0.7],
+    '/insights': ['2026-07-04', 'weekly', 0.8],
+    '/cost/water-treatment-plant': ['2026-08-15', 'monthly', 0.8],
+    '/guides/how-to-find-a-contract-manufacturer-uk': ['2026-08-15', 'monthly', 0.8],
+    '/guides/how-to-cost-a-hardware-bill-of-materials': ['2026-08-15', 'monthly', 0.8],
+    '/guides/how-to-get-a-hardware-startup-investor-ready': ['2026-08-15', 'monthly', 0.8],
+    '/guides/design-for-manufacture-explained': ['2026-08-15', 'monthly', 0.8],
+    '/investor-readiness': ['2026-04-16', 'monthly', 0.7],
+    '/techniques': ['2026-04-25', 'monthly', 0.7],
+    '/sample-package': ['2026-08-14', 'monthly', 0.8],
+    '/signup': ['2026-05-05', 'monthly', 0.7],
+}
+
+/** The insights essays were republished in one batch. */
+const ARTICLES_LASTMOD = '2026-07-04'
+
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://fractionalforge.app'
-    const now = new Date()
 
-    const staticPages: MetadataRoute.Sitemap = [
-        {
-            url: appUrl,
-            lastModified: now,
-            changeFrequency: 'weekly',
-            priority: 1.0,
-        },
-        {
-            url: `${appUrl}/pricing`,
-            lastModified: now,
-            changeFrequency: 'monthly',
-            priority: 0.9,
-        },
-        {
-            url: `${appUrl}/about`,
-            lastModified: now,
-            changeFrequency: 'monthly',
-            priority: 0.7,
-        },
-        {
-            url: `${appUrl}/contact`,
-            lastModified: now,
-            changeFrequency: 'monthly',
-            priority: 0.7,
-        },
-        {
-            url: `${appUrl}/terms`,
-            lastModified: now,
-            changeFrequency: 'yearly',
-            priority: 0.3,
-        },
-        {
-            url: `${appUrl}/privacy`,
-            lastModified: now,
-            changeFrequency: 'yearly',
-            priority: 0.3,
-        },
-        {
-            url: `${appUrl}/brief`,
-            lastModified: now,
-            changeFrequency: 'monthly',
-            priority: 0.9,
-        },
-        {
-            url: `${appUrl}/story`,
-            lastModified: now,
-            changeFrequency: 'monthly',
-            priority: 0.7,
-        },
-        {
-            url: `${appUrl}/insights`,
-            lastModified: now,
-            changeFrequency: 'weekly',
-            priority: 0.8,
-        },
-        {
-            url: `${appUrl}/cost/water-treatment-plant`,
-            lastModified: now,
-            changeFrequency: 'monthly',
-            priority: 0.8,
-        },
-        ...[
-            'how-to-find-a-contract-manufacturer-uk',
-            'how-to-cost-a-hardware-bill-of-materials',
-            'how-to-get-a-hardware-startup-investor-ready',
-            'design-for-manufacture-explained',
-        ].map((slug) => ({
-            url: `${appUrl}/guides/${slug}`,
-            lastModified: now,
-            changeFrequency: 'monthly' as const,
-            priority: 0.8,
-        })),
-        {
-            url: `${appUrl}/investor-readiness`,
-            lastModified: now,
-            changeFrequency: 'monthly',
-            priority: 0.7,
-        },
-        {
-            url: `${appUrl}/techniques`,
-            lastModified: now,
-            changeFrequency: 'monthly',
-            priority: 0.7,
-        },
-        {
-            url: `${appUrl}/sample-package`,
-            lastModified: now,
-            changeFrequency: 'monthly',
-            priority: 0.8,
-        },
-        {
-            url: `${appUrl}/signup`,
-            lastModified: now,
-            changeFrequency: 'monthly',
-            priority: 0.7,
-        },
-    ]
+    const staticPages: MetadataRoute.Sitemap = Object.entries(STATIC_PAGES).map(
+        ([route, [lastmod, changeFrequency, priority]]) => ({
+            url: `${appUrl}${route}`,
+            lastModified: new Date(lastmod),
+            changeFrequency,
+            priority,
+        })
+    )
 
-    // Native Insights articles (republished HFN essays)
     const articlePages: MetadataRoute.Sitemap = getArticleSlugs().map((slug) => ({
         url: `${appUrl}/insights/${slug}`,
-        lastModified: now,
+        lastModified: new Date(ARTICLES_LASTMOD),
         changeFrequency: 'monthly' as const,
         priority: 0.7,
     }))

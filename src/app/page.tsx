@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { HeroNavScroll } from "./nav-scroll";
+import { WorkbookGate } from "@/components/marketing/workbook-gate";
 
 export const metadata: Metadata = {
   title: "Fractional Forge — the front end for hardware",
@@ -393,11 +394,13 @@ const HTML = `<style>
       <div class="card"><h3>Risk &amp; open questions</h3><p>What you&rsquo;ll need to certify, the holds and exclusions, and the questions still to resolve &mdash; stated plainly, not buried.</p></div>
       <div class="card"><h3>It checks itself</h3><p>A scorecard, sense-check, connection trace and audit run before delivery &mdash; then a senior engineer from our partner network reviews the whole workbook. It&rsquo;s built to be checked: it makes an expert think, and catches what a busy team would miss.</p></div>
     </div>
-    <div style="text-align:center;margin-top:30px;display:flex;gap:12px;justify-content:center;flex-wrap:wrap"><a class="btn btn-ghost btn-lg" href="https://jyarhvinengfyrwgtskq.supabase.co/storage/v1/object/public/dossiers/example-water-treatment-dossier.xlsx">See a real example workbook &mdash; Excel &darr;</a><a class="btn btn-ghost btn-lg" href="/cost/water-treatment-plant">Read a worked cost breakdown &rarr;</a></div>
-    <p class="ex-note">A worked example (a water-treatment plant): open it and change an assumption to watch the model recompute. The same engine has been pointed at grid-scale battery storage, vertical farms, CO&#8322; capture and power-to-liquid aviation fuel. Yours covers your idea.</p>
   </div>
 </section>
+`;
 
+// Second HTML chunk — everything after the workbook gate (rendered as JSX
+// between the two chunks so the email-unlock form can be a client component).
+const HTML_AFTER_GATE = `
 <!-- FOR FOUNDERS -->
 <section class="s" id="founders">
   <div class="wrap">
@@ -453,7 +456,7 @@ const HTML = `<style>
       <div class="axis"><span class="axis-k">Win the near-misses</span><p>Get a credible number back first. On most tenders the fastest sound quote takes the contract.</p></div>
       <div class="axis"><span class="axis-k">Right, not just fast</span><p>First-principles physics flags what a busy team can miss &mdash; and a human signs off every quote before it goes out.</p></div>
     </div>
-    <div style="margin-top:30px"><a class="btn btn-ghost btn-lg" href="/contact">Talk to us about your team &rarr;</a></div>
+    <div style="margin-top:30px"><a class="btn btn-ghost btn-lg" href="/quote">For teams who quote &rarr;</a></div>
   </div>
 </section>
 
@@ -491,6 +494,17 @@ const HTML = `<style>
         </ul>
         <p class="hood-note">35 data sources in total &mdash; over 5 million reference records, kept current. Then a senior engineer from our partner network reviews the whole workbook before you see it.</p>
       </div>
+    </div>
+    <div class="hood-col" style="margin-top:26px">
+      <h3>Check one yourself</h3>
+      <p class="lead">Every calculation in a Dossier is shown like this &mdash; inputs, formula, source, result &mdash; so you can verify it by hand:</p>
+      <div style="margin-top:16px;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:18px 20px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:13.5px;line-height:1.8;color:var(--ink-soft);overflow-x:auto">
+        <div><b style="color:var(--ink)">Pump hydraulic power</b> &mdash; sizing a transfer pump</div>
+        <div>Inputs: flow Q = 40 m&sup3;/h (0.0111 m&sup3;/s) &middot; head H = 35 m &middot; density &rho; = 998 kg/m&sup3; &middot; pump efficiency &eta; = 0.65</div>
+        <div>Formula: P = &rho; &middot; g &middot; Q &middot; H / &eta;&ensp;(standard pump power equation &mdash; e.g. Sinnott &amp; Towler, <em>Chemical Engineering Design</em>, ch. 5)</div>
+        <div>Working: 998 &times; 9.81 &times; 0.0111 &times; 35 / 0.65 = <b style="color:var(--ink)">5.85 kW</b> &rarr; next standard motor: <b style="color:var(--ink)">7.5 kW</b></div>
+      </div>
+      <p class="hood-note">An illustrative example of the method &mdash; your Dossier shows the same working for your numbers, with the library or standard cited on every line.</p>
     </div>
   </div>
 </section>
@@ -699,6 +713,24 @@ export default function HomePage() {
         dangerouslySetInnerHTML={{ __html: JSON.stringify(FAQ_JSON_LD) }}
       />
       <div dangerouslySetInnerHTML={{ __html: HTML }} />
+      {/* Workbook email gate (P1-c) — React island between the two HTML chunks */}
+      <section className="examples" style={{ background: "var(--surface)", padding: "0 0 64px", marginTop: "-30px" }}>
+        <div className="wrap">
+          <WorkbookGate source="homepage" />
+          <div style={{ textAlign: "center", marginTop: "16px" }}>
+            <a className="btn btn-ghost" href="/cost/water-treatment-plant">
+              Read the worked cost breakdown &rarr;
+            </a>
+          </div>
+          <p className="ex-note">
+            A worked example (a water-treatment plant): open it and change an assumption to watch
+            the model recompute. The same engine has been pointed at grid-scale battery storage,
+            vertical farms, CO&#8322; capture and power-to-liquid aviation fuel. Yours covers your
+            idea.
+          </p>
+        </div>
+      </section>
+      <div dangerouslySetInnerHTML={{ __html: HTML_AFTER_GATE }} />
       <HeroNavScroll />
     </>
   );

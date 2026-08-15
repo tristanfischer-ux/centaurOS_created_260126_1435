@@ -70,6 +70,7 @@ export interface DossierProject {
   status: DossierStatus
   status_updated_at: string
   nda_requested: boolean
+  nda_status: 'requested' | 'sent' | 'signed' | null
   access_token: string
   assigned_to: string | null
   internal_notes: string | null

@@ -235,21 +235,71 @@ export async function setProjectStatus(formData: FormData): Promise<void> {
     note: note || null,
   })
 
-  // Phase-1 customer notifications: ready/delivered (download available).
-  // Other transition emails are Phase 2 (§6.8).
-  if (to === 'ready') {
-    sendEmail({
-      to: p.customer_email,
+  // Customer notifications on every meaningful transition (§6.8 Phase 2).
+  const first = p.customer_name.split(' ')[0] || 'there'
+  const statusUrl = `${appUrl()}/project/${p.access_token}`
+  const signoff = `\n— Tristan Fischer, Founder, Fractional Forge\n`
+  const CUSTOMER_EMAILS: Partial<Record<DossierStatus, { subject: string; text: string }>> = {
+    validated: {
+      subject: 'Your brief is validated — Anvil is up next',
+      text:
+        `Hi ${first},\n\n` +
+        `I've read your brief and it's good to run. Anvil builds the first pass next, ` +
+        `then senior engineers from our partner network review it before you see it.\n\n` +
+        `Track progress: ${statusUrl}\n` +
+        signoff,
+    },
+    in_review: {
+      subject: 'Your Design Dossier is in engineering review',
+      text:
+        `Hi ${first},\n\n` +
+        `Anvil has finished the first pass on your Design Dossier and it's now with ` +
+        `senior engineers from our partner network for review. You'll get the download ` +
+        `link as soon as it's signed off.\n\n` +
+        `Track progress: ${statusUrl}\n` +
+        signoff,
+    },
+    needs_info: {
+      subject: 'One thing before your Dossier can run',
+      text:
+        `Hi ${first},\n\n` +
+        `Your brief is in, but I need a detail or two before Anvil can do it justice` +
+        `${note ? `:\n\n${note}` : '.'}\n\n` +
+        `Just reply to this email with the answer and I'll get it moving.\n\n` +
+        `Your project page: ${statusUrl}\n` +
+        signoff,
+    },
+    on_hold: {
+      subject: 'Your Dossier project is paused',
+      text:
+        `Hi ${first},\n\n` +
+        `I've paused your project for now` +
+        `${note ? ` — ${note}` : ''}. Reply to this email whenever you want to pick it back up.\n\n` +
+        `Your project page: ${statusUrl}\n` +
+        signoff,
+    },
+    declined: {
+      subject: 'Your brief — not one we can take forward',
+      text:
+        `Hi ${first},\n\n` +
+        `Thank you for sending your brief. I'm sorry — it's not one we can take forward` +
+        `${note ? `: ${note}` : ' (usually a question of scope, not quality)'}.\n\n` +
+        `If the shape of the project changes, you're welcome to submit again.\n` +
+        signoff,
+    },
+    ready: {
       subject: 'Your Design Dossier is ready',
       text:
-        `Hi ${p.customer_name.split(' ')[0] || 'there'},\n\n` +
+        `Hi ${first},\n\n` +
         `Your Design Dossier is ready — reviewed and signed off. Download it from your ` +
-        `private project page:\n${appUrl()}/project/${p.access_token}\n\n` +
+        `private project page:\n${statusUrl}\n\n` +
         `Open it in Excel and change an assumption — every number recomputes. ` +
-        `If you'd like to walk through it together: https://calendly.com/tristan-fischer-wjlf/30min\n\n` +
-        `— Tristan Fischer, Founder, Fractional Forge\n`,
-    })
+        `If you'd like to walk through it together: https://calendly.com/tristan-fischer-wjlf/30min\n` +
+        signoff,
+    },
   }
+  const mail = CUSTOMER_EMAILS[to]
+  if (mail) sendEmail({ to: p.customer_email, subject: mail.subject, text: mail.text })
 
   revalidatePath('/studio')
   revalidatePath(`/studio/${projectId}`)
@@ -302,6 +352,54 @@ export async function uploadDossier(formData: FormData): Promise<void> {
   advance.set('to', 'ready')
   advance.set('note', `Dossier uploaded: ${file.name}`)
   await setProjectStatus(advance)
+}
+
+const NDA_STATUSES = ['requested', 'sent', 'signed'] as const
+type NdaStatus = (typeof NDA_STATUSES)[number]
+
+export async function setNdaStatus(formData: FormData): Promise<void> {
+  const { email: actor } = await requireStudioAdmin()
+  const projectId = String(formData.get('projectId') ?? '')
+  const nda = String(formData.get('nda') ?? '') as NdaStatus
+  if (!projectId || !NDA_STATUSES.includes(nda)) throw new Error('Invalid NDA status')
+
+  const admin = createAdminClient()
+  const { data: project } = await admin
+    .from('dossier_projects')
+    .select('*')
+    .eq('id', projectId)
+    .maybeSingle()
+  if (!project) throw new Error('Project not found')
+  const p = project as DossierProject
+
+  await admin
+    .from('dossier_projects')
+    .update({ nda_status: nda, nda_requested: true })
+    .eq('id', projectId)
+
+  await admin.from('dossier_project_events').insert({
+    project_id: projectId,
+    from_status: p.status,
+    to_status: p.status,
+    actor,
+    note: `NDA ${nda}`,
+  })
+
+  if (nda === 'sent') {
+    sendEmail({
+      to: p.customer_email,
+      subject: 'Your NDA is on its way',
+      text:
+        `Hi ${p.customer_name.split(' ')[0] || 'there'},\n\n` +
+        `As requested, I've sent the NDA to this address (check for a separate email with ` +
+        `the document). Nothing moves on your brief beyond intake until it's in place.\n\n` +
+        `Your project page: ${appUrl()}/project/${p.access_token}\n\n` +
+        `— Tristan Fischer, Founder, Fractional Forge\n`,
+    })
+  }
+
+  revalidatePath(`/studio/${projectId}`)
+  revalidatePath('/studio')
 }
 
 export async function saveInternalNotes(formData: FormData): Promise<void> {
