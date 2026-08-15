@@ -28,11 +28,12 @@ const NEXT_ACTIONS: Partial<Record<DossierStatus, { to: DossierStatus; label: st
     { to: 'declined', label: 'Decline' },
   ],
   validated: [
-    { to: 'in_progress', label: 'Start (running Anvil)' },
+    { to: 'needs_info', label: 'Needs info' },
     { to: 'on_hold', label: 'Put on hold' },
+    { to: 'in_progress', label: 'Run Anvil myself (skip the auto-runner)' },
   ],
   in_progress: [
-    { to: 'in_review', label: 'Send to engineering review' },
+    { to: 'in_review', label: 'Mark ready for review (if you ran it yourself)' },
     { to: 'on_hold', label: 'Put on hold' },
   ],
   in_review: [{ to: 'on_hold', label: 'Put on hold' }],
@@ -62,6 +63,19 @@ export default async function StudioProjectPage({
   const briefUrls = await Promise.all(briefFiles.map((f) => signedBriefUrl(f)))
   const actions = NEXT_ACTIONS[project.status] ?? []
 
+  // Plain-English "what happens now" per status, so the operator knows whether
+  // to act or wait (the auto-runner owns the validated → in_review leg).
+  const STATUS_HELP: Partial<Record<DossierStatus, string>> = {
+    submitted: 'New brief. Read it, then Validate to send it to Anvil (or ask for more info / decline).',
+    validated: 'Validated. The Anvil runner picks this up automatically within ~10 minutes, runs the first pass, and emails you when it’s ready to review — you don’t need to do anything. The buttons below are only for corrections or running Anvil yourself.',
+    in_progress: 'Anvil is running (or you’re running it yourself). When it finishes it moves to engineering review automatically and emails you. Nothing to do unless you ran it manually.',
+    in_review: 'First pass is done and waiting for your review. Check the staged workbook, then upload the final version in “Deliver the Dossier” below to send it to the customer.',
+    ready: 'Delivered to the customer — they’ve been emailed their download link. Mark delivered once they’ve collected it.',
+    needs_info: 'Waiting on the customer. They’ve been emailed your note; validate once they reply.',
+    on_hold: 'Paused. Resume when you’re ready.',
+  }
+  const help = STATUS_HELP[project.status]
+
   return (
     <div className="space-y-8">
       <div className="flex items-start justify-between gap-4">
@@ -84,6 +98,13 @@ export default async function StudioProjectPage({
           {STATUS_LABELS[project.status]}
         </span>
       </div>
+
+      {/* What happens now — orient the operator before the buttons */}
+      {help && (
+        <p className="rounded-xl border border-international-orange/30 bg-international-orange/5 px-4 py-3 text-sm text-foreground">
+          {help}
+        </p>
+      )}
 
       {/* Transitions — each with an optional note that lands in the event trail
           and (for needs_info / on_hold / declined) in the customer email */}
