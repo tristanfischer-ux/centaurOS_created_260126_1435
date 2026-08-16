@@ -12,6 +12,7 @@ import { useState, type FormEvent } from "react"
 import { submitDossierBrief } from "@/actions/dossier-projects"
 import { MarketingNav } from "@/components/marketing/marketing-nav"
 import { MarketingFooter } from "@/components/marketing/marketing-footer"
+import { FOCUS_SECTORS } from "@/lib/focus-sectors"
 
 const CSS = `
 .ff-intake{--ink:#0f1729;--ink-soft:#334155;--muted:#64748b;--line:#e6eaf0;--surface:#f8fafc;--ember:#e2562a;--ember-dark:#c2410c;--ember-soft:#fff2ec;--blue:#1d4ed8;--green:#0f7a4d;--green-soft:#ecfdf5;--radius:18px;--radius-sm:12px;--shadow:0 1px 2px rgba(15,23,41,.04),0 10px 30px rgba(15,23,41,.07);
@@ -105,7 +106,7 @@ export function BriefIntake() {
             <div className="card">
               <span className="eyebrow">Get your Design Dossier</span>
               <h1>Tell me about your idea.</h1>
-              <p className="sub">A short brief is all I need &mdash; a paragraph is enough to start, and the more you tell me, the more precisely it hits your spec. Anvil builds your Design Dossier: an auditable Excel workbook with the architecture, a costed bill-of-materials ledger, a full financial model, the licences and regulations you&rsquo;ll face, the risks to watch, and a built-in self-audit &mdash; every number a formula you can trace. A senior engineer from our partner network reviews it before I send it, within a few business days. No account, and your first one is free.</p>
+              <p className="sub">A short brief is all I need &mdash; a paragraph is enough to start, and the more you tell me, the more precisely it hits your spec. We go deepest on battery energy storage, water treatment systems, electric motor sets and medical assay machines; other hardware still comes through the same door as a generic pack. Anvil builds your Design Dossier: an auditable Excel workbook with the architecture, a costed bill-of-materials ledger, a full financial model, the licences and regulations you&rsquo;ll face, the risks to watch, and a built-in self-audit &mdash; every number a formula you can trace. A senior engineer from our partner network reviews it before I send it, within a few business days. No account, and your first one is free.</p>
               <form onSubmit={onSubmit}>
                 <div>
                   <label htmlFor="idea">Your idea <span className="req">*</span> <span className="hint">&mdash; what it does, who it&rsquo;s for, roughly how big.</span></label>
@@ -136,12 +137,11 @@ export function BriefIntake() {
                     <label htmlFor="sector">Sector</label>
                     <select id="sector" value={sector} onChange={(e) => setSector(e.target.value)}>
                       <option value="">Choose one&hellip;</option>
-                      <option>Energy / storage</option>
-                      <option>Agritech / food</option>
-                      <option>Robotics / automation</option>
-                      <option>Medical / diagnostics</option>
-                      <option>Mobility / transport</option>
-                      <option>Other hardware</option>
+                      {FOCUS_SECTORS.map((s) => (
+                        <option key={s.id} value={s.briefValue}>
+                          {s.title}
+                        </option>
+                      ))}
                     </select>
                   </div>
                   <div>

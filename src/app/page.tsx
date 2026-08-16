@@ -1,6 +1,13 @@
 import type { Metadata } from "next";
 import { HeroNavScroll } from "./nav-scroll";
 import { WorkbookGate } from "@/components/marketing/workbook-gate";
+import { FOCUS_SECTORS } from "@/lib/focus-sectors";
+
+const FOCUS_ONLY = FOCUS_SECTORS.filter((s) => s.id !== "generic");
+const GENERIC = FOCUS_SECTORS.find((s) => s.id === "generic");
+const SECTOR_CARDS = FOCUS_ONLY.map(
+  (s) => `      <div class="scard"><h3>${s.title}</h3><p>${s.blurb}</p></div>`,
+).join("\n");
 
 export const metadata: Metadata = {
   title: "Fractional Forge — the front end for hardware",
@@ -118,6 +125,16 @@ const HTML = `<style>
   .card p{font-size:14px;color:var(--muted);}
   @media(max-width:920px){.feat{grid-template-columns:repeat(2,1fr);} }
   @media(max-width:520px){.feat{grid-template-columns:1fr;} }
+
+  .sectors{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px;margin-top:32px;}
+  .scard{background:#fff;border:1px solid var(--line);border-radius:var(--radius-sm);padding:22px;box-shadow:var(--shadow-sm);}
+  .scard h3{font-size:16.5px;margin:0 0 8px;}
+  .scard p{font-size:14px;color:var(--muted);}
+  .scard-wide{margin-top:16px;background:#fff;border:1px dashed var(--line);border-radius:var(--radius-sm);padding:22px;}
+  .scard-wide h3{font-size:16.5px;margin:0 0 8px;}
+  .scard-wide p{font-size:14px;color:var(--muted);}
+  @media(max-width:920px){.sectors{grid-template-columns:repeat(2,1fr);} }
+  @media(max-width:520px){.sectors{grid-template-columns:1fr;} }
 
   .examples{background:var(--surface);}
   .ex-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px;margin-top:34px;}
@@ -247,6 +264,7 @@ const HTML = `<style>
     <a class="brand" href="#"><span class="flame"><svg viewBox="0 0 24 24"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></svg></span> Fractional&nbsp;Forge</a>
     <nav class="nav-links">
       <a href="#how">How it works</a>
+      <a href="#sectors">What we do</a>
       <a href="#examples">What&rsquo;s inside</a>
       <a href="/sample-package">Example package</a>
       <a href="#partners">For partners</a>
@@ -281,7 +299,7 @@ const HTML = `<style>
   <div class="wrap cred-inner">
     <div class="cred-stat"><b>25+ yrs</b><span>building capital-intensive deep-tech &amp; manufacturing</span></div>
     <div class="cred-stat"><b>~&pound;200m</b><span>raised across his own &amp; advised companies</span></div>
-    <div class="cred-stat"><b>6 sectors</b><span>solar &middot; wind &middot; tidal &middot; batteries &middot; vertical farming &middot; carbon capture</span></div>
+    <div class="cred-stat"><b>4 focus lines</b><span>battery energy storage &middot; water treatment &middot; electric motor sets &middot; medical assay</span></div>
     <div class="cred-stat"><b>Ex-Citigroup</b><span>&amp; Shell Ventures &middot; took a company public on AIM</span></div>
   </div>
   <p class="wrap cred-by">Founded by <strong>Tristan Fischer</strong> &mdash; a decade building Fischer Farms into one of the world&rsquo;s largest vertical farms. Every Design Dossier is reviewed by a senior engineer from our partner network.</p>
@@ -333,6 +351,25 @@ const HTML = `<style>
       </div>
     </div>
     <p style="margin-top:28px;font-size:16px;color:var(--ink-soft);max-width:72ch">And when you&rsquo;re raising: we help with the capital too &mdash; fundraising on an introducer / success-fee basis (<strong>no raise, no fee</strong>), plus grants and non-dilutive routes. A costed, engineer-reviewed design with a route to build makes you far more fundable.</p>
+  </div>
+</section>
+
+<!-- FOCUS SECTORS -->
+<section class="s" id="sectors">
+  <div class="wrap">
+    <div class="s-head">
+      <span class="eyebrow">What we do</span>
+      <h2>Four lines we are building to be genuinely good at.</h2>
+      <p class="muted" style="margin-top:12px">Anvil still takes a short brief for any machine. These four are where the engine, the packs and the partner review are deepest &mdash; battery energy storage, water treatment systems, electric motor sets, and medical assay machines. Everything else uses the same door as a generic pack.</p>
+    </div>
+    <div class="sectors">
+${SECTOR_CARDS}
+    </div>
+    <div class="scard-wide">
+      <h3>${GENERIC?.title ?? "Other hardware"}</h3>
+      <p>${GENERIC?.blurb ?? ""}</p>
+    </div>
+    <p style="margin-top:22px"><a class="btn btn-primary" href="/brief">Send a brief in one of these &rarr;</a></p>
   </div>
 </section>
 

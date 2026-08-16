@@ -72,6 +72,9 @@ const DECLARED_CLASS_SIGNATURES: Array<{ re: RegExp; cls: string }> = [
   // Bench / lab PSU (2026-08-16): must beat the generic vehicle fallthrough
   // (`vehicle|car|drivetrain|crash|homologation`). A 240 W supply is an instrument.
   { re: /bench\s+(?:psu|power\s+supply)|lab(?:oratory)?\s+power\s+supply|programmable\s+power\s+supply|desktop\s+psu|\b240\s*w\b.{0,60}(?:psu|power\s+supply)/, cls: 'bench_psu' },
+  { re: /\b(?:elisa|assay\s+(?:machine|reader|instrument|analyser|analyzer)|sample[- ]to[- ]answer|diagnostic\s+reader)\b/, cls: 'medical_device' },
+  { re: /\belectric\s+motor\s+set|motor[- ]inverter\s+set|drive\s+unit\s+set\b/, cls: 'vehicle' },
+  { re: /\bbattery\s+energy\s+storage|\bbess\b(?:\s+(?:pack|system|cabinet|container))/, cls: 'energy_storage' },
 ]
 
 /** Lock families the one-engine door may force. instrument ≠ vehicle ≠ plant. */
@@ -85,6 +88,14 @@ export const CLASS_LOCK_ALLOWED: Record<string, readonly string[]> = {
     'pcb_assembly',
     'medical_device',
     'wearable_medical',
+  ],
+  assay: [
+    'medical_device',
+    'optical_instrument',
+    'lab_instrument',
+    'wearable_medical',
+    'pcb_assembly',
+    'bench_psu',
   ],
   'wall-store': ['energy_storage'],
   ahs: ['energy_storage'],
@@ -120,7 +131,7 @@ export function applyClassLock(
   lockFamily: string | undefined,
 ): ProductClassification {
   const family = (lockFamily || '').trim().toLowerCase()
-  if (!family) return classified
+  if (!family || family === 'generic') return classified
   const allowed = CLASS_LOCK_ALLOWED[family]
   if (!allowed) return classified
   if (allowed.includes(classified.productClass)) return classified

@@ -3,6 +3,7 @@ import Link from "next/link"
 import { CheckCircle2 } from "lucide-react"
 import { MarketingNav } from "@/components/marketing/marketing-nav"
 import { MarketingFooter } from "@/components/marketing/marketing-footer"
+import { FOCUS_SECTORS } from "@/lib/focus-sectors"
 
 /**
  * @file /quote — landing page for teams who assess briefs and quote for work
@@ -74,6 +75,22 @@ export default function QuotePage() {
               >
                 See a real example
               </Link>
+            </div>
+          </section>
+
+          <section className="space-y-4">
+            <h2 className="text-2xl sm:text-3xl font-semibold">Sectors we quote fastest</h2>
+            <p className="max-w-3xl text-sm text-muted-foreground">
+              The same four lines the engine is built around. Other hardware still comes through
+              as a generic pack &mdash; we do not invent a specialist plant for it.
+            </p>
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {FOCUS_SECTORS.map((s) => (
+                <div key={s.id} className="rounded-xl border p-5">
+                  <h3 className="font-bold">{s.title}</h3>
+                  <p className="mt-2 text-sm text-muted-foreground">{s.blurb}</p>
+                </div>
+              ))}
             </div>
           </section>
 
