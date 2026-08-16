@@ -69,7 +69,71 @@ const DECLARED_CLASS_SIGNATURES: Array<{ re: RegExp; cls: string }> = [
   // leafy-greens vertical-farm brief never names a "water-handling / fertigation / irrigation
   // plant" as its deliverable, so it falls through to vertical_farm.
   { re: /\b(?:irrigation|fertigation)\s+(?:and\s+\w+\s+)?(?:plant|system|installation)\b|water[\s-]?handling(?:\s+(?:and|,))?|\bwater[\s-]?treatment\s+(?:plant|system)|water[\s-]?purification|(?:reverse[\s-]?osmosis|ebb[\s\/.-]*and[\s\/.-]*flow|ebb[\s\/.-]*flow)[^.]{0,160}(?:fertigation|irrigation|nutrient|storage\s+tank|plant|installation)/, cls: 'water_treatment' },
+  // Bench / lab PSU (2026-08-16): must beat the generic vehicle fallthrough
+  // (`vehicle|car|drivetrain|crash|homologation`). A 240 W supply is an instrument.
+  { re: /bench\s+(?:psu|power\s+supply)|lab(?:oratory)?\s+power\s+supply|programmable\s+power\s+supply|desktop\s+psu|\b240\s*w\b.{0,60}(?:psu|power\s+supply)/, cls: 'bench_psu' },
 ]
+
+/** Lock families the one-engine door may force. instrument ≠ vehicle ≠ plant. */
+export const CLASS_LOCK_ALLOWED: Record<string, readonly string[]> = {
+  instrument: [
+    'bench_psu',
+    'lab_instrument',
+    'optical_instrument',
+    'ups_inverter',
+    'consumer_electronics',
+    'pcb_assembly',
+    'medical_device',
+    'wearable_medical',
+  ],
+  'wall-store': ['energy_storage'],
+  ahs: ['energy_storage'],
+  edu: ['vehicle', 'industrial_machine', 'robotics'],
+  plant: [
+    'water_treatment',
+    'bioreactor',
+    'vertical_farm',
+    'fluid_processing',
+    'co2_mineralisation',
+    'e_fuel_synthesis',
+    'dac',
+    'h2_electrolyser',
+    'aquaculture_ras',
+  ],
+}
+
+const CLASS_LOCK_CANONICAL: Record<string, string> = {
+  instrument: 'bench_psu',
+  'wall-store': 'energy_storage',
+  ahs: 'energy_storage',
+  edu: 'vehicle',
+  plant: 'water_treatment',
+}
+
+/**
+ * Honour ANVIL_CLASS_LOCK from the one-engine door. If the keyword classifier
+ * landed on a forbidden slug (bench PSU → vehicle), force the canonical class
+ * for that family and say so. Does not mint a ship flag.
+ */
+export function applyClassLock(
+  classified: ProductClassification,
+  lockFamily: string | undefined,
+): ProductClassification {
+  const family = (lockFamily || '').trim().toLowerCase()
+  if (!family) return classified
+  const allowed = CLASS_LOCK_ALLOWED[family]
+  if (!allowed) return classified
+  if (allowed.includes(classified.productClass)) return classified
+  const locked = CLASS_LOCK_CANONICAL[family] || classified.productClass
+  return {
+    ...classified,
+    productClass: locked,
+    confidence: 'HIGH',
+    reasoning:
+      `ANVIL_CLASS_LOCK=${family} refused classified "${classified.productClass}" ` +
+      `and forced "${locked}". ${classified.reasoning}`,
+  }
+}
 
 export function classifyProduct(briefText: string): ProductClassification {
   const lower = briefText.toLowerCase()

@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation'
 import { MarketingNav } from '@/components/marketing/marketing-nav'
 import { MarketingFooter } from '@/components/marketing/marketing-footer'
 import { getProjectByToken } from '@/lib/dossier-pipeline/queries'
+import { QuoteEditor } from '@/components/quotation/quote-editor'
 import { CUSTOMER_STEPS, customerStepIndex, type DossierStatus } from '@/lib/dossier-pipeline/types'
 
 /**
@@ -55,7 +56,7 @@ export default async function ProjectStatusPage({
   const view = await getProjectByToken(token)
   if (!view) notFound()
 
-  const { project, events, dossierDownloadUrl } = view
+  const { project, events, dossierDownloadUrl, quoteSource, quoteDocxUrl } = view
   const side = SIDE_STATE_COPY[project.status]
 
   // First time each main-line status was reached (for timestamps under steps)
@@ -197,6 +198,14 @@ export default async function ProjectStatusPage({
                 </p>
               )}
             </div>
+          )}
+
+          {quoteSource && (
+            <QuoteEditor
+              token={token}
+              initial={quoteSource as Parameters<typeof QuoteEditor>[0]['initial']}
+              docxUrl={quoteDocxUrl}
+            />
           )}
 
           <p className="text-sm text-muted-foreground">

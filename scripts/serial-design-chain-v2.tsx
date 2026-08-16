@@ -45,7 +45,7 @@ import { augmentBrief } from '../src/lib/pdf-engine-v2/brief-augment'
 import { expandBrief } from '../src/lib/pdf-engine-v2/brief-expander'
 import { runResearchSynthesis } from '../src/lib/pdf-engine-v2/stages/1-research'
 import { LLM_CONFIG } from '../src/lib/pdf-engine-v2/llm-config'
-import { classifyProduct } from '../src/lib/pdf-engine-v2/product-classifier'
+import { applyClassLock, classifyProduct } from '../src/lib/pdf-engine-v2/product-classifier'
 import { buildContractForChain, type EngineeringContract } from './lib/engineering-contract'
 import { generateToolsFlowMermaid } from './lib/tools-flow-mermaid'
 import { runSemanticSelfAudit, evaluateSelfAuditEnforcement, selfAuditEnforceModeFromEnv, type LlmCaller } from './lib/semantic-self-audit'
@@ -3689,9 +3689,12 @@ async function main() {
   logAction({ step: 'parse_brief', model: 'gemini-3.1-pro', latency_ms: Date.now() - t0, cache_hit: briefParseCacheHit })
   writeFileSync(resolve(outDir, '1-parsed-brief-original.json'), JSON.stringify(parsedResultOriginal.data, null, 2))
 
-  const classificationOriginal = classifyProduct(brief)
+  const classificationOriginal = applyClassLock(
+    classifyProduct(brief),
+    process.env.ANVIL_CLASS_LOCK,
+  )
   console.error(`[chain] classification: ${classificationOriginal.productClass} (confidence=${classificationOriginal.confidence})`)
-  logAction({ step: 'classify', product_class: classificationOriginal.productClass, confidence: classificationOriginal.confidence })
+  logAction({ step: 'classify', product_class: classificationOriginal.productClass, confidence: classificationOriginal.confidence, class_lock: process.env.ANVIL_CLASS_LOCK || '' })
 
   // Build #19a (2026-05-22): engineering_contract moved AFTER brief refinement
   // — it now uses the FINAL stable brief, not the pre-revision draft.
@@ -6790,7 +6793,7 @@ async function main() {
       const stateSnapshot: any = {
         moduleDecomposition: g23State?.moduleDecomposition || design,
         parsedBrief,
-        orchestratorContract,
+        orchestratorContract: orchEngineeringContract,
       }
       const triggerStatePath = resolve(outDir, '10.7-pcb-trigger-state.json')
       writeFileSync(triggerStatePath, JSON.stringify(stateSnapshot, null, 2))

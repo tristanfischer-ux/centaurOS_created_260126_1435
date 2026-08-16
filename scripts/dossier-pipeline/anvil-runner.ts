@@ -295,6 +295,8 @@ function stageForReview(outDir: string, dir: string): string | null {
         xlsx.push({ p: full, m: fs.statSync(full).mtimeMs })
       } else if (
         e.name === 'Quotation.pdf' ||
+        e.name === 'Quotation.docx' ||
+        e.name === 'quotation-source.json' ||
         e.name === 'Price-Schedule.xlsx' ||
         e.name === 'Terms-of-Sale.pdf'
       ) {

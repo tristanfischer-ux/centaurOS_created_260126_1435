@@ -44,6 +44,9 @@ export interface ProjectView {
   files: DossierProjectFile[]
   /** Present only when status is ready/delivered and a dossier file exists. */
   dossierDownloadUrl: string | null
+  /** Latest quotation-source.json, when uploaded. Customer edits this. */
+  quoteSource: Record<string, unknown> | null
+  quoteDocxUrl: string | null
 }
 
 /** Customer status page: look a project up by its unguessable token. */
@@ -103,8 +106,11 @@ async function buildView(project: DossierProject): Promise<ProjectView> {
   ])
 
   let dossierDownloadUrl: string | null = null
+  let quoteSource: Record<string, unknown> | null = null
+  let quoteDocxUrl: string | null = null
+  const list = (files ?? []) as DossierProjectFile[]
   if (project.status === 'ready' || project.status === 'delivered') {
-    const dossier = (files ?? []).filter((f) => f.kind === 'dossier').at(-1)
+    const dossier = list.filter((f) => f.kind === 'dossier').at(-1)
     // Defence-in-depth (council Sol/Grok): only ever sign an object whose path is
     // under THIS project's prefix, so a corrupted/mismatched file row can never
     // sign another project's object. Not exploitable via any current write path;
@@ -119,11 +125,49 @@ async function buildView(project: DossierProject): Promise<ProjectView> {
     }
   }
 
+  const quoteFile = list
+    .filter(
+      (f) =>
+        f.kind === 'other' &&
+        (f.original_name === 'quotation-source.json' || f.storage_path.endsWith('quotation-source.json')),
+    )
+    .at(-1)
+  if (quoteFile && quoteFile.storage_path.startsWith(`${project.id}/`)) {
+    const { data: blob, error } = await admin.storage
+      .from(PROJECT_DOSSIERS_BUCKET)
+      .download(quoteFile.storage_path)
+    if (!error && blob) {
+      try {
+        quoteSource = JSON.parse(await blob.text()) as Record<string, unknown>
+      } catch {
+        quoteSource = null
+      }
+    }
+  }
+
+  const docx = list
+    .filter(
+      (f) =>
+        f.kind === 'other' &&
+        (f.original_name?.toLowerCase().endsWith('.docx') || f.storage_path.toLowerCase().endsWith('.docx')),
+    )
+    .at(-1)
+  if (docx && docx.storage_path.startsWith(`${project.id}/`)) {
+    const { data: signed } = await admin.storage
+      .from(PROJECT_DOSSIERS_BUCKET)
+      .createSignedUrl(docx.storage_path, 60 * 60, {
+        download: docx.original_name ?? 'Quotation.docx',
+      })
+    quoteDocxUrl = signed?.signedUrl ?? null
+  }
+
   return {
     project,
     events: (events ?? []) as DossierProjectEvent[],
-    files: (files ?? []) as DossierProjectFile[],
+    files: list,
     dossierDownloadUrl,
+    quoteSource,
+    quoteDocxUrl,
   }
 }
 

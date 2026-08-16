@@ -8,6 +8,7 @@ import {
   setNdaStatus,
   deleteProject,
 } from '@/actions/dossier-projects'
+import { uploadQuotation } from '@/actions/quotation'
 import { STATUS_LABELS, type DossierStatus } from '@/lib/dossier-pipeline/types'
 
 export const dynamic = 'force-dynamic'
@@ -69,7 +70,7 @@ export default async function StudioProjectPage({
     submitted: 'New brief. Read it, then Validate to send it to Anvil (or ask for more info / decline).',
     validated: 'Validated. The Anvil runner picks this up automatically within ~10 minutes, runs the first pass, and emails you when it’s ready to review — you don’t need to do anything. The buttons below are only for corrections or running Anvil yourself.',
     in_progress: 'Anvil is running (or you’re running it yourself). When it finishes it moves to engineering review automatically and emails you. Nothing to do unless you ran it manually.',
-    in_review: 'First pass is done and waiting for your review. Check the staged DOSSIER.xlsx and Quotation.pdf in the queue review folder, then upload the final workbook in “Deliver the Dossier” below to send it to the customer.',
+    in_review: 'First pass is done and waiting for your review. Check the staged DOSSIER.xlsx, Quotation.pdf, Quotation.docx and quotation-source.json in the queue review folder. Upload the workbook and the quotation source so the customer can edit the quote on the web and download PDF or Word.',
     ready: 'Delivered to the customer — they’ve been emailed their download link. Mark delivered once they’ve collected it.',
     needs_info: 'Waiting on the customer. They’ve been emailed your note; validate once they reply.',
     on_hold: 'Paused. Resume when you’re ready.',
@@ -222,6 +223,31 @@ export default async function StudioProjectPage({
             </a>
           </p>
         )}
+      </section>
+
+      <section className="rounded-xl border p-5">
+        <h2 className="mb-2 font-bold">Quotation the customer can edit</h2>
+        <p className="mb-3 text-sm text-muted-foreground">
+          Upload <code>quotation-source.json</code> and optionally <code>Quotation.docx</code>.
+          The customer then edits the quote on their project page and downloads PDF or Word.
+          Does not re-solve engine money.
+        </p>
+        <form action={uploadQuotation} className="flex flex-wrap items-center gap-3">
+          <input type="hidden" name="projectId" value={project.id} />
+          <input
+            type="file"
+            name="quotation"
+            required
+            accept=".json,.docx,application/json,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+            className="text-sm file:mr-3 file:rounded-full file:border-0 file:bg-muted file:px-4 file:py-2 file:text-sm file:font-semibold"
+          />
+          <button
+            type="submit"
+            className="rounded-full border border-foreground/20 px-5 py-2 text-sm font-semibold hover:bg-muted"
+          >
+            Upload quotation
+          </button>
+        </form>
       </section>
 
       {/* Internal notes */}

@@ -401,6 +401,15 @@ export interface PcbStageResult {
   /** Phase D (2026-07-12): set only when disposition==='bespoke' AND PCB_STAGE actually
    *  attempted the build/route/DRC pipeline (or honestly recorded why it couldn't). */
   pipeline?: PcbPipelineRecord
+  /** Optional architecture summary written by later PCB stages. */
+  architecture?: { onBoardElectronicPartCount?: number }
+  /** Optional fitness verdict written by later PCB stages. */
+  designFitness?: {
+    ok?: boolean
+    findings?: Array<{ severity?: string; message?: string }>
+  }
+  /** True when several boards were smashed into one KiCad project. */
+  multiBoardMerged?: boolean
 }
 
 /**

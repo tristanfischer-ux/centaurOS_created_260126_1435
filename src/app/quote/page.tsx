@@ -34,7 +34,7 @@ const PILLARS = [
 ]
 
 const DELIVERABLES = [
-  "A supply-only quotation PDF — the number on the cover, groups A–F, terms",
+  "A supply-only quotation you can edit on the web and download as PDF, plus a Word copy",
   "A price schedule workbook that matches the quotation",
   "The formal Design Dossier (Excel) — every cost line with method, confidence and source",
   "Engineering drawings and STEP when the design has them",

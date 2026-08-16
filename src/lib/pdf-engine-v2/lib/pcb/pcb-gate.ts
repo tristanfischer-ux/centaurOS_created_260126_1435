@@ -153,7 +153,9 @@ export function evaluatePcbGate(pcb: PcbStageResult | null | undefined): PcbGate
     // P6: toolchain hygiene ≠ architecture fitness / multi-board honesty.
     const fitness = pcb.designFitness
     if (fitness && fitness.ok === false) {
-      const highs = (fitness.findings ?? []).filter((f) => f.severity === 'high')
+      const highs = (fitness.findings ?? []).filter(
+        (f: { severity?: string; message?: string }) => f.severity === 'high',
+      )
       if (highs.length > 0) {
         return {
           applicable: true,
