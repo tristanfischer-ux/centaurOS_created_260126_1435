@@ -26,6 +26,10 @@ const PUBLIC_ROUTES = [
     '/forgot-password',  // Password reset request
     '/update-password',  // Set new password (after reset link)
     '/pricing',  // Public pricing page
+    '/condition-desk',  // Lumicity product page (noindex until approved)
+    '/habitat-draft',  // Lumicity product page (noindex until approved)
+    '/bid-check',  // Lumicity product page (noindex until approved)
+    '/lumicity',  // Lumicity demo data and images
     '/techniques',  // Public manufacturing techniques explorer (SEO)
     '/demo',  // Public demo page
     '/brief-demo',  // Public CO2 brief-editor demo (no auth) — temporary, client demos

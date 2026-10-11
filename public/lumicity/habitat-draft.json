@@ -1,0 +1,221 @@
+{
+ "site": "Land east of Southampton Road, Romsey",
+ "council": "Test Valley Borough Council",
+ "ref": "26/01906/FULLS",
+ "proposal": "98 homes",
+ "area_ha": 6.84,
+ "parcels": [
+  {
+   "id": "G1",
+   "habitat": "Cereal crops",
+   "area_ha": 5.8,
+   "length_m": null,
+   "distinctiveness": "Low",
+   "confidence": "low"
+  },
+  {
+   "id": "G2",
+   "habitat": "Modified grassland",
+   "area_ha": 0.57,
+   "length_m": null,
+   "distinctiveness": "Low",
+   "confidence": "low"
+  },
+  {
+   "id": "G3",
+   "habitat": "Modified grassland",
+   "area_ha": 0.03,
+   "length_m": null,
+   "distinctiveness": "Low",
+   "confidence": "low"
+  },
+  {
+   "id": "W1",
+   "habitat": "Other woodland; broadleaved",
+   "area_ha": 0.1,
+   "length_m": null,
+   "distinctiveness": "Medium",
+   "confidence": "medium"
+  },
+  {
+   "id": "W2",
+   "habitat": "Mixed scrub",
+   "area_ha": 0.02,
+   "length_m": null,
+   "distinctiveness": "Medium",
+   "confidence": "low"
+  },
+  {
+   "id": "W3",
+   "habitat": "Other woodland; broadleaved",
+   "area_ha": 0.22,
+   "length_m": null,
+   "distinctiveness": "Medium",
+   "confidence": "medium"
+  },
+  {
+   "id": "W4",
+   "habitat": "Other woodland; broadleaved",
+   "area_ha": 0.11,
+   "length_m": null,
+   "distinctiveness": "Medium",
+   "confidence": "high"
+  },
+  {
+   "id": "W5",
+   "habitat": "Native hedgerow",
+   "area_ha": null,
+   "length_m": 0,
+   "distinctiveness": "Low",
+   "confidence": "medium"
+  },
+  {
+   "id": "W6",
+   "habitat": "Line of trees",
+   "area_ha": null,
+   "length_m": 0,
+   "distinctiveness": "Low",
+   "confidence": "high"
+  },
+  {
+   "id": "W7",
+   "habitat": "Line of trees",
+   "area_ha": null,
+   "length_m": 0,
+   "distinctiveness": "Low",
+   "confidence": "high"
+  },
+  {
+   "id": "W8",
+   "habitat": "Line of trees",
+   "area_ha": null,
+   "length_m": 0,
+   "distinctiveness": "Low",
+   "confidence": "high"
+  },
+  {
+   "id": "W9",
+   "habitat": "Line of trees",
+   "area_ha": null,
+   "length_m": 0,
+   "distinctiveness": "Low",
+   "confidence": "high"
+  },
+  {
+   "id": "W10",
+   "habitat": "Native hedgerow",
+   "area_ha": null,
+   "length_m": 0,
+   "distinctiveness": "Low",
+   "confidence": "low"
+  },
+  {
+   "id": "W11",
+   "habitat": "Line of trees",
+   "area_ha": null,
+   "length_m": 0,
+   "distinctiveness": "Low",
+   "confidence": "high"
+  },
+  {
+   "id": "W12",
+   "habitat": "Line of trees",
+   "area_ha": null,
+   "length_m": 0,
+   "distinctiveness": "Low",
+   "confidence": "high"
+  }
+ ],
+ "checks": [
+  {
+   "parcel": "G1",
+   "priority": "High",
+   "what": "Confirm Cereal crops and score condition (low confidence).",
+   "why": "Broad type taken from satellite map and ."
+  },
+  {
+   "parcel": "G2",
+   "priority": "High",
+   "what": "Grassland grade uncertain: called Modified grassland (default grade, no positive evidence); low confidence; satellite-map hint of semi-natural grass (low). Confirm species mix and score condition.",
+   "why": "Open data cannot separate farmed from semi-natural grass."
+  },
+  {
+   "parcel": "G3",
+   "priority": "High",
+   "what": "Grassland grade uncertain: called Modified grassland (default grade, no positive evidence); low confidence; satellite-map hint of semi-natural grass (low). Confirm species mix and score condition.",
+   "why": "Open data cannot separate farmed from semi-natural grass."
+  },
+  {
+   "parcel": "W1",
+   "priority": "Standard",
+   "what": "Confirm Other woodland; broadleaved (medium confidence); measure and score on site.",
+   "why": "Small patch found from laser heights."
+  },
+  {
+   "parcel": "W2",
+   "priority": "Medium",
+   "what": "Confirm Mixed scrub (low confidence); measure and score on site.",
+   "why": "Small patch found from laser heights."
+  },
+  {
+   "parcel": "W3",
+   "priority": "Medium",
+   "what": "Confirm Other woodland; broadleaved (medium confidence); measure and score on site.",
+   "why": "Small patch found from laser heights."
+  },
+  {
+   "parcel": "W4",
+   "priority": "Standard",
+   "what": "Confirm Other woodland; broadleaved (high confidence); measure and score on site.",
+   "why": "Small patch found from laser heights."
+  },
+  {
+   "parcel": "W5",
+   "priority": "Standard",
+   "what": "Confirm Native hedgerow (medium confidence); measure and score on site.",
+   "why": "Small patch found from laser heights."
+  },
+  {
+   "parcel": "W6",
+   "priority": "Standard",
+   "what": "Confirm Line of trees (high confidence); measure and score on site.",
+   "why": "Small patch found from laser heights."
+  },
+  {
+   "parcel": "W7",
+   "priority": "Standard",
+   "what": "Confirm Line of trees (high confidence); measure and score on site.",
+   "why": "Small patch found from laser heights."
+  },
+  {
+   "parcel": "W8",
+   "priority": "Standard",
+   "what": "Confirm Line of trees (high confidence); measure and score on site.",
+   "why": "Small patch found from laser heights."
+  },
+  {
+   "parcel": "W9",
+   "priority": "Standard",
+   "what": "Confirm Line of trees (high confidence); measure and score on site.",
+   "why": "Small patch found from laser heights."
+  },
+  {
+   "parcel": "W10",
+   "priority": "Medium",
+   "what": "Confirm Native hedgerow (low confidence); measure and score on site.",
+   "why": "Small patch found from laser heights."
+  },
+  {
+   "parcel": "W11",
+   "priority": "Standard",
+   "what": "Confirm Line of trees (high confidence); measure and score on site.",
+   "why": "Small patch found from laser heights."
+  },
+  {
+   "parcel": "W12",
+   "priority": "Standard",
+   "what": "Confirm Line of trees (high confidence); measure and score on site.",
+   "why": "Small patch found from laser heights."
+  }
+ ]
+}

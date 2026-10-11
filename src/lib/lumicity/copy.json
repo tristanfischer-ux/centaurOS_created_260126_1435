@@ -1,0 +1,245 @@
+{
+ "condition-desk": {
+  "headline": "Start on site sooner",
+  "subhead": "Condition Desk turns your decision notice into a plain English register of every planning condition, usually within a day, and picks out the conditions that block a start on site.",
+  "problem": [
+   "Every condition has to be understood, and evidence sent to the council for approval, often before work can start.",
+   "Finding and briefing the right specialists is slow.",
+   "It is all done by hand, and it delays the start on site."
+  ],
+  "steps": [
+   {
+    "title": "Send the decision notice",
+    "text": "Send us the notice for any permission you hold."
+   },
+   {
+    "title": "We build the register",
+    "text": "Usually within a day you get every condition in plain English: what the council needs, when it is due, and which specialist usually prepares it."
+   },
+   {
+    "title": "Act on the register",
+    "text": "Commission the right specialists. You or your planner send each submission to the council with the covering letter we draft."
+   }
+  ],
+  "demo_intro": "Below is the real register we produced for a 150-home outline permission in Albrighton, Shropshire. Filter the 38 conditions by stage, then click one to see what it means and which documents you need. This page also shows a sample report page.",
+  "you_get": [
+   "A register of every condition in plain English, usually within a day.",
+   "When each condition is due: before work starts, during the build, before people move in, or with a reserved matters application.",
+   "Which specialist usually prepares each condition and which documents to gather.",
+   "The conditions that block a start on site, picked out, plus a drafted covering letter to the council for each submission."
+  ],
+  "not_do": [
+   "We do not give planning advice.",
+   "We do not submit anything to the council. You or your planner remain responsible."
+  ],
+  "price_line": "It costs £400 per permission, or £1,000 a month for up to five live sites.",
+  "faqs": [
+   {
+    "q": "How fast do I get the register?",
+    "a": "Usually within a day of sending us the decision notice."
+   },
+   {
+    "q": "What does it cost?",
+    "a": "£400 per permission, or £1,000 a month for up to five live sites. The register covers every condition on the permission, picks out the conditions that block a start on site, and comes with a drafted covering letter to the council for each submission. You or your planner send the submissions to the council."
+   },
+   {
+    "q": "Can I see an example first?",
+    "a": "Yes. This page shows the real register we produced for a 150-home outline permission in Albrighton, Shropshire, with all 38 conditions, plus a sample report page."
+   },
+   {
+    "q": "Can you handle large permissions?",
+    "a": "Yes. We have worked on real permissions, including 38 conditions on a 150-home outline permission in Albrighton, Shropshire and 46 on a 586-home scheme in New Malden."
+   },
+   {
+    "q": "Does this replace my planning consultant?",
+    "a": "No. We prepare the register and draft the covering letters. We do not give planning advice and we do not submit anything to the council. You or your planner remain responsible for submissions."
+   },
+   {
+    "q": "Who checks the work?",
+    "a": "A chartered planner reviews reports before delivery once the service is live."
+   },
+   {
+    "q": "Who delivers Condition Desk?",
+    "a": "Condition Desk is delivered by Lumicity, which is run by Tristan Fischer."
+   }
+  ],
+  "cta": "Send your decision notice",
+  "name": "Condition Desk",
+  "slug": "condition-desk",
+  "mail": "Condition Desk enquiry",
+  "one": [
+   "£400",
+   "per planning permission"
+  ],
+  "mon": [
+   "£1,000",
+   "a month, for up to five live sites"
+  ],
+  "demo_title": "The Albrighton planning permission",
+  "demo_label": "A real example, built from public documents: Land north of Kingswood Road, Albrighton, Shropshire (Shropshire Council, 24/02662/OUT, up to 150 homes).",
+  "report": "/lumicity/condition-desk-report.png",
+  "report_alt": "First page of a Condition Desk report for the Albrighton permission, showing counts of conditions by stage and the conditions that block a start on site.",
+  "report_cap": "Page 1 of a real Condition Desk report (Albrighton).",
+  "who_extra": ""
+ },
+ "habitat-draft": {
+  "headline": "Walk in knowing which parcels matter",
+  "subhead": "Send us a site boundary or a planning reference and, usually within a day, you get a two-page desk study (the map and records work done before a site visit) ready for your walkover, the first visit on foot.",
+  "problem": [
+   "I spend hours pulling maps and records before every site visit.",
+   "In survey season my team is stretched too thin.",
+   "I need to know which parcels matter before I set foot on site."
+  ],
+  "steps": [
+   {
+    "title": "Send your site",
+    "text": "Send us a site boundary or a planning reference."
+   },
+   {
+    "title": "We gather the records",
+    "text": "We pull together protected sites, priority habitats, the national habitat map, tree and hedge heights and aerial photos."
+   },
+   {
+    "title": "You walk in prepared",
+    "text": "Usually within a day you receive a two-page desk study with a prioritised list of parcels to check on the walkover."
+   }
+  ],
+  "demo_intro": "This is a real worked example: the 98-home site at Romsey, mapped into 15 parcels. Click any parcel to see its likely habitat, how sure we are (low, medium or high), and what to check on the walkover. The checks are for your visit; the desk study does not score habitat condition. A sample report page is included on this page. Habitat Draft is built on real current applications, including this one.",
+  "you_get": [
+   "Protected sites and priority habitats (those most important for nature conservation) within 600 metres of your site",
+   "A first habitat map of the site from national data, with a confidence rating for each parcel (low, medium or high)",
+   "Tree and hedge heights from the Environment Agency's laser survey",
+   "A prioritised list of parcels (separate areas of the site) to check on the walkover",
+   "A rough first draft of baseline biodiversity units (the measure used in biodiversity net gain), offered only as a starting point to correct on site"
+  ],
+  "not_do": [
+   "It does not replace the site survey.",
+   "It does not score habitat condition; the parcel list tells you what to check, and your ecologist makes the assessment.",
+   "The biodiversity units figure is a rough first draft to correct on site, not a finished baseline.",
+   "Your ecologist checks and signs everything."
+  ],
+  "price_line": "£150 per desk study, or £1,000 a month for up to eight.",
+  "faqs": [
+   {
+    "q": "How fast is it?",
+    "a": "Usually within a day of receiving your site boundary or planning reference. It is a desk study drawn from existing records, not a new survey."
+   },
+   {
+    "q": "What does it cost?",
+    "a": "£150 per desk study, or £1,000 a month for up to eight desk studies."
+   },
+   {
+    "q": "The data is already out there. What am I paying for?",
+    "a": "The hours of gathering. Pulling these maps and records together takes hours per site, and in survey season your team is already stretched. We do not claim the data is unique. We deliver it as a two-page desk study, usually within a day."
+   },
+   {
+    "q": "Can I use it for baseline biodiversity units?",
+    "a": "Only as a rough starting point. On four test sites the draft was 14 to 73 per cent away from ecologists' figures, so it is offered only as a draft to correct on site. It is not a finished baseline, and we do not offer it as one. Your ecologist checks and signs everything."
+   },
+   {
+    "q": "Does it replace the site survey?",
+    "a": "No. It does not replace the site survey and it does not score habitat condition. It gives you a first habitat map and a prioritised list of parcels to check on the walkover. Your ecologist makes the judgements on site and signs everything."
+   },
+   {
+    "q": "Who is behind Habitat Draft?",
+    "a": "Habitat Draft is delivered by Lumicity, which is run by Tristan Fischer."
+   }
+  ],
+  "cta": "Send us a site",
+  "name": "Habitat Draft",
+  "slug": "habitat-draft",
+  "mail": "Habitat Draft enquiry",
+  "one": [
+   "£150",
+   "per desk study"
+  ],
+  "mon": [
+   "£1,000",
+   "a month, for up to eight desk studies"
+  ],
+  "demo_title": "The Romsey site",
+  "demo_label": "A real example, built from public documents: Land east of Southampton Road, Romsey (Test Valley Borough Council, 26/01906/FULLS, 98 homes).",
+  "report": "/lumicity/habitat-draft-report.png",
+  "report_alt": "First page of a Habitat Draft desk study for land east of Southampton Road, Romsey, with a first habitat map and a plain English summary.",
+  "report_cap": "Page 1 of a real Habitat Draft desk study (Romsey)."
+ },
+ "bid-check": {
+  "headline": "Every pass-or-fail item, quoted from the tender",
+  "subhead": "Bid Check reads your tender pack end to end and sends back a bid at a glance, usually within a day: every pass-or-fail condition, every document to submit, how bids are scored and the key dates, each quoted from the tender so you can check it against the source. It then checks your evidence against each requirement, lists the gaps to close and gives first-draft answers for your team to sign off.",
+  "problem": [
+   "Reading a tender pack end to end takes days.",
+   "Miss one pass-or-fail item and the bid is lost.",
+   "Bid writers charge around £500 a day."
+  ],
+  "steps": [
+   {
+    "title": "Send the tender pack",
+    "text": "Add your certificates, policies and case studies too if you like."
+   },
+   {
+    "title": "We read it end to end",
+    "text": "Every pass-or-fail condition, document, scoring rule and date is pulled out and quoted from the tender, so you can check each one against the source."
+   },
+   {
+    "title": "Get your bid at a glance",
+    "text": "Usually within a day: your checklist, your evidence checked against each requirement, a list of gaps to close and first-draft answers for your team to sign off."
+   }
+  ],
+  "demo_intro": "Try it on a real tender. This is Hedge End Town Council's Drummond Community Centre refurbishment: 52 requirements, 18 of them pass-or-fail, 18 documents and 12 scored criteria. Tick off the pass-or-fail conditions and documents and watch the ready to bid bar fill.",
+  "you_get": [
+   "Every pass-or-fail condition, quoted from the tender so you can check each one",
+   "Every document you must submit, how bids are scored and the key dates",
+   "Your evidence checked against each requirement, with a list of gaps to close",
+   "First-draft answers for your team to check and sign off"
+  ],
+  "not_do": [
+   "We do not submit bids for you.",
+   "We do not guarantee a win.",
+   "Your team signs off every answer."
+  ],
+  "price_line": "£600 per tender, or £1,500 a month for up to three tenders.",
+  "faqs": [
+   {
+    "q": "What exactly is the bid at a glance?",
+    "a": "One report on your tender. It lists every pass-or-fail condition, every document to submit, how bids are scored and the key dates, each quoted from the tender. It then checks your evidence against each requirement, lists the gaps to close and gives first-draft answers for your team to check and sign off."
+   },
+   {
+    "q": "How fast do I get my bid at a glance?",
+    "a": "Usually within a day of sending us the tender pack."
+   },
+   {
+    "q": "How accurate is it?",
+    "a": "Every item is quoted from the tender, so you can check each one against the source. In testing it agreed with a person's own reading on 19 of 24 requirements. Your team signs off every answer."
+   },
+   {
+    "q": "Has it been used on real tenders?",
+    "a": "Yes, on real live tenders, including Hedge End Town Council's Drummond Community Centre refurbishment: 52 requirements, 18 pass-or-fail, 18 documents and 12 scored criteria. You can try that tender as a checklist on this page and see a sample report page."
+   },
+   {
+    "q": "What does it cost?",
+    "a": "£600 per tender, or £1,500 a month for up to three tenders. Reading a tender pack end to end takes days, and bid writers charge around £500 a day."
+   },
+   {
+    "q": "Who delivers Bid Check?",
+    "a": "Bid Check is delivered by Lumicity, which is run by Tristan Fischer."
+   }
+  ],
+  "cta": "Get your bid at a glance",
+  "name": "Bid Check",
+  "slug": "bid-check",
+  "mail": "Bid Check enquiry",
+  "one": [
+   "£600",
+   "per tender"
+  ],
+  "mon": [
+   "£1,500",
+   "a month, for up to three tenders"
+  ],
+  "demo_title": "The Drummond tender",
+  "demo_label": "A real example, built from public documents: Drummond Community Centre refurbishment, Hedge End Town Council (closing 19 October 2026).",
+  "report": "/lumicity/bid-check-report.png",
+  "report_alt": "First page of a Bid Check \"bid at a glance\" for the Drummond Community Centre tender, with the tender details, key dates and pass or fail conditions.",
+  "report_cap": "Page 1 of a real Bid at a glance (Drummond)."
+ }
+}
