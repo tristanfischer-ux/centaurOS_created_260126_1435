@@ -6,10 +6,10 @@ import copy from "@/lib/lumicity/copy.json";
 const C = copy["bid-check"];
 
 export const metadata: Metadata = {
-  title: `${C.name}, a Lumicity service`,
+  title: `${C.name}, a Fractional Forge service`,
   description: C.subhead,
-  openGraph: { title: `${C.name}, a Lumicity service`, description: C.subhead },
-  twitter: { title: `${C.name}, a Lumicity service`, description: C.subhead },
+  openGraph: { title: `${C.name}, a Fractional Forge service`, description: C.subhead },
+  twitter: { title: `${C.name}, a Fractional Forge service`, description: C.subhead },
   robots: { index: false, follow: false },
 };
 

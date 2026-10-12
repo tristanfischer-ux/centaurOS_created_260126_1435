@@ -121,10 +121,10 @@ export function buildHtml(key: LumicityKey): string {
     .map((f) => `<details class="faq"><summary>${esc(f.q)}</summary><p>${esc(f.a)}</p></details>`)
     .join("");
   return `<style>${CSS}</style>
-<header class="nav"><div class="wrap nav-inner"><a class="brand" href="/${key}">${esc(c.name)} <small>by Lumicity</small></a>${link(c, "Book a call", "btn btn-primary")}</div></header>
+<header class="nav"><div class="wrap nav-inner"><a class="brand" href="/${key}">${esc(c.name)} <small>by Fractional Forge</small></a>${link(c, "Book a call", "btn btn-primary")}</div></header>
 <main>
 <section class="hero"><div class="wrap">
-<p class="eyebrow">${esc(c.name)}, a Lumicity service</p>
+<p class="eyebrow">${esc(c.name)}, a Fractional Forge service</p>
 <h1>${esc(c.headline)}</h1>
 <p class="sub">${esc(c.subhead)}</p>
 <div class="cta-row">${link(c, c.cta)}<a class="btn btn-ghost" href="#demo">See a real example</a></div>
@@ -152,6 +152,6 @@ ${demoShell(key, c)}</div></section>
 <section class="final"><div class="wrap"><h2>${esc(c.cta)}</h2><p>Book a 30 minute call, or email <a class="mail" href="mailto:${MAIL}?subject=${encodeURIComponent(c.mail)}">${MAIL}</a>.</p>
 <div class="cta-row">${link(c, c.cta)}</div></div></section>
 </main>
-<footer><div class="wrap"><p>${esc(c.name)}, a Lumicity service. Also from Lumicity: ${others}</p>
-<p>Lumicity services are hosted by Fractional Forge · Tristan Fischer · ${mailto(c)}</p></div></footer>`;
+<footer><div class="wrap"><p>${esc(c.name)}, a Fractional Forge service. Also from Fractional Forge: ${others}</p>
+<p>Fractional Forge Limited · Tristan Fischer · ${mailto(c)}</p></div></footer>`;
 }
