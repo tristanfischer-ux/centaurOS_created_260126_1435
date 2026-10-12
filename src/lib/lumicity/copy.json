@@ -32,7 +32,7 @@
    "We do not give planning advice.",
    "We do not submit anything to the council. You or your planner remain responsible."
   ],
-  "price_line": "It costs £400 per permission, or £1,000 a month for up to five live sites.",
+  "price_line": "It costs \u00a3400 per permission, or \u00a31,000 a month for up to five live sites.",
   "faqs": [
    {
     "q": "How fast do I get the register?",
@@ -40,7 +40,7 @@
    },
    {
     "q": "What does it cost?",
-    "a": "£400 per permission, or £1,000 a month for up to five live sites. The register covers every condition on the permission, picks out the conditions that block a start on site, and comes with a drafted covering letter to the council for each submission. You or your planner send the submissions to the council."
+    "a": "\u00a3400 per permission, or \u00a31,000 a month for up to five live sites. The register covers every condition on the permission, picks out the conditions that block a start on site, and comes with a drafted covering letter to the council for each submission. You or your planner send the submissions to the council."
    },
    {
     "q": "Can I see an example first?",
@@ -68,11 +68,11 @@
   "slug": "condition-desk",
   "mail": "Condition Desk enquiry",
   "one": [
-   "£400",
+   "\u00a3400",
    "per planning permission"
   ],
   "mon": [
-   "£1,000",
+   "\u00a31,000",
    "a month, for up to five live sites"
   ],
   "demo_title": "The Albrighton planning permission",
@@ -118,7 +118,7 @@
    "The biodiversity units figure is a rough first draft to correct on site, not a finished baseline.",
    "Your ecologist checks and signs everything."
   ],
-  "price_line": "£150 per desk study, or £1,000 a month for up to eight.",
+  "price_line": "\u00a3150 per desk study, or \u00a31,000 a month for up to eight.",
   "faqs": [
    {
     "q": "How fast is it?",
@@ -126,7 +126,7 @@
    },
    {
     "q": "What does it cost?",
-    "a": "£150 per desk study, or £1,000 a month for up to eight desk studies."
+    "a": "\u00a3150 per desk study, or \u00a31,000 a month for up to eight desk studies."
    },
    {
     "q": "The data is already out there. What am I paying for?",
@@ -150,11 +150,11 @@
   "slug": "habitat-draft",
   "mail": "Habitat Draft enquiry",
   "one": [
-   "£150",
+   "\u00a3150",
    "per desk study"
   ],
   "mon": [
-   "£1,000",
+   "\u00a31,000",
    "a month, for up to eight desk studies"
   ],
   "demo_title": "The Romsey site",
@@ -169,7 +169,7 @@
   "problem": [
    "Reading a tender pack end to end takes days.",
    "Miss one pass-or-fail item and the bid is lost.",
-   "Bid writers charge around £500 a day."
+   "Bid writers charge around \u00a3500 a day."
   ],
   "steps": [
    {
@@ -197,7 +197,7 @@
    "We do not guarantee a win.",
    "Your team signs off every answer."
   ],
-  "price_line": "£600 per tender, or £1,500 a month for up to three tenders.",
+  "price_line": "\u00a3600 per tender, or \u00a31,500 a month for up to three tenders.",
   "faqs": [
    {
     "q": "What exactly is the bid at a glance?",
@@ -217,7 +217,7 @@
    },
    {
     "q": "What does it cost?",
-    "a": "£600 per tender, or £1,500 a month for up to three tenders. Reading a tender pack end to end takes days, and bid writers charge around £500 a day."
+    "a": "\u00a3600 per tender, or \u00a31,500 a month for up to three tenders. Reading a tender pack end to end takes days, and bid writers charge around \u00a3500 a day."
    },
    {
     "q": "Who delivers Bid Check?",
@@ -229,11 +229,11 @@
   "slug": "bid-check",
   "mail": "Bid Check enquiry",
   "one": [
-   "£600",
+   "\u00a3600",
    "per tender"
   ],
   "mon": [
-   "£1,500",
+   "\u00a31,500",
    "a month, for up to three tenders"
   ],
   "demo_title": "The Drummond tender",

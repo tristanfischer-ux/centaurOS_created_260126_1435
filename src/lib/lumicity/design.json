@@ -1,0 +1,144 @@
+{
+ "condition-desk": {
+  "accent": "#a8481a",
+  "accent_dark": "#8a3a12",
+  "accent_soft": "#fbeee4",
+  "accent_mid": "#e9b896",
+  "kicker": "For housebuilders and land promoters after planning permission",
+  "trust": [
+   "38 conditions on a 150-home outline permission in Albrighton",
+   "46 conditions on a 586-home scheme in New Malden",
+   "Register usually within a day",
+   "\u00a3400 per permission"
+  ],
+  "chart_title": "Where the 38 Albrighton conditions fall",
+  "chart_caption": "11 of 38 conditions must be cleared before work can start on site.",
+  "before_after": [
+   [
+    "Every condition worked through by hand after permission is granted",
+    "A register of every condition in plain English, usually within a day"
+   ],
+   [
+    "Slow to see what must be approved before work can start",
+    "The conditions that block a start on site are picked out for you"
+   ],
+   [
+    "Guessing which specialist to commission",
+    "Each condition shows which specialist usually prepares it and which documents to gather"
+   ],
+   [
+    "Drafting each submission letter from scratch",
+    "A drafted covering letter to the council for each submission"
+   ]
+  ],
+  "step_titles": [
+   "Send",
+   "Read",
+   "Start"
+  ],
+  "step_texts": [
+   "Send us the decision notice. That is the whole brief.",
+   "Every condition is put into plain English: what the council needs, when it is due, which specialist usually prepares it and which documents to gather.",
+   "You get the register with the conditions that block a start picked out, plus a drafted covering letter for each council submission. You or your planner send each submission to the council."
+  ],
+  "extra_faq": [
+   {
+    "q": "Do you submit anything to the council?",
+    "a": "No. Condition Desk does not give planning advice and does not submit anything to the council; you or your planner remain responsible."
+   }
+  ]
+ },
+ "habitat-draft": {
+  "accent": "#2f6b43",
+  "accent_dark": "#245437",
+  "accent_soft": "#e9f3ec",
+  "accent_mid": "#a6cdb3",
+  "kicker": "For ecology consultancies, before the site visit",
+  "trust": [
+   "Built on real current applications, including a 98-home site at Romsey",
+   "Protected sites and priority habitats within 600 metres",
+   "Tree and hedge heights from the Environment Agency's laser survey",
+   "\u00a3150 per desk study"
+  ],
+  "chart_title": "How sure the national data is, parcel by parcel",
+  "chart_caption": "Low-confidence parcels are where your walkover time matters most. The desk study does not score habitat condition; the ecologist does that on site.",
+  "before_after": [
+   [
+    "Hours per site gathering maps and records: protected sites, priority habitats, the national habitat map, tree heights, aerial photos",
+    "One two-page desk study, usually within a day"
+   ],
+   [
+    "Arriving on site to work out which parcels need attention",
+    "A prioritised list of parcels to check on the walkover"
+   ],
+   [
+    "Staff stretched in survey season doing desk work",
+    "The desk work is done before the visit"
+   ],
+   [
+    "No starting figure for baseline biodiversity units",
+    "A rough first draft of baseline units to correct on site, never a finished baseline"
+   ]
+  ],
+  "step_titles": [
+   "Send",
+   "Gather",
+   "Walk in"
+  ],
+  "step_texts": [
+   "Send us a site boundary or a planning reference.",
+   "We pull together protected sites and priority habitats within 600 metres, a first habitat map from national data, and tree and hedge heights from the Environment Agency's laser survey.",
+   "Usually within a day you receive a two-page desk study with a prioritised list of parcels to check on the walkover. The ecologist signs everything."
+  ],
+  "extra_faq": []
+ },
+ "bid-check": {
+  "accent": "#b4400c",
+  "accent_dark": "#8f3208",
+  "accent_soft": "#fdeee2",
+  "accent_mid": "#eeb792",
+  "kicker": "For firms that bid for public contracts",
+  "trust": [
+   "Worked on real live tenders, including Hedge End Town Council's Drummond Community Centre refurbishment",
+   "52 requirements found in that tender: 18 pass-or-fail, 18 documents, 12 scored criteria",
+   "In testing it agreed with a person's own reading on 19 of 24 requirements",
+   "\u00a3600 per tender"
+  ],
+  "chart_title": "What is in the Drummond tender pack",
+  "chart_caption": "Miss one pass-or-fail item and the bid is lost. Each requirement is quoted from the tender with its source.",
+  "before_after": [
+   [
+    "Reading every public tender pack end to end by hand takes days",
+    "A bid at a glance, usually within a day"
+   ],
+   [
+    "Missing one pass-or-fail item loses the bid",
+    "Every pass-or-fail condition listed, quoted from the tender"
+   ],
+   [
+    "Bid writers charge around \u00a3500 a day",
+    "\u00a3600 per tender, or \u00a31,500 a month for up to three"
+   ],
+   [
+    "Matching requirements to your certificates, policies and past projects by hand",
+    "Your evidence checked against each requirement, the gaps listed, first-draft answers written"
+   ]
+  ],
+  "step_titles": [
+   "Send",
+   "Check",
+   "Bid"
+  ],
+  "step_texts": [
+   "Send us the tender pack, and if you like your library of certificates, policies and case studies.",
+   "Every pass-or-fail condition, document, scoring rule and key date is listed and quoted from the tender, then your evidence is checked against each requirement.",
+   "You get a list of gaps to close and first-draft answers. Your team signs off every answer."
+  ],
+  "extra_faq": [
+   {
+    "q": "Do you submit the bid or guarantee a win?",
+    "a": "No. Bid Check does not submit bids or guarantee a win; your team signs off every answer."
+   }
+  ]
+ }
+}

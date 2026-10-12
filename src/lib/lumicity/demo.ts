@@ -21,10 +21,12 @@ async function load<T>(f: string): Promise<T> {
 function condition(root: HTMLElement, d: { conditions: Cond[] }) {
   const all = d.conditions;
   let filter = "all";
+  let showAll = false;
   const label = (s: string) => STAGES.find((x) => x[0] === s)?.[1] ?? s;
   const blockers = all.filter((c) => c.stage === "before_start");
   const render = () => {
-    const list = all.filter((c) => filter === "all" || c.stage === filter);
+    const full = all.filter((c) => filter === "all" || c.stage === filter);
+    const list = showAll || full.length <= 8 ? full : full.slice(0, 8);
     const chip = (k: string, t: string, n: number) =>
       `<button class="chip" type="button" data-f="${k}" aria-pressed="${filter === k}">${h(t)}<span>${n}</span></button>`;
     const who = [...new Set(blockers.map((b) => b.who))].length;
@@ -32,12 +34,13 @@ function condition(root: HTMLElement, d: { conditions: Cond[] }) {
 <div class="chips" role="group" aria-label="Filter conditions by stage">${chip("all", "All", all.length)}${STAGES.map((s) => chip(s[0], s[1], all.filter((c) => c.stage === s[0]).length)).join("")}</div>
 <p class="priv" style="margin:0 0 10px" aria-live="polite">Showing ${list.length} of ${all.length} conditions. Select one to read it.</p>
 <div class="cards">${list.map((c) => `<div class="cc" id="cc${c.n}"><button type="button" aria-expanded="false" aria-controls="b${c.n}" data-c="${c.n}"><span class="num">${c.n}</span><span style="min-width:0"><span class="t" style="display:block">${h(c.title)}</span><span class="meta" style="display:block">${h(label(c.stage))} · prepared by: ${h(c.who)}</span></span><span class="caret" aria-hidden="true">&#9662;</span></button>
-<div class="body" id="b${c.n}"><p>${h(c.plain)}</p><h4>Who prepares it</h4><p>${h(c.who)}</p><h4>Documents</h4><ul>${c.docs.map((x) => `<li>${h(x)}</li>`).join("")}</ul></div></div>`).join("")}</div>`;
+<div class="body" id="b${c.n}"><p>${h(c.plain)}</p><h4>Who prepares it</h4><p>${h(c.who)}</p><h4>Documents</h4><ul>${c.docs.map((x) => `<li>${h(x)}</li>`).join("")}</ul></div></div>`).join("")}</div>${list.length < full.length ? `<p style="margin-top:12px"><button class="chip" type="button" data-more="1">Show all ${full.length} conditions</button></p>` : ""}`;
   };
   root.addEventListener("click", (e) => {
-    const t = (e.target as HTMLElement).closest("[data-f],[data-c]") as HTMLElement | null;
+    const t = (e.target as HTMLElement).closest("[data-f],[data-c],[data-more]") as HTMLElement | null;
     if (!t) return;
-    if (t.dataset.f) { filter = t.dataset.f; render(); (root.querySelector(`.chip[data-f="${filter}"]`) as HTMLElement | null)?.focus(); }
+    if (t.dataset.more) { showAll = true; render(); return; }
+    if (t.dataset.f) { showAll = false; filter = t.dataset.f; render(); (root.querySelector(`.chip[data-f="${filter}"]`) as HTMLElement | null)?.focus(); }
     else { const card = t.closest(".cc")!; const o = card.classList.toggle("open"); t.setAttribute("aria-expanded", String(o)); }
   });
   render();

@@ -1,4 +1,8 @@
 import copy from "./copy.json";
+import design from "./design.json";
+import cdData from "../../../public/lumicity/condition-desk.json";
+import hdData from "../../../public/lumicity/habitat-draft.json";
+import bcData from "../../../public/lumicity/bid-check.json";
 
 export type LumicityKey = "condition-desk" | "habitat-draft" | "bid-check";
 export const CAL = "https://calendly.com/tristan-fischer-wjlf/30min";
@@ -10,7 +14,7 @@ const esc = (s: string) =>
   s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
 export const CSS = `
-:root{--bg:#fff;--surface:#f8fafc;--surface-2:#f1f5f9;--ink:#0f1729;--ink-soft:#334155;--muted:#5b6b82;--line:#e6eaf0;--ember:#e2562a;--ember-dark:#b83a0e;--ember-soft:#fff2ec;--blue:#1d4ed8;--green:#0f7a4d;--green-soft:#e8f6ef;--amber:#8a5a00;--amber-soft:#fff6e0;--red:#a3231b;--red-soft:#fdecea;--radius:16px;--shadow:0 1px 2px rgba(15,23,41,.04),0 10px 30px rgba(15,23,41,.07);--font:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,Helvetica,Arial,sans-serif}
+:root{--bg:#fff;--surface:#f8fafc;--surface-2:#f1f5f9;--ink:#0f1729;--ink-soft:#334155;--muted:#5b6b82;--line:#e6eaf0;--ember:#e2562a;--ember-dark:#b83a0e;--ember-soft:#fff2ec;--acc:#b83a0e;--acc-d:#8f3208;--acc-s:#fff2ec;--acc-m:#f0b99c;--blue:#1d4ed8;--green:#0f7a4d;--green-soft:#e8f6ef;--amber:#8a5a00;--amber-soft:#fff6e0;--red:#a3231b;--red-soft:#fdecea;--radius:16px;--shadow:0 1px 2px rgba(15,23,41,.04),0 10px 30px rgba(15,23,41,.07);--font:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,Helvetica,Arial,sans-serif}
 *{box-sizing:border-box}html{scroll-behavior:smooth;color-scheme:light}
 body{overflow-wrap:anywhere;margin:0;background:#fff;color:var(--ink);font-family:var(--font);line-height:1.6;font-size:17px;-webkit-font-smoothing:antialiased;overflow-x:hidden}
 a{color:var(--blue)}h1,h2,h3{line-height:1.15;letter-spacing:-.02em;margin:0}p{margin:0}
@@ -102,56 +106,192 @@ footer{padding:30px 0 40px;font-size:14px;color:var(--muted);border-top:1px soli
 @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}*{transition:none!important}}
 `;
 
+
+export const CSS2 = `
+body{background:#fffdfa}
+h1,h2{font-family:"Iowan Old Style","Palatino Linotype",Palatino,"Book Antiqua",Georgia,serif;font-weight:700;letter-spacing:-.015em}
+h1{font-size:clamp(36px,7vw,58px)}
+.eyebrow{color:var(--ember-dark)}
+.btn-primary{background:var(--ember-dark);box-shadow:0 6px 18px rgba(15,23,41,.18)}.btn-primary:hover{background:var(--ink)}
+.pg{--ember:var(--acc);--ember-dark:var(--acc-d);--ember-soft:var(--acc-s)}
+.pg .hero{background:linear-gradient(180deg,var(--acc-s) 0%,#fffdfa 100%);padding:36px 0 40px;overflow:hidden}
+.hero-grid{display:grid;grid-template-columns:minmax(0,1fr);gap:32px;align-items:center}.hero-grid>*,.mock,.mock-map>*{min-width:0}
+.hero h1{max-width:16ch}
+.hero .price-hint{font-weight:700;color:var(--ink);margin-top:12px;font-size:15px}
+.mock{background:#fff;border:1px solid var(--line);border-radius:18px;box-shadow:0 2px 4px rgba(15,23,41,.05),0 24px 60px rgba(15,23,41,.14);overflow:hidden;font-size:13.5px;line-height:1.4;animation:rise .6s ease-out both}
+@keyframes rise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+.mock-bar{display:flex;align-items:center;gap:6px;padding:10px 14px;background:var(--surface-2);border-bottom:1px solid var(--line)}
+.mock-bar i{width:10px;height:10px;border-radius:50%;background:#cbd5e1;display:block}.mock-bar span{margin-left:8px;font-size:12px;color:var(--muted);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mock-body{padding:16px}
+.mock h4{margin:0 0 2px;font-size:15px}.mock .mm{color:var(--muted);font-size:12.5px}
+.big{display:flex;gap:10px;margin:12px 0}.big div{flex:1;border:1px solid var(--line);border-radius:12px;padding:10px 12px;background:var(--surface)}
+.big b{display:block;font-size:26px;line-height:1.1;letter-spacing:-.02em}.big small{color:var(--ink-soft);font-size:12px}
+.big div.hot{background:var(--acc-s);border-color:var(--acc-m)}.big div.hot b{color:var(--acc-d)}
+.mrow{display:flex;gap:10px;align-items:flex-start;padding:9px 0;border-top:1px solid var(--line)}
+.mrow .num{min-width:24px;height:24px;border-radius:7px;background:var(--surface-2);font-weight:800;font-size:12px;display:flex;align-items:center;justify-content:center}
+.mrow .tt{font-weight:700;font-size:13.5px}.mrow .ss{font-size:12px;color:var(--muted)}
+.mrow .q{font-size:12.5px;color:var(--ink-soft);font-style:italic}
+.spill{display:inline-block;border-radius:999px;padding:1px 8px;font-size:11px;font-weight:700;background:var(--acc-s);color:var(--acc-d);white-space:nowrap}
+.spill.n{background:var(--surface-2);color:var(--ink-soft)}
+.letter{margin-top:10px;border:1px dashed var(--acc-m);border-radius:10px;padding:8px 12px;background:var(--acc-s);font-size:12.5px;color:var(--acc-d);font-weight:600}
+.mock-map{display:grid;grid-template-columns:minmax(0,1fr)}.mock-map img{width:100%;height:auto;display:block;border-bottom:1px solid var(--line);max-height:340px;object-fit:cover;object-position:top}
+.crow{display:flex;align-items:center;gap:8px;padding:6px 0;border-top:1px solid var(--line);font-size:12.5px}.crow b{min-width:30px}.crow span.ha{margin-left:auto;color:var(--muted);white-space:nowrap}
+.trust{background:#fff;border-top:1px solid var(--line);border-bottom:1px solid var(--line);padding:18px 0}
+.trust ul{list-style:none;margin:0;padding:0;display:grid;gap:10px;grid-template-columns:1fr}
+.trust li{font-size:14.5px;font-weight:600;color:var(--ink-soft);padding-left:26px;position:relative}
+.trust li:before{content:"";position:absolute;left:4px;top:5px;width:12px;height:7px;border-left:3px solid var(--acc);border-bottom:3px solid var(--acc);transform:rotate(-45deg)}
+.pg section.alt{background:var(--acc-s);border-color:var(--acc-m)}
+.pg .step{background:#fff}.pg .step .n{background:var(--acc);color:#fff;font-family:Georgia,serif;font-size:18px}
+.chart{background:#fff;border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:22px}
+.chart h3{font-size:18px;margin-bottom:14px}
+.hbar{display:grid;grid-template-columns:minmax(110px,170px) 1fr 34px;gap:10px;align-items:center;margin:8px 0;font-size:14px}
+.hbar .track{background:var(--surface-2);height:22px;border-radius:7px;overflow:hidden}.hbar .track i{display:block;height:100%;background:#b8c2d0;border-radius:7px;transform-origin:left;animation:grow .9s ease-out both}
+.hbar.hot .track i{background:var(--acc)}.hbar.hot{font-weight:800}.hbar b{text-align:right;font-variant-numeric:tabular-nums}
+@keyframes grow{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+.stack{display:flex;height:34px;border-radius:10px;overflow:hidden;margin:6px 0 12px;border:1px solid var(--line)}.stack i{display:block;min-width:2px}
+.legend{display:flex;flex-wrap:wrap;gap:8px 18px;font-size:13.5px;color:var(--ink-soft)}.legend span:before{content:"";display:inline-block;width:12px;height:12px;border-radius:3px;background:var(--c);margin-right:6px;vertical-align:-1px}
+.chart .cap{margin-top:14px;font-weight:700;color:var(--acc-d);font-size:15px}
+.ba{display:grid;gap:12px}.ba .row{display:grid;gap:8px}
+.ba .b,.ba .a{border-radius:14px;padding:16px 18px;font-size:16px}
+.ba .b{background:#fff;border:1px solid var(--line);color:var(--ink-soft)}.ba .b small,.ba .a small{display:block;font-size:11.5px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;margin-bottom:4px}
+.ba .b small{color:var(--muted)}.ba .a{background:#fff;border:2px solid var(--acc);font-weight:600}.ba .a small{color:var(--acc-d)}
+.price{grid-template-columns:1fr}.pc{position:relative}.pc.feat{border:2px solid var(--acc)}
+.pc .badge{position:absolute;top:-12px;left:22px;background:var(--acc);color:#fff;font-size:12px;font-weight:800;border-radius:999px;padding:3px 12px}
+.pc .amt{font-family:Georgia,serif;color:var(--acc-d)}
+.pc ul{list-style:none;margin:14px 0 0;padding:0;display:grid;gap:6px;font-size:15px;color:var(--ink-soft)}.pc ul li{padding-left:22px;position:relative}.pc ul li:before{content:"";position:absolute;left:2px;top:7px;width:10px;height:6px;border-left:2px solid var(--acc);border-bottom:2px solid var(--acc);transform:rotate(-45deg)}
+.honest{margin-top:20px;background:#fff;border:1px solid var(--line);border-left:4px solid var(--acc);border-radius:12px;padding:16px 18px}.honest h3{font-size:16px;margin-bottom:6px}.honest ul{margin:0;padding-left:18px;color:var(--ink-soft);font-size:15px}
+.final{background:var(--acc-s);color:var(--ink);border-top:1px solid var(--acc-m)}.final h2{color:var(--ink)}.final p{color:var(--ink-soft)}.final .btn-ghost{color:var(--ink);border-color:#c9d2de;background:#fff}
+.final .sign{margin-top:16px;font-size:15px;font-weight:600;color:var(--ink)}
+.hdr-note{display:none;font-size:14px;color:var(--muted);font-weight:600}
+.mbar{display:none}
+.pg .step{position:relative;overflow:hidden}.pg .step .ic{color:var(--acc);margin-bottom:10px}.pg .step .n{position:absolute;top:16px;right:16px;margin:0;width:34px;height:34px}
+.pg .step h3{font-family:Georgia,serif;font-size:22px}
+.mock{font-size:14.5px}.mock .mrow .tt{font-size:14.5px}.mock .mrow .ss,.mock .mm{font-size:13px}.crow{font-size:14px}
+.hero-vis{position:relative}.hero-vis:before{content:"";position:absolute;inset:-26px -18px -26px 30px;background:radial-gradient(closest-side,var(--acc-m),transparent 72%);opacity:.55;z-index:0}.hero-vis .mock{position:relative;z-index:1}
+.hero-vis .back{position:absolute;z-index:0;left:-14px;right:22px;top:20px;bottom:-16px;background:#fff;border:1px solid var(--line);border-radius:18px;transform:rotate(-1.4deg);box-shadow:0 14px 34px rgba(15,23,41,.1)}
+.ba .b small,.ba .a small{display:flex;align-items:center;gap:6px}.ba .b small svg{color:#b91c1c}.ba .a small svg{color:var(--acc)}
+.ba .a{background:linear-gradient(90deg,var(--acc-s),#fff 60%)}.ba .b{background:var(--surface);}
+.get figure{max-width:620px;margin:0 auto}
+.section-num{font-size:13px}
+.s-head h2:after{content:"";display:block;width:56px;height:4px;border-radius:4px;background:var(--acc);margin-top:12px}
+@media(max-width:759px){.mbar{display:flex;position:fixed;left:0;right:0;bottom:0;z-index:60;background:#fff;border-top:1px solid var(--line);padding:10px 16px calc(10px + env(safe-area-inset-bottom));gap:12px;align-items:center;justify-content:space-between;box-shadow:0 -6px 20px rgba(15,23,41,.08)}.mbar span{font-size:13px;font-weight:700;line-height:1.25}.mbar .btn{padding:10px 18px;min-height:44px;white-space:nowrap}body{padding-bottom:72px}.nav .btn{display:none}.nav-inner{min-height:54px}}
+@media(min-width:760px){.hero-grid{grid-template-columns:minmax(0,1.05fr) minmax(0,.95fr);gap:44px}.trust ul{grid-template-columns:repeat(4,1fr);gap:18px}.ba .row{grid-template-columns:1fr 1fr;align-items:stretch}.price{grid-template-columns:1fr 1fr}.hdr-note{display:block}.pg .hero{padding:64px 0 68px}.mock-map{grid-template-columns:minmax(0,.8fr) minmax(0,1.2fr)}.mock-map img{border-bottom:0;border-right:1px solid var(--line);max-height:none;height:100%}}
+@media(prefers-reduced-motion:reduce){.mock,.hbar .track i{animation:none!important}}
+`;
+
 const link = (c: C, label: string, cls = "btn btn-primary") =>
   `<a class="${cls}" href="${CAL}" target="_blank" rel="noopener">${esc(label)}</a>`;
 const mailto = (c: C) =>
   `<a href="mailto:${MAIL}?subject=${encodeURIComponent(c.mail)}">${MAIL}</a>`;
+type D = (typeof design)["condition-desk"];
 
-function demoShell(key: LumicityKey, c: C): string {
-  const intro = `<p class="demo-label"><b>A real example, built from public documents.</b> ${esc(c.demo_label.replace(/^A real example, built from public documents: /, ""))}</p>`;
-  return `<div id="demo-root" data-demo="${key}" class="panel"><p>Loading the example</p></div>${""}${intro ? "" : ""}`;
+const STAGE_LABEL: Record<string, string> = {
+  before_start: "Before work starts", with_reserved_matters: "With the detailed plans", during_build: "During the build",
+  before_occupation: "Before people move in", start_deadline: "Time limit to start", if_event: "Only if something happens", compliance: "Rules to follow throughout",
+};
+const short = (s: string, n: number) => (s.length > n ? s.slice(0, n - 1).replace(/\s+\S*$/, "") + "…" : s);
+
+const ICON = [
+  `<svg viewBox="0 0 32 32" width="30" height="30" aria-hidden="true"><path d="M4 16L28 5l-6 22-6-8-4 5-1-7z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>`,
+  `<svg viewBox="0 0 32 32" width="30" height="30" aria-hidden="true"><rect x="6" y="3" width="20" height="26" rx="3" fill="none" stroke="currentColor" stroke-width="2"/><path d="M11 11h10M11 16h10M11 21h6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>`,
+  `<svg viewBox="0 0 32 32" width="30" height="30" aria-hidden="true"><circle cx="16" cy="16" r="12" fill="none" stroke="currentColor" stroke-width="2"/><path d="M10 16.5l4 4 8-9" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+];
+function mockup(key: LumicityKey): string {
+  if (key === "condition-desk") {
+    const all = cdData.conditions;
+    const blockers = all.filter((c) => c.stage === "before_start");
+    const rows = blockers.slice(0, 4).map((c) => `<div class="mrow"><span class="num">${c.n}</span><div><div class="tt">${esc(c.title)}</div><div class="ss"><span class="spill">${esc(STAGE_LABEL[c.stage])}</span> prepared by ${esc(c.who.toLowerCase())}</div></div></div>`).join("");
+    return `<div class="mock" aria-label="Example of a Condition Desk register"><div class="mock-bar"><i></i><i></i><i></i><span>Condition register: ${esc(cdData.site)}, ${esc(cdData.ref)}</span></div><div class="mock-body">
+<h4>${esc(cdData.site)}</h4><p class="mm">${esc(cdData.council)}, ${esc(cdData.homes)} homes (a real permission)</p>
+<div class="big"><div><b>${all.length}</b><small>conditions found</small></div><div class="hot"><b>${blockers.length}</b><small>must be cleared before work starts</small></div></div>
+${rows}<div class="letter">A covering letter to the council is drafted for each submission.</div></div></div>`;
+  }
+  if (key === "habitat-draft") {
+    const ps = hdData.parcels.slice(0, 6);
+    const rows = ps.map((p) => `<div class="crow"><b>${esc(p.id)}</b><span>${esc(short(p.habitat, 26))}</span><span class="pill ${p.confidence}">${esc(p.confidence)}</span></div>`).join("");
+    return `<div class="mock" aria-label="Example of a Habitat Draft desk study"><div class="mock-bar"><i></i><i></i><i></i><span>Desk study: ${esc(hdData.site)}, ${esc(hdData.ref)}</span></div>
+<div class="mock-map"><img src="/lumicity/romsey-map.png" alt="First habitat map of the Romsey site drawn from national data" width="600" height="800"><div class="mock-body"><h4>${esc(hdData.proposal)}, ${hdData.area_ha} hectares</h4><p class="mm">${hdData.parcels.length} parcels. First draft, unchecked. How sure we are, per parcel:</p>${rows}<p class="mm" style="margin-top:8px">The ecologist checks and signs everything.</p></div></div></div>`;
+  }
+  const items = bcData.items;
+  const n = (k: string) => items.filter((i) => i.kind === k).length;
+  const gates = items.filter((i) => i.kind === "gate").slice(0, 3);
+  const rows = gates.map((g, i) => `<div class="mrow"><span class="num">${i + 1}</span><div><div class="q">“${esc(short(g.text, 88))}”</div><div class="ss"><span class="spill">Pass or fail</span> ${esc(g.source)}</div></div></div>`).join("");
+  return `<div class="mock" aria-label="Example of a Bid Check bid at a glance"><div class="mock-bar"><i></i><i></i><i></i><span>Bid at a glance: ${esc(bcData.title)}</span></div><div class="mock-body">
+<h4>${esc(bcData.title)}</h4><p class="mm">${esc(bcData.buyer)}, closes ${esc(bcData.closing)}, ${esc(bcData.value)} (a real tender)</p>
+<div class="big"><div><b>${items.length}</b><small>requirements found</small></div><div class="hot"><b>${n("gate")}</b><small>pass-or-fail conditions</small></div><div><b>${n("return_item")}</b><small>documents to return</small></div></div>${rows}</div></div>`;
+}
+
+function chart(key: LumicityKey, d: D): string {
+  const cap = `<p class="cap">${esc(d.chart_caption)}</p>`;
+  if (key === "condition-desk") {
+    const all = cdData.conditions; const order = Object.keys(STAGE_LABEL);
+    const rows = order.map((k) => [k, all.filter((c) => c.stage === k).length] as [string, number]).filter((r) => r[1] > 0).sort((a, b) => b[1] - a[1]);
+    const mx = Math.max(...rows.map((r) => r[1]));
+    return `<div class="chart"><h3>${esc(d.chart_title)}</h3>${rows.map((r) => `<div class="hbar${r[0] === "before_start" ? " hot" : ""}"><span>${esc(STAGE_LABEL[r[0]])}</span><span class="track"><i style="width:${(r[1] / mx) * 100}%"></i></span><b>${r[1]}</b></div>`).join("")}${cap}</div>`;
+  }
+  if (key === "habitat-draft") {
+    const col: Record<string, string> = { low: "#d97706", medium: "#2563eb", high: "#0f7a4d" };
+    const cnt = (k: string) => hdData.parcels.filter((p) => p.confidence === k).length;
+    const tot = hdData.parcels.length;
+    return `<div class="chart"><h3>${esc(d.chart_title)}</h3><div class="stack" role="img" aria-label="Parcels by confidence: ${cnt("low")} low, ${cnt("medium")} medium, ${cnt("high")} high">${["low", "medium", "high"].map((k) => `<i style="width:${(cnt(k) / tot) * 100}%;background:${col[k]}"></i>`).join("")}</div>
+<div class="legend">${["low", "medium", "high"].map((k) => `<span style="--c:${col[k]}">${cnt(k)} parcels, ${k} confidence</span>`).join("")}</div>${cap}</div>`;
+  }
+  const items = bcData.items; const kinds: [string, string, string][] = [["gate", "Pass or fail", "#b4400c"], ["return_item", "Documents to return", "#64748b"], ["scored", "Scored criteria", "#2563eb"], ["deadline", "Deadlines", "#0f7a4d"], ["other", "Other", "#a8b3c4"]];
+  const cnt = (k: string) => items.filter((i) => i.kind === k).length;
+  return `<div class="chart"><h3>${esc(d.chart_title)}</h3><div class="stack" role="img" aria-label="Requirements by type">${kinds.map((k) => `<i style="width:${(cnt(k[0]) / items.length) * 100}%;background:${k[2]}"></i>`).join("")}</div>
+<div class="legend">${kinds.map((k) => `<span style="--c:${k[2]}">${cnt(k[0])} ${k[1].toLowerCase()}</span>`).join("")}</div>
+<p style="margin-top:14px;color:var(--ink-soft)"><b>How the bid is scored:</b> Price 50%, Quality 40%.</p>${cap}</div>`;
+}
+
+function demoShell(key: LumicityKey): string {
+  return `<div id="demo-root" data-demo="${key}" class="panel"><p>Loading the example</p></div>`;
 }
 
 export function buildHtml(key: LumicityKey): string {
-  const c = (copy as Record<string, C>)[key];
+  const c = (copy as unknown as Record<string, C>)[key];
+  const d = (design as unknown as Record<string, D>)[key];
   const others = KEYS.filter((k) => k !== key)
-    .map((k) => `<a href="/${k}">${esc((copy as Record<string, C>)[k].name)}</a>`)
+    .map((k) => `<a href="/${k}">${esc((copy as unknown as Record<string, C>)[k].name)}</a>`)
     .join(" · ");
-  const faqs = c.faqs
+  const faqs = [...c.faqs.slice(0, -1), ...d.extra_faq, c.faqs[c.faqs.length - 1]]
     .map((f) => `<details class="faq"><summary>${esc(f.q)}</summary><p>${esc(f.a)}</p></details>`)
     .join("");
-  return `<style>${CSS}</style>
-<header class="nav"><div class="wrap nav-inner"><a class="brand" href="/${key}">${esc(c.name)} <small>by Fractional Forge</small></a>${link(c, "Book a call", "btn btn-primary")}</div></header>
+  const style = `--acc:${d.accent};--acc-d:${d.accent_dark};--acc-s:${d.accent_soft};--acc-m:${d.accent_mid}`;
+  return `<style>${CSS}${CSS2}</style>
+<div class="pg" style="${style}">
+<header class="nav"><div class="wrap nav-inner"><a class="brand" href="/${key}">${esc(c.name)} <small>by Fractional Forge</small></a><span class="hdr-note">${esc(c.one[0])} ${esc(c.one[1])} · usually within a day</span>${link(c, c.cta, "btn btn-primary")}</div></header>
 <main>
-<section class="hero"><div class="wrap">
-<p class="eyebrow">${esc(c.name)}, a Fractional Forge service</p>
+<section class="hero"><div class="wrap hero-grid"><div>
+<p class="eyebrow">${esc(d.kicker)}</p>
 <h1>${esc(c.headline)}</h1>
 <p class="sub">${esc(c.subhead)}</p>
-<div class="cta-row">${link(c, c.cta)}<a class="btn btn-ghost" href="#demo">See a real example</a></div>
+<div class="cta-row">${link(c, c.cta)}<a class="btn btn-ghost" href="#demo">Try a real example</a></div>
+<p class="price-hint">${esc(c.one[0])} ${esc(c.one[1])}, or ${esc(c.mon[0])} ${esc(c.mon[1])}.</p>
 <p class="hero-note">Prefer email? Write to ${mailto(c)}.</p>
-</div></section>
-<section class="s"><div class="wrap"><div class="s-head"><h2>Sound familiar?</h2></div>
-<ul class="problems">${c.problem.map((p) => `<li>${esc(p)}</li>`).join("")}</ul></div></section>
-<section class="s alt"><div class="wrap"><div class="s-head"><h2>How it works</h2></div>
-<div class="steps">${c.steps.map((s, i) => `<div class="step"><div class="n">${i + 1}</div><h3>${esc(s.title)}</h3><p>${esc(s.text)}</p></div>`).join("")}</div></div></section>
-<section class="s" id="demo"><div class="wrap"><div class="s-head"><h2>${esc(c.demo_title)}</h2><p>${esc(c.demo_intro)}</p></div>
+</div><div class="hero-vis"><div class="back" aria-hidden="true"></div>${mockup(key)}</div></div></section>
+<section class="trust" aria-label="Key facts"><div class="wrap"><ul>${d.trust.map((t) => `<li>${esc(t)}</li>`).join("")}</ul></div></section>
+<section class="s"><div class="wrap"><div class="s-head"><h2>A real example, in numbers</h2></div>${chart(key, d)}</div></section>
+<section class="s alt" id="demo"><div class="wrap"><div class="s-head"><h2>${esc(c.demo_title)}</h2><p>${esc(c.demo_intro)}</p></div>
 <p class="demo-label"><b>A real example, built from public documents.</b> ${esc(c.demo_label.replace(/^A real example, built from public documents: /, ""))}</p>
-${demoShell(key, c)}</div></section>
-<section class="s alt"><div class="wrap"><div class="s-head"><h2>What you get</h2></div>
+${demoShell(key)}</div></section>
+<section class="s"><div class="wrap"><div class="s-head"><h2>By hand, or with ${esc(c.name)}</h2></div>
+<div class="ba">${d.before_after.map((r) => `<div class="row"><div class="b"><small><svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M3 3l10 10M13 3L3 13" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg> By hand</small>${esc(r[0])}</div><div class="a"><small><svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M2.5 8.5l3.5 3.5 7.5-8" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg> With ${esc(c.name)}</small>${esc(r[1])}</div></div>`).join("")}</div></div></section>
+<section class="s alt"><div class="wrap"><div class="s-head"><h2>How it works</h2></div>
+<div class="steps">${d.step_titles.map((t, i) => `<div class="step"><div class="ic">${ICON[i]}</div><div class="n">${i + 1}</div><h3>${esc(t)}</h3><p>${esc(d.step_texts[i])}</p></div>`).join("")}</div></div></section>
+<section class="s"><div class="wrap"><div class="s-head"><h2>What you get</h2></div>
 <div class="get"><ul>${c.you_get.map((g) => `<li>${esc(g)}</li>`).join("")}</ul>
-<figure><a href="${c.report}" target="_blank" rel="noopener" aria-label="Open the sample report page at full size"><img src="${c.report}" alt="${esc(c.report_alt)}" width="918" height="1298" loading="lazy"></a><figcaption>${esc(c.report_cap)} Select the image to open it at full size.</figcaption></figure></div></div></section>
-<section class="s"><div class="wrap"><div class="s-head"><h2>What it does not do</h2></div>
-<ul class="not">${c.not_do.map((n) => `<li>${esc(n)}</li>`).join("")}</ul></div></section>
+<figure><a href="${c.report}" target="_blank" rel="noopener" aria-label="Open the sample report page at full size"><img src="${c.report}" alt="${esc(c.report_alt)}" width="918" height="1298"></a><figcaption>${esc(c.report_cap)} Select the image to open it at full size.</figcaption></figure></div></div></section>
 <section class="s alt"><div class="wrap"><div class="s-head"><h2>Price</h2></div>
-<div class="price"><div class="pc feat"><p class="eyebrow">One-off</p><p class="amt">${esc(c.one[0])}</p><p class="unit">${esc(c.one[1])}</p><div class="cta-row">${link(c, c.cta)}</div></div>
+<div class="price"><div class="pc feat"><span class="badge">Start here</span><p class="eyebrow">One-off</p><p class="amt">${esc(c.one[0])}</p><p class="unit">${esc(c.one[1])}</p><div class="cta-row">${link(c, c.cta)}</div></div>
 <div class="pc"><p class="eyebrow">Monthly</p><p class="amt">${esc(c.mon[0])}</p><p class="unit">${esc(c.mon[1])}</p><div class="cta-row">${link(c, "Talk about monthly", "btn btn-ghost")}</div></div></div>
+<div class="honest"><h3>What it does not do</h3><ul>${c.not_do.map((n) => `<li>${esc(n)}</li>`).join("")}</ul></div>
 </div></section>
 <section class="s"><div class="wrap"><div class="s-head"><h2>Questions</h2></div>${faqs}</div></section>
-<section class="s alt"><div class="wrap"><div class="s-head"><h2>Who is behind it</h2></div>
-<p class="who">Tristan Fischer has led or sat on the boards of fourteen hard-technology companies, built three industrial sites and raised around £200m. He began his career in project finance at Citigroup.</p></div></section>
 <section class="final"><div class="wrap"><h2>${esc(c.cta)}</h2><p>Book a 30 minute call, or email <a class="mail" href="mailto:${MAIL}?subject=${encodeURIComponent(c.mail)}">${MAIL}</a>.</p>
-<div class="cta-row">${link(c, c.cta)}</div></div></section>
+<div class="cta-row">${link(c, c.cta)}</div><p class="sign">${esc(c.name)} is a Fractional Forge service, run by Tristan Fischer.</p></div></section>
 </main>
 <footer><div class="wrap"><p>${esc(c.name)}, a Fractional Forge service. Also from Fractional Forge: ${others}</p>
-<p>Fractional Forge Limited · Tristan Fischer · ${mailto(c)}</p></div></footer>`;
+<p>Fractional Forge Limited · Tristan Fischer · ${mailto(c)}</p></div></footer>
+<div class="mbar"><span>${esc(c.one[0])} ${esc(c.one[1])}<br>Usually within a day</span>${link(c, "Book a call")}</div>
+</div>`;
 }
