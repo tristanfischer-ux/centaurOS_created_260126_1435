@@ -21,7 +21,7 @@
     "text": "Commission the right specialists. You or your planner send each submission to the council with the covering letter we draft."
    }
   ],
-  "demo_intro": "Below is the real register we produced for a 150-home outline permission in Albrighton, Shropshire. Filter the 38 conditions by stage, then click one to see what it means and which documents you need. This page also shows a sample report page.",
+  "demo_intro": "Below is the real register we produced for a 150-home outline permission in Albrighton, Shropshire. Filter the 38 conditions by stage, then click one to see what it means and which documents you need.",
   "you_get": [
    "A register of every condition in plain English, usually within a day.",
    "When each condition is due: before work starts, during the build, before people move in, or with a reserved matters application.",
@@ -32,7 +32,7 @@
    "We do not give planning advice.",
    "We do not submit anything to the council. You or your planner remain responsible."
   ],
-  "price_line": "It costs \u00a3400 per permission, or \u00a31,000 a month for up to five live sites.",
+  "price_line": "It costs £400 per permission, or £1,000 a month for up to five live sites.",
   "faqs": [
    {
     "q": "How fast do I get the register?",
@@ -40,7 +40,7 @@
    },
    {
     "q": "What does it cost?",
-    "a": "\u00a3400 per permission, or \u00a31,000 a month for up to five live sites. The register covers every condition on the permission, picks out the conditions that block a start on site, and comes with a drafted covering letter to the council for each submission. You or your planner send the submissions to the council."
+    "a": "£400 per permission, or £1,000 a month for up to five live sites. The register covers every condition on the permission, picks out the conditions that block a start on site, and comes with a drafted covering letter to the council for each submission. You or your planner send the submissions to the council."
    },
    {
     "q": "Can I see an example first?",
@@ -68,11 +68,11 @@
   "slug": "condition-desk",
   "mail": "Condition Desk enquiry",
   "one": [
-   "\u00a3400",
+   "£400",
    "per planning permission"
   ],
   "mon": [
-   "\u00a31,000",
+   "£1,000",
    "a month, for up to five live sites"
   ],
   "demo_title": "The Albrighton planning permission",
@@ -80,7 +80,9 @@
   "report": "/lumicity/condition-desk-report.png",
   "report_alt": "First page of a Condition Desk report for the Albrighton permission, showing counts of conditions by stage and the conditions that block a start on site.",
   "report_cap": "Page 1 of a real Condition Desk report (Albrighton).",
-  "who_extra": ""
+  "who_extra": "",
+  "hero_head": "Start on site sooner",
+  "hero_sub": "Condition Desk turns your decision notice into a plain English register of every planning condition, usually within a day, and picks out the conditions that block a start on site."
  },
  "habitat-draft": {
   "headline": "Walk in knowing which parcels matter",
@@ -104,7 +106,7 @@
     "text": "Usually within a day you receive a two-page desk study with a prioritised list of parcels to check on the walkover."
    }
   ],
-  "demo_intro": "This is a real worked example: the 98-home site at Romsey, mapped into 15 parcels. Click any parcel to see its likely habitat, how sure we are (low, medium or high), and what to check on the walkover. The checks are for your visit; the desk study does not score habitat condition. A sample report page is included on this page. Habitat Draft is built on real current applications, including this one.",
+  "demo_intro": "This is a real worked example: the 98-home site at Romsey, mapped into 15 parcels. Click any parcel to see its likely habitat, how sure we are (low, medium or high), and what to check on the walkover. The checks are for your visit; the desk study does not score habitat condition. Habitat Draft is built on real current applications, including this one.",
   "you_get": [
    "Protected sites and priority habitats (those most important for nature conservation) within 600 metres of your site",
    "A first habitat map of the site from national data, with a confidence rating for each parcel (low, medium or high)",
@@ -118,7 +120,7 @@
    "The biodiversity units figure is a rough first draft to correct on site, not a finished baseline.",
    "Your ecologist checks and signs everything."
   ],
-  "price_line": "\u00a3150 per desk study, or \u00a31,000 a month for up to eight.",
+  "price_line": "£150 per desk study, or £1,000 a month for up to eight.",
   "faqs": [
    {
     "q": "How fast is it?",
@@ -126,7 +128,7 @@
    },
    {
     "q": "What does it cost?",
-    "a": "\u00a3150 per desk study, or \u00a31,000 a month for up to eight desk studies."
+    "a": "£150 per desk study, or £1,000 a month for up to eight desk studies."
    },
    {
     "q": "The data is already out there. What am I paying for?",
@@ -150,18 +152,20 @@
   "slug": "habitat-draft",
   "mail": "Habitat Draft enquiry",
   "one": [
-   "\u00a3150",
+   "£150",
    "per desk study"
   ],
   "mon": [
-   "\u00a31,000",
+   "£1,000",
    "a month, for up to eight desk studies"
   ],
   "demo_title": "The Romsey site",
   "demo_label": "A real example, built from public documents: Land east of Southampton Road, Romsey (Test Valley Borough Council, 26/01906/FULLS, 98 homes).",
   "report": "/lumicity/habitat-draft-report.png",
   "report_alt": "First page of a Habitat Draft desk study for land east of Southampton Road, Romsey, with a first habitat map and a plain English summary.",
-  "report_cap": "Page 1 of a real Habitat Draft desk study (Romsey)."
+  "report_cap": "Page 1 of a real Habitat Draft desk study (Romsey).",
+  "hero_head": "Know which parcels matter before the walkover",
+  "hero_sub": "Send us a site boundary or a planning reference. Usually within a day you get a two-page desk study: a first habitat map, the records search and the parcels to check on your first visit."
  },
  "bid-check": {
   "headline": "Every pass-or-fail item, quoted from the tender",
@@ -169,7 +173,7 @@
   "problem": [
    "Reading a tender pack end to end takes days.",
    "Miss one pass-or-fail item and the bid is lost.",
-   "Bid writers charge around \u00a3500 a day."
+   "Bid writers charge around £500 a day."
   ],
   "steps": [
    {
@@ -197,7 +201,7 @@
    "We do not guarantee a win.",
    "Your team signs off every answer."
   ],
-  "price_line": "\u00a3600 per tender, or \u00a31,500 a month for up to three tenders.",
+  "price_line": "£600 per tender, or £1,500 a month for up to three tenders.",
   "faqs": [
    {
     "q": "What exactly is the bid at a glance?",
@@ -217,7 +221,7 @@
    },
    {
     "q": "What does it cost?",
-    "a": "\u00a3600 per tender, or \u00a31,500 a month for up to three tenders. Reading a tender pack end to end takes days, and bid writers charge around \u00a3500 a day."
+    "a": "£600 per tender, or £1,500 a month for up to three tenders. Reading a tender pack end to end takes days, and bid writers charge around £500 a day."
    },
    {
     "q": "Who delivers Bid Check?",
@@ -229,17 +233,19 @@
   "slug": "bid-check",
   "mail": "Bid Check enquiry",
   "one": [
-   "\u00a3600",
+   "£600",
    "per tender"
   ],
   "mon": [
-   "\u00a31,500",
+   "£1,500",
    "a month, for up to three tenders"
   ],
   "demo_title": "The Drummond tender",
   "demo_label": "A real example, built from public documents: Drummond Community Centre refurbishment, Hedge End Town Council (closing 19 October 2026).",
   "report": "/lumicity/bid-check-report.png",
   "report_alt": "First page of a Bid Check \"bid at a glance\" for the Drummond Community Centre tender, with the tender details, key dates and pass or fail conditions.",
-  "report_cap": "Page 1 of a real Bid at a glance (Drummond)."
+  "report_cap": "Page 1 of a real Bid at a glance (Drummond).",
+  "hero_head": "Every pass-or-fail item, quoted from the tender",
+  "hero_sub": "Send us the tender pack. Usually within a day you get a bid at a glance: every pass-or-fail condition, every document to submit, how bids are scored and the key dates, each quoted from the source so you can check it."
  }
 }
