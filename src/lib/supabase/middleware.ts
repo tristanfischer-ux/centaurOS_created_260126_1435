@@ -30,6 +30,7 @@ const PUBLIC_ROUTES = [
     '/habitat-draft',  // Lumicity product page (noindex until approved)
     '/bid-check',  // Lumicity product page (noindex until approved)
     '/lumicity',  // Lumicity demo data and images
+    '/api/service-enquiry',  // Public enquiry form on the service pages (honeypot + validation at route)
     '/techniques',  // Public manufacturing techniques explorer (SEO)
     '/demo',  // Public demo page
     '/brief-demo',  // Public CO2 brief-editor demo (no auth) — temporary, client demos

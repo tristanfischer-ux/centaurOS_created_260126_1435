@@ -5,7 +5,6 @@ import hdData from "../../../public/lumicity/habitat-draft.json";
 import bcData from "../../../public/lumicity/bid-check.json";
 
 export type LumicityKey = "condition-desk" | "habitat-draft" | "bid-check";
-export const CAL = "https://calendly.com/tristan-fischer-wjlf/30min";
 export const MAIL = "tristan.fischer@fractionalforge.app";
 export const KEYS: LumicityKey[] = ["condition-desk", "habitat-draft", "bid-check"];
 type C = (typeof copy)["condition-desk"];
@@ -180,7 +179,7 @@ h1{font-size:clamp(36px,7vw,58px)}
 `;
 
 const link = (c: C, label: string, cls = "btn btn-primary") =>
-  `<a class="${cls}" href="${CAL}" target="_blank" rel="noopener">${esc(label)}</a>`;
+  `<a class="${cls}" href="#send">${esc(label)}</a>`;
 const mailto = (c: C) =>
   `<a href="mailto:${MAIL}?subject=${encodeURIComponent(c.mail)}">${MAIL}</a>`;
 type D = (typeof design)["condition-desk"];
@@ -325,6 +324,16 @@ export const CSS3 = `
 .pg footer{background:#fff}
 @media(max-width:759px){body:has(.pg) [aria-label="Cookie preferences"]{margin-bottom:76px}.photo .float{margin:-60px 8px 0}.photo .tagc{top:12px;left:12px}}
 @media(min-width:760px){.navlinks{display:flex}.hero2{padding:56px 0 84px}.hero2 .grid{grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:56px}.photo .float{position:absolute;left:-48px;right:auto;bottom:-40px;width:300px;margin:0}.photo .ph{aspect-ratio:4/4.5}.stats ul{grid-template-columns:repeat(4,1fr)}.split{grid-template-columns:1fr 1fr;gap:64px}.split.rev .pic{order:2}.sample{grid-template-columns:.85fr 1.15fr;padding:48px}.founder{grid-template-columns:auto 1fr;padding:40px}}
+
+.enq{display:grid;gap:32px;background:#fff;border:1px solid var(--line,#e5e7eb);border-radius:24px;padding:28px;box-shadow:0 20px 50px -30px rgba(15,23,42,.35)}
+.enq-l p{color:var(--ink-soft);margin-top:14px}.enq-l h2{margin-top:10px}.enq-l ul{list-style:none;padding:0;margin:20px 0 0;display:grid;gap:10px;font-weight:600}.enq-l li{display:flex;gap:8px;align-items:center}.enq-l li svg{color:var(--acc)}
+.enq-f{display:grid;gap:14px}.enq-f label{display:grid;gap:6px;font-size:14px;font-weight:600}
+.enq-f input,.enq-f textarea{font:inherit;font-weight:400;font-size:16px;padding:12px 14px;border:1px solid #d1d5db;border-radius:12px;background:#fff;width:100%;box-sizing:border-box}
+.enq-f input:focus,.enq-f textarea:focus{outline:2px solid var(--acc);outline-offset:1px;border-color:transparent}
+.enq-f .hp{position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden}
+.enq-f button{justify-self:start;border:0;cursor:pointer}.enq-f button[disabled]{opacity:.6;cursor:wait}
+.enq-s{font-weight:600;min-height:1.4em}.enq-s.ok{color:#166534}.enq-s.err{color:#b91c1c}
+@media(min-width:760px){.enq{grid-template-columns:.9fr 1.1fr;padding:48px;gap:56px}}
 `;
 
 const MARK: Record<LumicityKey, string> = {
@@ -372,6 +381,30 @@ function mini(key: LumicityKey): string {
 
 const BIO = "Tristan Fischer has been chief executive or a board director of fourteen companies, almost all of them hard technology: wind, solar, wave and tidal, batteries, carbon capture and controlled-environment agriculture. He has built three greenfield industrial sites, including a 25,000 m² automated factory, and has raised around £200m for his companies. He started in project finance at Citigroup and later ran corporate venture investments at Shell Technology Ventures.";
 
+const ASK: Record<LumicityKey, [string, string]> = {
+  "condition-desk": ["Planning reference or link to the decision notice", "For example 24/02662/OUT, Shropshire Council"],
+  "habitat-draft": ["Site address, grid reference or planning reference", "For example land east of Southampton Road, Romsey"],
+  "bid-check": ["Link to the tender, or the buyer and tender title", "For example a Find a Tender or Contracts Finder link"],
+};
+
+function form(key: LumicityKey, c: C): string {
+  const [ref, ph] = ASK[key];
+  return `<section class="s" id="send"><div class="wrap"><div class="enq">
+<div class="enq-l"><p class="eyebrow">No calls needed</p><h2>${esc(c.cta)}</h2>
+<p>Fill in the form and we reply by email. If you have the documents to hand, you can also email them to ${mailto(c)}.</p>
+<ul><li>${TICK} Questions answered by email</li><li>${TICK} Usually within a day</li><li>${TICK} Built from public documents</li></ul></div>
+<form class="enq-f" data-service="${key}" novalidate>
+<label>Your name<input name="name" autocomplete="name" required maxlength="120"></label>
+<label>Work email<input name="email" type="email" autocomplete="email" required maxlength="200"></label>
+<label>Organisation<input name="org" autocomplete="organization" maxlength="200"></label>
+<label>${esc(ref)}<input name="ref" placeholder="${esc(ph)}" maxlength="500"></label>
+<label>Anything else we should know<textarea name="message" rows="4" maxlength="4000"></textarea></label>
+<label class="hp" aria-hidden="true">Leave blank<input name="website" tabindex="-1" autocomplete="off"></label>
+<button class="btn btn-primary" type="submit">Send</button>
+<p class="enq-s" role="status" aria-live="polite"></p>
+</form></div></div></section>`;
+}
+
 export function buildHtml(key: LumicityKey): string {
   const c = (copy as unknown as Record<string, C>)[key];
   const d = (design as unknown as Record<string, D>)[key];
@@ -389,7 +422,7 @@ export function buildHtml(key: LumicityKey): string {
   return `<style>${CSS}${CSS2}${CSS3}</style>
 <div class="pg" style="${style}">
 <header class="nav"><div class="wrap nav-inner"><a class="logo" href="/${key}"><span class="mk">${MARK[key]}</span><span><b>${esc(c.name)}</b><small>A Fractional Forge service</small></span></a>
-<nav class="navlinks" aria-label="Page sections"><a href="#how">How it works</a><a href="#demo">Example</a><a href="#sample">Sample report</a><a href="#price">Price</a><a href="#faq">Questions</a></nav>${link(c, "Book a call", "btn btn-primary")}</div></header>
+<nav class="navlinks" aria-label="Page sections"><a href="#how">How it works</a><a href="#demo">Example</a><a href="#sample">Sample report</a><a href="#price">Price</a><a href="#faq">Questions</a></nav>${link(c, "Send a request", "btn btn-primary")}</div></header>
 <main>
 <section class="hero2"><div class="wrap grid"><div>
 <p class="eyebrow">${esc(d.kicker)}</p>
@@ -420,19 +453,20 @@ ${demoShell(key)}<div style="margin-top:28px">${chart(key, d)}</div></div></sect
 <div class="cta-row">${dlBtn("btn btn-dl", "Download the sample")}${link(c, c.cta, "btn btn-ghost")}</div></div></div></div></section>
 <section class="s alt" id="price"><div class="wrap"><div class="s-head"><h2>Simple pricing</h2></div>
 <div class="price"><div class="pc feat"><span class="badge">Start here</span><p class="eyebrow">One-off</p><p class="amt">${esc(c.one[0])}</p><p class="unit">${esc(c.one[1])}</p><div class="cta-row">${link(c, c.cta)}</div></div>
-<div class="pc"><p class="eyebrow">Monthly</p><p class="amt">${esc(c.mon[0])}</p><p class="unit">${esc(c.mon[1])}</p><div class="cta-row">${link(c, "Talk about monthly", "btn btn-ghost")}</div></div></div>
+<div class="pc"><p class="eyebrow">Monthly</p><p class="amt">${esc(c.mon[0])}</p><p class="unit">${esc(c.mon[1])}</p><div class="cta-row">${link(c, "Ask about monthly", "btn btn-ghost")}</div></div></div>
 <div class="honest"><h3>What it does not do</h3><ul>${c.not_do.map((n) => `<li>${esc(n)}</li>`).join("")}</ul></div>
 </div></section>
 <section class="s"><div class="wrap"><div class="founder"><div class="av" aria-hidden="true">TF</div><div><h3>Who is behind ${esc(c.name)}</h3><p class="role">Tristan Fischer, Director, Fractional Forge Limited</p>
 <p class="bio">${esc(BIO)}</p>
 <div class="facts"><span>Chief executive or director of 14 companies</span><span>3 industrial sites built</span><span>About £200m raised</span><span>Citigroup project finance</span></div>
 <p style="margin-top:18px"><a href="https://www.linkedin.com/in/tristanfischer/" target="_blank" rel="noopener">Tristan on LinkedIn</a></p></div></div></div></section>
+${form(key, c)}
 <section class="s alt" id="faq"><div class="wrap"><div class="s-head"><h2>Questions</h2></div>${faqs}</div></section>
-<section class="cta-photo"><img class="bg" src="/lumicity/img/${x.img}-cta.jpg" alt="" loading="lazy"><div class="wrap"><h2>${esc(c.cta)}</h2><p>${esc(x.ctaLine)} Book a 30 minute call, or email <a class="mail" href="mailto:${MAIL}?subject=${encodeURIComponent(c.mail)}">${MAIL}</a>.</p>
+<section class="cta-photo"><img class="bg" src="/lumicity/img/${x.img}-cta.jpg" alt="" loading="lazy"><div class="wrap"><h2>${esc(c.cta)}</h2><p>${esc(x.ctaLine)} Everything is done by email: no calls or meetings needed.</p>
 <div class="cta-row">${link(c, c.cta)}${dlBtn("btn btn-ghost", "Download the sample")}</div></div></section>
 </main>
 <footer><div class="wrap"><p>${esc(c.name)}, a Fractional Forge service. Also from Fractional Forge: ${others}</p>
 <p>Fractional Forge Limited · Tristan Fischer · ${mailto(c)}</p></div></footer>
-<div class="mbar"><span>${esc(c.one[0])} ${esc(c.one[1])}<br>Usually within a day</span>${link(c, "Book a call")}</div>
+<div class="mbar"><span>${esc(c.one[0])} ${esc(c.one[1])}<br>Usually within a day</span>${link(c, "Send a request")}</div>
 </div>`;
 }
