@@ -9,7 +9,7 @@ export const MAIL = "tristan.fischer@fractionalforge.app";
 export const KEYS: LumicityKey[] = ["condition-desk", "habitat-draft", "bid-check"];
 type C = (typeof copy)["condition-desk"];
 
-const esc = (s: string) =>
+export const esc = (s: string) =>
   s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
 export const CSS = `
@@ -336,12 +336,12 @@ export const CSS3 = `
 @media(min-width:760px){.enq{grid-template-columns:.9fr 1.1fr;padding:48px;gap:56px}}
 `;
 
-const MARK: Record<LumicityKey, string> = {
+export const MARK: Record<LumicityKey, string> = {
   "condition-desk": `<svg viewBox="0 0 24 24" width="19" height="19" aria-hidden="true"><path d="M6 3h9l3 3v15H6z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M9 13l2 2 4-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
   "habitat-draft": `<svg viewBox="0 0 24 24" width="19" height="19" aria-hidden="true"><path d="M5 19c0-8 5-13 14-14 0 9-5 14-13 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M5 19l8-8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>`,
   "bid-check": `<svg viewBox="0 0 24 24" width="19" height="19" aria-hidden="true"><path d="M4 6l2 2 3-3M4 13l2 2 3-3M4 20l2 2 3-3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M13 7h7M13 14h7M13 21h7" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>`,
 };
-const TICK = `<svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path d="M2.5 8.5l3.5 3.5 7.5-8" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+export const TICK = `<svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path d="M2.5 8.5l3.5 3.5 7.5-8" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 const DL = `<svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><path d="M10 3v10m0 0l-4-4m4 4l4-4M4 16h12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 
 type Extra = { img: string; problemTitle: string; stats: [string, string][]; sample: { pages: number; label: string; points: string[] }; ctaLine: string };

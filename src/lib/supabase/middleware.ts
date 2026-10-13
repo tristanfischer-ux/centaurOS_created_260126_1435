@@ -26,6 +26,7 @@ const PUBLIC_ROUTES = [
     '/forgot-password',  // Password reset request
     '/update-password',  // Set new password (after reset link)
     '/pricing',  // Public pricing page
+    '/design-dossier',  // Design Dossier page (the former homepage)
     '/condition-desk',  // Lumicity product page (noindex until approved)
     '/habitat-draft',  // Lumicity product page (noindex until approved)
     '/bid-check',  // Lumicity product page (noindex until approved)
