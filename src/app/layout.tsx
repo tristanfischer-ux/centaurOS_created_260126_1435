@@ -1,3 +1,4 @@
+import { SITE_GRAPH } from "@/lib/seo";
 import type { Metadata, Viewport } from "next";
 import { Outfit, Playfair_Display, Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
@@ -42,10 +43,10 @@ export const viewport: Viewport = {
 
 export const metadata: Metadata = {
   title: {
-    default: "Fractional Forge — the front end for hardware",
+    default: "Fractional Forge | Planning, ecology, tender and engineering reports",
     template: "%s | Fractional Forge",
   },
-  description: "The front end for hardware. Anvil turns your project brief into a costed, buildable engineering design in a few business days; senior engineers from our curated partner network review it; the same network can build it. And we help you raise the capital too (introducer/success-fee). Your first Design Dossier is free.",
+  description: "Fixed-price specialist reports: planning conditions registers, ecology desk studies, public tender checks and costed engineering designs for hardware founders. Ordered by email or web form, with no sales calls.",
   metadataBase: new URL("https://fractionalforge.app"),
   manifest: "/manifest.json",
   icons: {
@@ -65,14 +66,14 @@ export const metadata: Metadata = {
     type: "website",
     locale: "en_GB",
     siteName: "Fractional Forge",
-    title: "Fractional Forge — the front end for hardware",
-    description: "The front end for hardware. Anvil turns your project brief into a costed, buildable engineering design in a few business days; senior engineers from our curated partner network review it; the same network can build it. And we help you raise the capital too (introducer/success-fee). Your first Design Dossier is free.",
+    title: "Fractional Forge | Planning, ecology, tender and engineering reports",
+    description: "Fixed-price specialist reports: planning conditions registers, ecology desk studies, public tender checks and costed engineering designs for hardware founders. Ordered by email or web form, with no sales calls.",
     url: "https://fractionalforge.app",
   },
   twitter: {
     card: "summary_large_image",
-    title: "Fractional Forge — the front end for hardware",
-    description: "The front end for hardware. Anvil turns your project brief into a costed, buildable engineering design in a few business days; senior engineers from our curated partner network review it; the same network can build it. And we help you raise the capital too (introducer/success-fee). Your first Design Dossier is free.",
+    title: "Fractional Forge | Planning, ecology, tender and engineering reports",
+    description: "Fixed-price specialist reports: planning conditions registers, ecology desk studies, public tender checks and costed engineering designs for hardware founders. Ordered by email or web form, with no sales calls.",
   },
   robots: {
     index: true,
@@ -82,62 +83,7 @@ export const metadata: Metadata = {
 
 // Sitewide structured data (GEO/AEO): make "Fractional Forge" and
 // "Tristan Fischer" resolvable entities for search + AI answer-engines.
-const JSON_LD = {
-  "@context": "https://schema.org",
-  "@graph": [
-    {
-      "@type": "Organization",
-      "@id": "https://fractionalforge.app/#organization",
-      name: "Fractional Forge",
-      legalName: "Fractional Forge Ltd",
-      url: "https://fractionalforge.app",
-      logo: "https://fractionalforge.app/icons/icon-192x192.png",
-      description:
-        "The front end for hardware. Anvil turns a hardware founder's project brief into a costed, buildable engineering design; senior engineers from a curated network of design and engineering partner firms review it; the same partner network builds it. Capital-raising support on an introducer/success-fee basis. Every Design Dossier is reviewed by senior engineers from the partner network.",
-      slogan: "The front end for hardware",
-      areaServed: ["United Kingdom", "Europe"],
-      founder: { "@id": "https://fractionalforge.app/#tristan-fischer" },
-    },
-    {
-      "@type": "Person",
-      "@id": "https://fractionalforge.app/#tristan-fischer",
-      name: "Tristan Fischer",
-      jobTitle: "Founder",
-      url: "https://fractionalforge.app/about",
-      worksFor: { "@id": "https://fractionalforge.app/#organization" },
-      description:
-        "Founder of Fractional Forge. 25+ years founding, financing and scaling capital-intensive technology businesses across solar, wind, tidal, batteries, vertical farming and carbon capture. Project finance at Citigroup, corporate venture capital at Shell Technology Ventures, an AIM IPO, around £200m raised, and a decade building Fischer Farms.",
-      sameAs: [
-        "https://www.linkedin.com/in/tristanfischer/",
-        "https://www.historyfuturenow.com/",
-      ],
-    },
-    {
-      "@type": "WebSite",
-      "@id": "https://fractionalforge.app/#website",
-      url: "https://fractionalforge.app",
-      name: "Fractional Forge",
-      publisher: { "@id": "https://fractionalforge.app/#organization" },
-    },
-    {
-      "@type": "Service",
-      "@id": "https://fractionalforge.app/#design-dossier",
-      name: "Design Dossier",
-      serviceType: "Engineering design and costing study",
-      description:
-        "A costed, physics-checked engineering design for a hardware product: a buildable design, a costed bill-of-materials ledger, engineering drawings, a financial model and a risk register — delivered as an auditable Excel workbook within a few business days, reviewed by senior engineers from Fractional Forge's partner network. The first Dossier is free.",
-      provider: { "@id": "https://fractionalforge.app/#organization" },
-      areaServed: ["United Kingdom", "Europe"],
-      offers: {
-        "@type": "Offer",
-        price: 0,
-        priceCurrency: "GBP",
-        description: "The first Design Dossier is free.",
-        url: "https://fractionalforge.app/brief",
-      },
-    },
-  ],
-};
+const JSON_LD = SITE_GRAPH;
 
 export default function RootLayout({
   children,
@@ -145,7 +91,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en-GB" suppressHydrationWarning>
       <head>
         <script
           type="application/ld+json"

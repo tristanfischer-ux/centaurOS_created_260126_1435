@@ -38,14 +38,14 @@ const SERVICES: Svc[] = [
     price: "First Dossier free", time: "A few days", example: ["6", "parts: buildable design, costed bill of materials, true cost and financial model, drawings, worked calculations, risk and regulatory register"] },
 ];
 
-const FAQS: [string, string][] = [
+export const FAQS: [string, string][] = [
   ["Do I need to talk to anyone?", "No. There are no sales calls. Each service page has an enquiry form, or you can email the documents."],
   ["Who checks the work?", "A senior engineer reviews each Design Dossier before you see it. For Habitat Draft, your own ecologist checks and signs everything. Condition Desk sets out each condition from the decision notice and Bid Check quotes the tender for every item, so your team can check each point against the original."],
   ["What do the reports use?", "Public documents and public data: the decision notice, the tender pack, national habitat and protected-site data, and the Environment Agency laser survey. Design Dossiers also use open engineering libraries and real component prices."],
   ["Can I see the work first?", "Yes. Every service page has a full sample report to download, built on a real, current case."],
 ];
 
-const CSS_HOME = `
+export const CSS_HOME = `
 .home{--acc:#d9461a;--acc-d:#b23a12;--acc-s:#fff1ea;--acc-m:#f5b79c}
 .home .logo .mk{background:var(--ink)}
 .home .navlinks{gap:28px}
@@ -118,16 +118,33 @@ function card(s: Svc): string {
 <div class="ft"><p class="pr">${esc(s.price)}<small>${esc(s.time)}</small>${s.mo ? `<small class="mo">${esc(s.mo)}</small>` : ""}</p><span class="go">${s.key === "design-dossier" ? "Sample package and brief form" : "Sample report and form"} ${ARROW}</span></div></div></a>`;
 }
 
+const SVC_LINKS = () => SERVICES.map((s) => `<a href="${s.href}">${esc(s.name)}</a>`).join("");
+
+export function siteHeader(): string {
+  const svcLinks = SVC_LINKS();
+  return `<header class="nav"><div class="wrap nav-inner"><a class="logo" href="/"><span class="mk">${FF_MARK}</span><span><b>Fractional Forge</b><small>Fixed-price specialist reports</small></span></a>
+<nav class="navlinks" aria-label="Main">${svcLinks}<a href="/insights">Insights</a></nav>
+<a class="btn btn-primary" href="#services">Choose a service</a>
+<details class="mnav"><summary>Menu</summary><div class="mpanel">${svcLinks}<a href="/insights">Insights</a><a href="/about">About</a><a href="mailto:${MAIL}">Email Tristan</a></div></details></div></header>`;
+}
+
+export function siteFooter(): string {
+  const svcLinks = SVC_LINKS();
+  return `<footer class="hfoot"><div class="wrap"><div class="cols">
+<div><a class="logo" href="/"><span class="mk">${FF_MARK}</span><span><b>Fractional Forge</b><small>Fixed-price specialist reports</small></span></a></div>
+<div><h4>Services</h4>${svcLinks}</div>
+<div><h4>Company</h4><a href="/about">About</a><a href="/insights">Insights</a><a href="mailto:${MAIL}">Contact</a></div>
+<div><h4>More</h4><a href="/sample-package">Example Design Dossier</a><a href="/quote">For teams who quote</a><a href="/privacy">Privacy</a><a href="/terms">Terms</a></div>
+</div><p class="line">© ${new Date().getFullYear()} Fractional Forge Limited · ${MAIL}</p></div></footer>`;
+}
+
 export function buildHomeHtml(): string {
   const jump = SERVICES.map((s) => `<a href="${s.href}"><i style="background:${s.acc}"></i>${esc(s.name)}</a>`).join("");
   const faqs = FAQS.map(([q, a], i) => `<details class="faq" open><summary>${esc(q)}</summary><p>${esc(a)}</p></details>`).join("");
-  const svcLinks = SERVICES.map((s) => `<a href="${s.href}">${esc(s.name)}</a>`).join("");
+  const svcLinks = SVC_LINKS();
   return `<style>${CSS}${CSS2}${CSS3}${CSS_HOME}</style>
 <div class="pg home">
-<header class="nav"><div class="wrap nav-inner"><a class="logo" href="/"><span class="mk">${FF_MARK}</span><span><b>Fractional Forge</b><small>Fixed-price specialist reports</small></span></a>
-<nav class="navlinks" aria-label="Main">${svcLinks}<a href="/insights">Insights</a></nav>
-<a class="btn btn-primary" href="#services">Choose a service</a>
-<details class="mnav"><summary>Menu</summary><div class="mpanel">${svcLinks}<a href="/insights">Insights</a><a href="/about">About</a><a href="mailto:${MAIL}">Email Tristan</a></div></details></div></header>
+${siteHeader()}
 
 <section class="hh"><div class="wrap grid"><div>
 <p class="eyebrow">Planning · Ecology · Tenders · Hardware</p>
@@ -171,11 +188,6 @@ export function buildHomeHtml(): string {
 <p>Every service page has a sample report and an enquiry form. Not sure which one? Email <a class="mail" href="mailto:${MAIL}">${MAIL}</a>.</p>
 <div class="svc-row">${svcLinks}</div></div></section>
 
-<footer class="hfoot"><div class="wrap"><div class="cols">
-<div><a class="logo" href="/"><span class="mk">${FF_MARK}</span><span><b>Fractional Forge</b><small>Fixed-price specialist reports</small></span></a></div>
-<div><h4>Services</h4>${svcLinks}</div>
-<div><h4>Company</h4><a href="/about">About</a><a href="/insights">Insights</a><a href="mailto:${MAIL}">Contact</a></div>
-<div><h4>More</h4><a href="/sample-package">Example Design Dossier</a><a href="/quote">For teams who quote</a><a href="/privacy">Privacy</a><a href="/terms">Terms</a></div>
-</div><p class="line">© ${new Date().getFullYear()} Fractional Forge Limited · ${MAIL}</p></div></footer>
+${siteFooter()}
 </div>`;
 }

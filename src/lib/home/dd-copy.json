@@ -1,0 +1,168 @@
+{
+ "title": "Design Dossier: a costed, buildable hardware design",
+ "meta": "Send a paragraph. Get a buildable design, costed bill of materials, financial model, drawings, calculations and risk register in a few days.",
+ "hero": {
+  "eyebrow": "For hardware and deep-tech founders",
+  "headline": "A costed, buildable design from one paragraph.",
+  "subhead": "Send a paragraph. In a few days, get six parts in one live Excel workbook. Every number is traceable, and a senior engineer reviews the work before you see it. Your first Design Dossier is free.",
+  "cta": "Send a brief",
+  "secondary": "See the water-treatment example",
+  "card": {
+   "title": "Your Design Dossier",
+   "rows": [
+    [
+     "A few days",
+     "Delivery"
+    ],
+    [
+     "Six parts",
+     "Design to risk register"
+    ],
+    [
+     "Live Excel",
+     "Traceable formulas"
+    ],
+    [
+     "Free",
+     "First Dossier"
+    ]
+   ]
+  }
+ },
+ "stats": [
+  [
+   "~10 MW",
+   "floating AI data centre designed with Anvil"
+  ],
+  [
+   "6",
+   "parts in one live Excel workbook"
+  ],
+  [
+   "1",
+   "paragraph is all you need to send"
+  ],
+  [
+   "£0",
+   "for your first Design Dossier"
+  ]
+ ],
+ "problem": {
+  "title": "Know what you are building before you fund it.",
+  "points": [
+   "A promising concept is not yet a buildable design.",
+   "A cost needs a bill of materials, assumptions and calculations behind it.",
+   "Founders and investors need to inspect the model, not accept a black-box answer."
+  ],
+  "close": "The Design Dossier puts the design, costs, drawings, calculations and risk and regulatory register in one live workbook."
+ },
+ "steps": [
+  {
+   "title": "1. Send a short brief",
+   "text": "Use the brief form to describe what you want to build. A paragraph is enough. More detail gives a tighter result. No calls are needed."
+  },
+  {
+   "title": "2. Anvil builds it from first principles",
+   "text": "Fractional Forge’s design engine starts with engineering inputs and calculations. It uses open, peer-reviewed engineering libraries and real component pricing. You can fix the budget, footprint or output."
+  },
+  {
+   "title": "3. A senior engineer reviews it",
+   "text": "The work is reviewed before you see it. You receive a rigorous first pass in a live Excel workbook, with its assumptions, methods and sources exposed."
+  }
+ ],
+ "get": [
+  {
+   "title": "A buildable design",
+   "text": "A system design built around your brief, constraints and required output."
+  },
+  {
+   "title": "A costed bill of materials",
+   "text": "The components and quantities behind the design, using real component pricing."
+  },
+  {
+   "title": "True cost and a financial model",
+   "text": "The costs behind the design, with assumptions and formulas shown. Change an input and the workbook recalculates."
+  },
+  {
+   "title": "Engineering drawings",
+   "text": "Engineering drawings for the proposed design."
+  },
+  {
+   "title": "Worked calculations",
+   "text": "The engineering calculations with inputs, formulas, methods and sources shown."
+  },
+  {
+   "title": "A risk and regulatory register",
+   "text": "The risks, assumptions and regulatory matters to check as the project develops."
+  }
+ ],
+ "examples_intro": "Two worked examples show the range. The same engine has also been applied to grid-scale battery storage, vertical farms, CO₂ capture and power-to-liquid aviation fuel.",
+ "examples": [
+  {
+   "key": "barge",
+   "title": "A floating AI data centre",
+   "text": "A floating AI data centre of about 10 MW, gas-powered and designed with Anvil on a barge. Photoreal renders were produced from the 3D model.",
+   "caption": "Renders from the 3D model show the barge at sea and the deck."
+  },
+  {
+   "key": "water",
+   "title": "A water-treatment plant",
+   "text": "Read the worked cost breakdown or open the example package.",
+   "caption": "A plant render and general-arrangement drawing are available."
+  }
+ ],
+ "trust": {
+  "title": "First principles. Sources shown.",
+  "intro": "Anvil uses open, peer-reviewed engineering libraries and real component pricing. Every number in the workbook traces back to its inputs, method and source.",
+  "points": [
+   "Examples include PyBaMM for batteries, CoolProp for fluid properties, PandaPower for power networks and IAPWS-IF97 for steam and water.",
+   "A senior engineer reviews your Design Dossier before you see it.",
+   "You or an investor can change an assumption and see the result recalculate throughout the workbook.",
+   "It is a rigorous first pass, not a guarantee. Its assumptions remain visible so they can be checked.",
+   "Fractional Forge is run by Tristan Fischer. He worked in project finance at Citigroup and at Shell Technology Ventures, and took a company public on AIM."
+  ]
+ },
+ "steer": {
+  "title": "Fix what cannot move.",
+  "text": "Set the budget, footprint or required output and Anvil designs around it. Change your mind and it re-solves the design."
+ },
+ "price": {
+  "one": "Free",
+  "one_unit": "Your first Design Dossier",
+  "after": "Work scoped to your project",
+  "after_unit": "Advisory and fundraising introductions are on a success-fee basis: no raise, no fee."
+ },
+ "not_do": [
+  "Not a black box. Every number traces to an input, method and source.",
+  "Not a guarantee. It is a rigorous first pass, reviewed by a senior engineer and made to be checked.",
+  "Not locked to the first answer. Change an assumption and the live workbook recalculates.",
+  "No calls required. A paragraph through the brief form is enough to begin."
+ ],
+ "faqs": [
+  {
+   "q": "What do I need to send?",
+   "a": "A short description through the brief form. One paragraph is enough. Include the output, budget, footprint or other fixed constraints if you know them. More detail produces a tighter result."
+  },
+  {
+   "q": "How long does it take?",
+   "a": "You receive the Design Dossier in a few days. A senior engineer reviews it before you see it."
+  },
+  {
+   "q": "What kinds of hardware are strongest?",
+   "a": "The strongest focus lines are battery energy storage, water treatment, electric motor sets and medical assay machines. You can also brief other hardware."
+  },
+  {
+   "q": "What does it cost?",
+   "a": "Your first Design Dossier is free. Further work is scoped to your project. Advisory and fundraising introductions are available on a success-fee basis: no raise, no fee."
+  },
+  {
+   "q": "How reliable is the result?",
+   "a": "It is a rigorous first pass, not a guarantee. Anvil works from first principles, uses open engineering libraries and real component pricing, and shows its assumptions so the work can be checked."
+  },
+  {
+   "q": "How does Design Dossier fit within Fractional Forge?",
+   "a": "It is one of four Fractional Forge services run by Tristan Fischer. The others are Condition Desk, Habitat Draft and Bid Check."
+  }
+ ],
+ "cta_line": "Send one paragraph. Get a design you can inspect and change. Your first Design Dossier is free."
+}

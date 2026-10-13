@@ -20,7 +20,11 @@ export const dynamic = 'force-dynamic'
 
 /** route → [lastmod, changeFrequency, priority] */
 const STATIC_PAGES: Record<string, [string, 'weekly' | 'monthly' | 'yearly', number]> = {
-    '': ['2026-08-15', 'weekly', 1.0],
+    '': ['2026-10-13', 'weekly', 1.0],
+    '/condition-desk': ['2026-10-13', 'monthly', 0.95],
+    '/habitat-draft': ['2026-10-13', 'monthly', 0.95],
+    '/bid-check': ['2026-10-13', 'monthly', 0.95],
+    '/design-dossier': ['2026-10-13', 'monthly', 0.95],
     '/pricing': ['2026-08-14', 'monthly', 0.9],
     '/about': ['2026-08-14', 'monthly', 0.7],
     '/contact': ['2026-04-25', 'monthly', 0.7],
