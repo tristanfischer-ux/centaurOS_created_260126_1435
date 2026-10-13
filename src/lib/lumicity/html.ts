@@ -465,7 +465,7 @@ ${form(key, c)}
 <section class="cta-photo"><img class="bg" src="/lumicity/img/${x.img}-cta.jpg" alt="" loading="lazy"><div class="wrap"><h2>${esc(c.cta)}</h2><p>${esc(x.ctaLine)} Everything is done by email: no calls or meetings needed.</p>
 <div class="cta-row">${link(c, c.cta)}${dlBtn("btn btn-ghost", "Download the sample")}</div></div></section>
 </main>
-<footer><div class="wrap"><p>${esc(c.name)}, a Fractional Forge service. Also from Fractional Forge: ${others}</p>
+<footer><div class="wrap"><p>${esc(c.name)}, a <a href="/">Fractional Forge</a> service. Also from Fractional Forge: ${others} · <a href="/design-dossier">Design Dossier</a></p>
 <p>Fractional Forge Limited · Tristan Fischer · ${mailto(c)}</p></div></footer>
 <div class="mbar"><span>${esc(c.one[0])} ${esc(c.one[1])}<br>Usually within a day</span>${link(c, "Send a request")}</div>
 </div>`;
