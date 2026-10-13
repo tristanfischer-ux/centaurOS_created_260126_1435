@@ -10,7 +10,7 @@ const SECTOR_CARDS = FOCUS_ONLY.map(
 ).join("\n");
 
 export const metadata: Metadata = {
-  title: "Design Dossier — a costed engineering design for hardware founders · Fractional Forge",
+  title: "Design Dossier — a costed engineering design for hardware founders",
   description:
     "A costed, buildable engineering design in a few days — free, and reviewed by senior engineers from our partner network, who can then build it. From there we help you raise the capital too. Anvil designs and costs it; fractional experts review it; contract manufacturers build it.",
   alternates: {
