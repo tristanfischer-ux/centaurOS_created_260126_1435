@@ -39,11 +39,11 @@ export function MarketingFooter() {
                             </span>
                         </Link>
                         <p className="max-w-sm text-sm leading-relaxed text-muted-foreground">
-                            The front end for hardware. Anvil turns your brief
-                            into a costed, buildable design; senior engineers
-                            from our curated partner network review it; the same
-                            network can build it. And we help you raise the
-                            capital too. Your first Design Dossier is free.
+                            Anvil turns your brief into a costed, buildable
+                            Design Dossier in a few days, using open engineering
+                            libraries and real component prices. Your own
+                            engineers should check it. Advisory and fundraising
+                            introductions are available on a success-fee basis.
                         </p>
                     </div>
 

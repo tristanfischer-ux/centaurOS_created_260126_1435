@@ -248,8 +248,8 @@ export default function InsightsPage() {
               Building something physical?
             </h2>
             <p className="text-muted-foreground max-w-lg mx-auto">
-              Start with a free Design Dossier — an auditable, engineer-checked
-              model of what it takes to build your idea.
+              Start with a Design Dossier: a costed, buildable design in a live
+              workbook, showing what it takes to build your idea. £2,500.
             </p>
             <Link
               href="/brief"

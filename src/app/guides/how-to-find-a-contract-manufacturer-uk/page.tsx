@@ -338,7 +338,7 @@ export default function FindContractManufacturerGuide() {
             </h2>
             <p className="text-muted-foreground max-w-lg mx-auto">
               Describe your product in a short brief and get a Design Dossier — an
-              auditable, engineer-checked model with the bill of materials,
+              auditable, fully traceable model with the bill of materials,
               quantities and costs a manufacturer needs to quote. Your first one is
               free.
             </p>

@@ -23,7 +23,7 @@ import { WorkbookGate } from "@/components/marketing/workbook-gate"
 export const metadata: Metadata = {
   title: "What does an industrial water-treatment plant cost to build?",
   description:
-    "A worked cost breakdown for an industrial water-handling, purification and fertigation plant — around £1.36M installed. Every number from a real, engineer-checked Design Dossier you can download and check.",
+    "A worked cost breakdown for an industrial water-handling, purification and fertigation plant — around £1.36M installed. Every number comes from a real, Anvil-built Design Dossier you can download and check.",
   alternates: { canonical: "https://fractionalforge.app/cost/water-treatment-plant" },
 }
 
@@ -61,7 +61,7 @@ const FAQ = [
   },
   {
     q: "How accurate are these numbers?",
-    a: "They come from a real Design Dossier built by our engine and reviewed by a senior engineer — an auditable Excel model where every cost traces from the inputs and assumptions, through the calculations and quantities, into a bill-of-materials ledger and a cost waterfall. They are indicative and scoped to this specific plant, not a universal price. You can download the workbook and check every figure yourself.",
+    a: "They come from a real Design Dossier built by Anvil — a live Excel workbook where every number is a traceable formula, from the inputs and assumptions through the calculations and quantities to the costed bill of materials and financial model. It has not been reviewed by Fractional Forge or an external engineer, so your own engineers should check it. The figures are indicative and specific to this plant, not a universal price. You can download the workbook and check every figure yourself.",
   },
   {
     q: "Can I see the full model?",
@@ -77,7 +77,7 @@ export default function WaterTreatmentCostPage() {
         "@type": "Article",
         headline: "What does an industrial water-treatment plant cost to build?",
         description:
-          "A worked cost breakdown for an industrial water-handling, purification and fertigation plant — around £1.36M installed — from a real, engineer-checked Design Dossier.",
+          "A worked cost breakdown for an industrial water-handling, purification and fertigation plant — around £1.36M installed — from a real Design Dossier built by Anvil.",
         author: { "@id": "https://fractionalforge.app/#tristan-fischer" },
         publisher: { "@id": "https://fractionalforge.app/#organization" },
         mainEntityOfPage: "https://fractionalforge.app/cost/water-treatment-plant",
@@ -113,7 +113,7 @@ export default function WaterTreatmentCostPage() {
               What does an industrial water-treatment plant cost to build?
             </h1>
             <p className="text-lg text-muted-foreground max-w-2xl leading-relaxed">
-              A worked breakdown from a real, engineer-checked Design Dossier — an
+              A worked breakdown from a real Design Dossier built by Anvil — an
               industrial water-handling, purification and fertigation plant
               supplying a large indoor cultivation facility.
             </p>
@@ -199,14 +199,15 @@ export default function WaterTreatmentCostPage() {
               How the number is built — and how to check it
             </h2>
             <p className="text-muted-foreground max-w-2xl leading-relaxed">
-              This isn&apos;t a rule-of-thumb. Every figure traces through an
-              auditable model:
+              This isn&apos;t a rule-of-thumb. Anvil builds each Design Dossier from
+              open engineering libraries and real component prices. Every figure
+              traces through a live Excel model:
             </p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-2xl">
               {[
                 "Inputs & assumptions (flow, water quality, hours, energy price)",
                 "First-principles calculations and quantities",
-                "A bill-of-materials ledger with real part numbers",
+                "A costed bill of materials using real component prices",
                 "A cost waterfall and a live financial model",
               ].map((item) => (
                 <div key={item} className="flex items-start gap-3">
@@ -216,9 +217,9 @@ export default function WaterTreatmentCostPage() {
               ))}
             </div>
             <p className="text-muted-foreground max-w-2xl leading-relaxed">
-              A senior engineer reviews the whole workbook before it&apos;s used.
-              Download the sanitised example and change an assumption to watch the
-              costs recompute.
+              Fractional Forge does not review the workbook. Your own engineers
+              should check it. Download the sanitised example and change an
+              assumption to watch the costs recompute.
             </p>
             <WorkbookGate source="cost-water-treatment" />
           </section>
@@ -270,9 +271,11 @@ export default function WaterTreatmentCostPage() {
               Costing something you want to build?
             </h2>
             <p className="text-muted-foreground max-w-lg mx-auto">
-              Describe your idea in a short brief and get your own Design Dossier —
-              an auditable, engineer-checked model of what it takes to build it.
-              Your first one is free.
+              Describe your idea in a short brief. Anvil delivers a buildable Design
+              Dossier in a few days, including engineering drawings, worked
+              calculations, a costed bill of materials, a financial model and a
+              risk and regulatory register. It costs £2,500 per Dossier, or £6,000
+              a month for up to three.
             </p>
             <Link
               href="/brief"

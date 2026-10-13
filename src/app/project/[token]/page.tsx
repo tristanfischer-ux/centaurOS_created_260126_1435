@@ -182,7 +182,7 @@ export default async function ProjectStatusPage({
               <h2 className="text-xl font-bold">Your Design Dossier is ready.</h2>
               <p className="text-sm text-muted-foreground">
                 An auditable Excel workbook — open it and change an assumption to watch every number
-                recompute. Reviewed by a senior engineer from our partner network.
+                recompute.
               </p>
               {dossierDownloadUrl ? (
                 <a
@@ -209,14 +209,9 @@ export default async function ProjectStatusPage({
           )}
 
           <p className="text-sm text-muted-foreground">
-            Questions, or want to talk it through?{' '}
-            <a
-              className="font-semibold text-international-orange"
-              href="https://calendly.com/tristan-fischer-wjlf/30min"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Book a 30-minute call with Tristan
+            Questions? Email{' '}
+            <a className="font-semibold text-international-orange" href="mailto:tristan.fischer@fractionalforge.app">
+              tristan.fischer@fractionalforge.app
             </a>{' '}
             or reply to your confirmation email.
           </p>

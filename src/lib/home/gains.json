@@ -1,0 +1,102 @@
+{
+ "condition-desk": {
+  "lead": "Start on site sooner",
+  "gains": [
+   [
+    "save time",
+    "Hours of reading done for you",
+    "Every condition in the decision notice turned into a plain-English register, usually within a day, instead of your team working through it one condition at a time."
+   ],
+   [
+    "make money",
+    "Start on site sooner",
+    "The conditions that block a start are picked out first, so the right specialists are briefed early and the build is not held up waiting for approvals."
+   ],
+   [
+    "reduce risk",
+    "Fewer surprises late on",
+    "Each condition is listed with when it is due and the documents it needs, so nothing is left to be found at the last minute."
+   ],
+   [
+    "known cost",
+    "A fixed £400 per permission",
+    "Your planner checks a finished register instead of building one from scratch, at a price you know before you start."
+   ]
+  ]
+ },
+ "habitat-draft": {
+  "lead": "Spend survey season on site, not at a desk",
+  "gains": [
+   [
+    "save time",
+    "Desk work done before you arrive",
+    "The maps and records are gathered for you, usually within a day, so your ecologists spend their hours on site and on judgement."
+   ],
+   [
+    "make money",
+    "Take on more sites",
+    "With desk studies off your team's plate, the same team can quote for and survey more sites in the busy season."
+   ],
+   [
+    "reduce risk",
+    "Walk in knowing what to check",
+    "Protected sites, priority habitats and the parcels to check are flagged before the visit, so the walkover is planned, not improvised."
+   ],
+   [
+    "known cost",
+    "A fixed £150 per site",
+    "You know the desk-study cost before you quote the job."
+   ]
+  ]
+ },
+ "bid-check": {
+  "lead": "Don't lose a bid on a technicality",
+  "gains": [
+   [
+    "save time",
+    "No need to read the whole pack first",
+    "Every pass-or-fail item, document, scoring rule and key date pulled out of the tender, usually within a day."
+   ],
+   [
+    "reduce risk",
+    "Don't get knocked out on a technicality",
+    "Every pass-or-fail condition is listed and quoted from the tender, so a missing certificate or form does not cost you the bid."
+   ],
+   [
+    "make money",
+    "Bid for more, and choose better",
+    "Seeing the whole tender at a glance in a day helps you decide early whether to bid, and put writing time where the marks are."
+   ],
+   [
+    "known cost",
+    "A fixed £600 per tender",
+    "The price is known before you commit time to the bid."
+   ]
+  ]
+ },
+ "design-dossier": {
+  "lead": "A costed design investors can check",
+  "gains": [
+   [
+    "raise money",
+    "Answer investors' first questions",
+    "A costed design, bill of materials and financial model that investors can open, check and change for themselves."
+   ],
+   [
+    "save time",
+    "A first costed design in days",
+    "Six parts in one live workbook in a few days, so you can test the idea before committing to a long design programme."
+   ],
+   [
+    "save money",
+    "Know the cost before you build",
+    "The true cost and the bill of materials before you spend on prototypes or lock in a design."
+   ],
+   [
+    "reduce risk",
+    "See the risks while they are cheap to fix",
+    "Worked calculations and a risk and regulatory register bring problems to the surface early, when changing the design costs least."
+   ]
+  ]
+ }
+}

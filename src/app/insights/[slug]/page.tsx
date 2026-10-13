@@ -125,7 +125,7 @@ export default async function ArticlePage({
             </h2>
             <p className="text-muted-foreground max-w-md mx-auto text-sm">
               Fractional Forge is the front end for hardware. Start with a free,
-              engineer-checked Design Dossier of what it takes to build your idea.
+              fully traceable Design Dossier of what it takes to build your idea.
             </p>
             <Link
               href="/brief"

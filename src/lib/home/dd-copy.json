@@ -4,7 +4,7 @@
  "hero": {
   "eyebrow": "For hardware and deep-tech founders",
   "headline": "A costed, buildable design from one paragraph.",
-  "subhead": "Send a paragraph. In a few days, get six parts in one live Excel workbook. Every number is traceable, and a senior engineer reviews the work before you see it. Your first Design Dossier is free.",
+  "subhead": "Send a paragraph. In a few days, get six parts in one live Excel workbook. Every number is a traceable formula, so you, your engineers or an investor can check it and change it.",
   "cta": "Send a brief",
   "secondary": "See the water-treatment example",
   "card": {
@@ -23,8 +23,8 @@
      "Traceable formulas"
     ],
     [
-     "Free",
-     "First Dossier"
+     "£2,500",
+     "Per Dossier"
     ]
    ]
   }
@@ -43,8 +43,8 @@
    "paragraph is all you need to send"
   ],
   [
-   "£0",
-   "for your first Design Dossier"
+   "£2,500",
+   "per Design Dossier, fixed price"
   ]
  ],
  "problem": {
@@ -66,8 +66,8 @@
    "text": "Fractional Forge’s design engine starts with engineering inputs and calculations. It uses open, peer-reviewed engineering libraries and real component pricing. You can fix the budget, footprint or output."
   },
   {
-   "title": "3. A senior engineer reviews it",
-   "text": "The work is reviewed before you see it. You receive a rigorous first pass in a live Excel workbook, with its assumptions, methods and sources exposed."
+   "title": "3. You get a live workbook",
+   "text": "The finished Design Dossier arrives by email as a live Excel workbook, with its assumptions, methods and sources shown so your team can check every number."
   }
  ],
  "get": [
@@ -116,7 +116,6 @@
   "intro": "Anvil uses open, peer-reviewed engineering libraries and real component pricing. Every number in the workbook traces back to its inputs, method and source.",
   "points": [
    "Examples include PyBaMM for batteries, CoolProp for fluid properties, PandaPower for power networks and IAPWS-IF97 for steam and water.",
-   "A senior engineer reviews your Design Dossier before you see it.",
    "You or an investor can change an assumption and see the result recalculate throughout the workbook.",
    "It is a rigorous first pass, not a guarantee. Its assumptions remain visible so they can be checked.",
    "Fractional Forge is run by Tristan Fischer. He worked in project finance at Citigroup and at Shell Technology Ventures, and took a company public on AIM."
@@ -127,14 +126,14 @@
   "text": "Set the budget, footprint or required output and Anvil designs around it. Change your mind and it re-solves the design."
  },
  "price": {
-  "one": "Free",
-  "one_unit": "Your first Design Dossier",
-  "after": "Work scoped to your project",
-  "after_unit": "Advisory and fundraising introductions are on a success-fee basis: no raise, no fee."
+  "one": "£2,500",
+  "one_unit": "per Design Dossier",
+  "after": "£6,000 a month",
+  "after_unit": "for up to three Design Dossiers. Advisory and fundraising introductions are on a success-fee basis: no raise, no fee."
  },
  "not_do": [
   "Not a black box. Every number traces to an input, method and source.",
-  "Not a guarantee. It is a rigorous first pass, reviewed by a senior engineer and made to be checked.",
+  "Not a guarantee, and not a substitute for your own engineers' sign-off. It is a rigorous first pass, made to be checked.",
   "Not locked to the first answer. Change an assumption and the live workbook recalculates.",
   "No calls required. A paragraph through the brief form is enough to begin."
  ],
@@ -145,7 +144,7 @@
   },
   {
    "q": "How long does it take?",
-   "a": "You receive the Design Dossier in a few days. A senior engineer reviews it before you see it."
+   "a": "You receive the Design Dossier by email in a few days."
   },
   {
    "q": "What kinds of hardware are strongest?",
@@ -153,16 +152,16 @@
   },
   {
    "q": "What does it cost?",
-   "a": "Your first Design Dossier is free. Further work is scoped to your project. Advisory and fundraising introductions are available on a success-fee basis: no raise, no fee."
+   "a": "£2,500 per Design Dossier, or £6,000 a month for up to three. Advisory and fundraising introductions are available on a success-fee basis: no raise, no fee."
   },
   {
    "q": "How reliable is the result?",
-   "a": "It is a rigorous first pass, not a guarantee. Anvil works from first principles, uses open engineering libraries and real component pricing, and shows its assumptions so the work can be checked."
+   "a": "It is a rigorous first pass, not a guarantee, and your own engineers should check it before you rely on it. Anvil works from first principles, uses open engineering libraries and real component pricing, and shows every assumption and formula so the work can be checked."
   },
   {
    "q": "How does Design Dossier fit within Fractional Forge?",
    "a": "It is one of four Fractional Forge services run by Tristan Fischer. The others are Condition Desk, Habitat Draft and Bid Check."
   }
  ],
- "cta_line": "Send one paragraph. Get a design you can inspect and change. Your first Design Dossier is free."
+ "cta_line": "Send one paragraph. Get a design you can inspect and change, for a fixed £2,500."
 }

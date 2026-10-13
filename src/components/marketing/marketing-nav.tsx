@@ -21,11 +21,10 @@ import { Button } from '@/components/ui/button'
 import { useState, useEffect } from 'react'
 
 const NAV_LINKS = [
-    { href: '/#how', label: 'How it works' },
-    { href: '/#sectors', label: 'What we do' },
-    { href: '/#examples', label: "What's inside" },
-    { href: '/sample-package', label: 'Example package' },
-    { href: '/#partners', label: 'For partners' },
+    { href: '/condition-desk', label: 'Condition Desk' },
+    { href: '/habitat-draft', label: 'Habitat Draft' },
+    { href: '/bid-check', label: 'Bid Check' },
+    { href: '/design-dossier', label: 'Design Dossier' },
     { href: '/insights', label: 'Insights' },
     { href: '/about', label: 'About' },
 ] as const
@@ -112,7 +111,7 @@ export function MarketingNav({ isAuthed = false }: MarketingNavProps = {}) {
                             size="sm"
                             className="bg-international-orange text-white hover:bg-international-orange-hover"
                         >
-                            {isAuthed ? 'Open app' : 'Get your free Design Dossier'}
+                            {isAuthed ? 'Open app' : 'Send a brief'}
                         </Button>
                     </Link>
                 </div>
@@ -144,7 +143,7 @@ export function MarketingNav({ isAuthed = false }: MarketingNavProps = {}) {
                                 className="mb-3 flex min-h-[48px] items-center justify-center rounded-md bg-international-orange text-center text-sm font-bold text-primary-foreground transition-colors hover:bg-international-orange-hover"
                                 onClick={() => setMobileMenuOpen(false)}
                             >
-                                {isAuthed ? 'Open app' : 'Get your free Design Dossier'}
+                                {isAuthed ? 'Open app' : 'Send a brief'}
                             </Link>
                             {NAV_LINKS.map((link) => (
                                 <Link

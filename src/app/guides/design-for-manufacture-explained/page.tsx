@@ -303,7 +303,7 @@ export default function DesignForManufactureGuide() {
             </h2>
             <p className="text-muted-foreground max-w-lg mx-auto">
               Describe your product in a short brief and get a Design Dossier — an
-              auditable, engineer-checked model with the bill of materials and landed
+              auditable, fully traceable model with the bill of materials and landed
               unit cost, so the design-for-manufacture savings are easy to find. Your
               first one is free.
             </p>

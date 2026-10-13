@@ -1,5 +1,6 @@
 import { CSS, CSS2, CSS3, TICK, esc } from "@/lib/lumicity/html";
 import { CSS_HOME, MAIL, siteFooter, siteHeader } from "@/lib/home/html";
+import { GAINS_CSS, gainsSection } from "@/lib/home/gains";
 import copy from "@/lib/home/dd-copy.json";
 
 // Design Dossier page in the same design as the other service pages.
@@ -42,7 +43,7 @@ export function buildDdHtml(): string {
   const c = copy;
   const card = c.hero.card.rows.map(([v, l]) => `<a href="#get"><b style="font-size:20px;min-width:96px">${esc(v)}</b><span>${esc(l)}</span></a>`).join("");
   const faqs = c.faqs.map((f) => `<details class="faq" open><summary>${esc(f.q)}</summary><p>${esc(f.a)}</p></details>`).join("");
-  return `<style>${CSS}${CSS2}${CSS3}${CSS_HOME}${CSS_DD}</style>
+  return `<style>${CSS}${CSS2}${CSS3}${CSS_HOME}${CSS_DD}${GAINS_CSS}</style>
 <div class="pg home dd">
 ${siteHeader()}
 
@@ -51,13 +52,15 @@ ${siteHeader()}
 <h1>${esc(c.hero.headline)}</h1>
 <p class="sub">${esc(c.hero.subhead)}</p>
 <div class="cta-row"><a class="btn btn-primary" href="/brief">${esc(c.hero.cta)}</a><a class="btn btn-ghost" href="#examples">See worked examples</a></div>
-<div class="meta"><span>${TICK} First Dossier free</span><span>${TICK} No sales calls</span><span>${TICK} Reviewed by a senior engineer</span></div>
+<div class="meta"><span>${TICK} £2,500 fixed price</span><span>${TICK} No sales calls</span><span>${TICK} Every number traceable</span></div>
 </div>
 <div class="pic"><img src="/ff/img/barge-sea.jpg" alt="Render of a floating AI data centre designed with Anvil, at sea" fetchpriority="high">
 <div class="proof"><p>${esc(c.hero.card.title)}</p>${card}</div></div>
 </div></section>
 
 <section class="stats"><div class="wrap"><ul>${c.stats.map(([v, l]) => `<li><b>${esc(v)}</b><span>${esc(l)}</span></li>`).join("")}</ul></div></section>
+
+${gainsSection("design-dossier")}
 
 <section class="s"><div class="wrap ddsplit"><img src="/ff/img/dd-card.jpg" alt="An engineering workshop with a skid-mounted water treatment unit" loading="lazy">
 <div><h2>${esc(c.problem.title)}</h2><ul>${c.problem.points.map((p) => `<li>${TICK}<span>${esc(p)}</span></li>`).join("")}</ul><p class="close">${esc(c.problem.close)}</p></div></div></section>
@@ -75,7 +78,7 @@ ${siteHeader()}
 <section class="s"><div class="wrap"><div class="ddtrust"><h2>${esc(c.trust.title)}</h2><p class="lede" style="margin-top:10px">${esc(c.trust.intro)}</p>
 <ul>${c.trust.points.map((p) => `<li>${TICK}<span>${esc(p)}</span></li>`).join("")}</ul></div></div></section>
 
-<section class="s alt" id="price"><div class="wrap"><div class="s-head"><p class="eyebrow">Price</p><h2>Start free</h2></div>
+<section class="s alt" id="price"><div class="wrap"><div class="s-head"><p class="eyebrow">Price</p><h2>One fixed price</h2></div>
 <div class="price"><div class="pc feat"><p class="amt">${esc(c.price.one)}</p><p class="unit">${esc(c.price.one_unit)}</p><div class="cta-row"><a class="btn btn-primary" href="/brief">Send a brief</a></div></div>
 <div class="pc"><p class="amt" style="font-size:26px">${esc(c.price.after)}</p><p class="unit">${esc(c.price.after_unit)}</p></div></div>
 <ul class="notl">${c.not_do.map((n) => `<li>${TICK}<span>${esc(n)}</span></li>`).join("")}</ul></div></section>

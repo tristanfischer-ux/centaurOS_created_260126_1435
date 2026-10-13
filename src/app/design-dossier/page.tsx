@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import { buildDdHtml } from "@/lib/home/dd";
 import { ldScript, serviceLd } from "@/lib/seo";
 
-const TITLE = "Costed Engineering Design | First Dossier Free";
-const DESC = "Send a short brief and get a buildable engineering design, costed bill of materials, drawings and financial model in a few days. First Dossier free.";
+const TITLE = "Costed Engineering Design for Hardware | £2,500";
+const DESC = "Send a short brief and get a buildable engineering design, costed bill of materials, drawings and financial model in a few days. £2,500 fixed price.";
 const URL = "https://fractionalforge.app/design-dossier";
 const IMG = "https://fractionalforge.app/ff/img/barge-sea.jpg";
 

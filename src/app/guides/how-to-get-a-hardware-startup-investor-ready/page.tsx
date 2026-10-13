@@ -265,7 +265,7 @@ export default function InvestorReadyGuide() {
               </p>
               <p>
                 A Fractional Forge Design Dossier is built for exactly this moment: an
-                auditable, engineer-checked Excel model where the bill of materials,
+                auditable, fully traceable Excel model where the bill of materials,
                 the build plan, the landed unit cost and the margin all trace from
                 stated inputs and recompute when an assumption changes. An investor can
                 open it and check the arithmetic themselves. Your first one is free —
@@ -301,7 +301,7 @@ export default function InvestorReadyGuide() {
             </h2>
             <p className="text-muted-foreground max-w-lg mx-auto">
               Describe your product in a short brief and get a Design Dossier — an
-              auditable, engineer-checked model of the build, the bill of materials
+              auditable, fully traceable model of the build, the bill of materials
               and the unit economics an investor will ask to see. Your first one is
               free.
             </p>

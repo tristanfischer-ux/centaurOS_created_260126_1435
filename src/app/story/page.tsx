@@ -98,7 +98,7 @@ export default function StoryPage() {
               curated network of Europe&apos;s best manufacturers and design
               partners who already have the building, the machinery, and the
               expertise. We work alongside you to build an auditable,
-              engineer-checked Design Dossier, so you get real advice on how
+              fully traceable Design Dossier, so you get real advice on how
               your product actually gets made.
             </p>
             <p>

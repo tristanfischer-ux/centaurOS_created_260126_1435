@@ -89,7 +89,7 @@ export function BriefIntake() {
         window.scrollTo({ top: 0, behavior: "smooth" })
       }
     } catch {
-      setError("Something went wrong. Please try again, or email hello@fractionalforge.app.")
+      setError("Something went wrong. Please try again, or email tristan.fischer@fractionalforge.app.")
     } finally {
       setSending(false)
     }
@@ -106,13 +106,13 @@ export function BriefIntake() {
             <div className="card">
               <span className="eyebrow">Get your Design Dossier</span>
               <h1>Tell me about your idea.</h1>
-              <p className="sub">A short brief is all I need &mdash; a paragraph is enough to start, and the more you tell me, the more precisely it hits your spec. We go deepest on battery energy storage, water treatment systems, electric motor sets and medical assay machines; other hardware still comes through the same door as a generic pack. Anvil builds your Design Dossier: an auditable Excel workbook with the architecture, a costed bill-of-materials ledger, a full financial model, the licences and regulations you&rsquo;ll face, the risks to watch, and a built-in self-audit &mdash; every number a formula you can trace. A senior engineer from our partner network reviews it before I send it, within a few business days. No account, and your first one is free.</p>
+              <p className="sub">A short brief is enough to start, and the more you tell me, the more precisely the result can match your requirements. The Anvil engine uses open engineering libraries and real component prices to produce a buildable design, costed bill of materials, true cost and financial model, engineering drawings, worked calculations, and a risk and regulatory register. Everything is delivered within a few days in a live Excel workbook where every number is a traceable formula. Design Dossiers cost £2,500 each, or £6,000 a month for up to three. Fractional Forge does not review the Dossier, so your own engineers should check it.</p>
               <form onSubmit={onSubmit}>
                 <div>
                   <label htmlFor="idea">Your idea <span className="req">*</span> <span className="hint">&mdash; what it does, who it&rsquo;s for, roughly how big.</span></label>
                   <textarea id="idea" value={idea} onChange={(e) => setIdea(e.target.value)} required
                     placeholder="e.g. A 3.5 MWh containerised battery energy-storage system for UK grid-scale frequency response, grid-tied at 11 kV, target install cost under £400/kWh, deployable within 5 days of delivery..." />
-                  <p className="confid">Your brief is confidential. It&rsquo;s reviewed by a senior engineer from our partner network, never used to train any model, and never shared with a manufacturing or investor partner without your explicit consent. An NDA is available on request &mdash; just ask.</p>
+                  <p className="confid">Your brief is confidential. It is never used to train any model or shared without your explicit consent. An NDA is available on request &mdash; just ask.</p>
                 </div>
                 <div className="row2">
                   <div>
@@ -150,20 +150,19 @@ export function BriefIntake() {
                   </div>
                 </div>
                 {error && <div className="err">{error}</div>}
-                <button className="btn" type="submit" disabled={sending}>{sending ? "Sending…" : "Send me my Design Dossier →"}</button>
-                <p className="fineprint">No account needed. I personally review every brief and send the Dossier. &mdash; Tristan</p>
+                <button className="btn" type="submit" disabled={sending}>{sending ? "Sending…" : "Send my brief →"}</button>
+                <p className="fineprint">A Design Dossier costs £2,500. I&rsquo;ll confirm the scope and price by email before any work starts. No account needed. &mdash; Tristan</p>
               </form>
             </div>
           ) : (
             <div className="card done">
               <div className="check">&#10003;</div>
               <h1>Thanks, {firstName} &mdash; your brief&rsquo;s in.</h1>
-              <p className="sub">Anvil will build your Design Dossier &mdash; an auditable Excel workbook &mdash; and once a senior engineer from our partner network has reviewed it, I&rsquo;ll email it to <strong>{email}</strong>, within a few business days.</p>
+              <p className="sub">Anvil will build your Design Dossier and I&rsquo;ll email it to <strong>{email}</strong> within a few days, once we have confirmed the scope and price by email. As with any first-pass design, have your own engineers check it before you rely on it.</p>
               {trackToken && (
                 <p className="sub">Track its progress any time on your private status page (also in your confirmation email): <a href={`/project/${trackToken}`}><strong>your project tracker &rarr;</strong></a></p>
               )}
-              <p className="sub">Want to talk it through first? Grab a slot:</p>
-              <a className="btn" href="https://calendly.com/tristan-fischer-wjlf/30min" target="_blank" rel="noopener" style={{ maxWidth: "320px", margin: "14px auto 0" }}>Book a 30-min call</a>
+              <p className="sub">Questions? Email tristan.fischer@fractionalforge.app.</p>
               <p className="sign">&mdash; Tristan, Founder, Fractional Forge</p>
             </div>
           )}

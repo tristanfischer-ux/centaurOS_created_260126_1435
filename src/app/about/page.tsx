@@ -22,7 +22,7 @@ import { MarketingFooter } from "@/components/marketing/marketing-footer"
 export const metadata: Metadata = {
   title: "About",
   description:
-    "Fractional Forge helps deep-tech and hardware founders get funded and built — strategy, capital, and a curated network of Europe's best engineering and manufacturing partners. Every Design Dossier is reviewed by senior engineers from the partner network.",
+    "Fractional Forge provides fixed-price engineering services for hard-technology founders, including buildable, costed Design Dossiers delivered in a few days.",
 }
 
 export default function AboutPage() {
@@ -49,10 +49,10 @@ export default function AboutPage() {
             </h2>
             <div className="space-y-4 text-lg text-muted-foreground leading-relaxed max-w-3xl">
               <p className="text-xl sm:text-2xl font-medium text-foreground">
-                We are building the AWS for atoms.
+                Hard technology should be easier to assess, design and finance.
               </p>
               <p>
-                Software founders rent infrastructure on AWS and focus on product. Hardware founders have no equivalent — they&apos;re expected to build factories, source suppliers and navigate procurement alone. Fractional Forge provides the missing layer: strategy and commercialisation, starting with a first-principles Design Dossier; capital, through fundraising and grants on an introducer/success-fee basis; and build, via a curated network of Europe&apos;s best engineering firms and a fractional bench of senior engineers. Every dossier is reviewed by a senior engineer from the partner network before the founder sees it.
+                Fractional Forge offers four fixed-price services: Condition Desk (£400), Habitat Draft (£150), Bid Check (£600) and Design Dossier (£2,500 per Dossier, or £6,000 a month for up to three). A Design Dossier provides a buildable design, costed bill of materials, true cost and financial model, engineering drawings, worked calculations, and a risk and regulatory register. Anvil builds it from open engineering libraries and real component prices in a live Excel workbook where every number is a traceable formula. It is delivered in a few days and is not reviewed by Fractional Forge or any external engineer, so the client&apos;s own engineers should check it. Advisory and fundraising introductions are also available on a success-fee basis: no raise, no fee.
               </p>
             </div>
           </section>
@@ -83,13 +83,13 @@ export default function AboutPage() {
                     </p>
                   </div>
                   <p className="text-muted-foreground leading-relaxed">
-                    I&apos;ve spent 25 years founding, financing and scaling capital-intensive technology businesses across solar, wind, tidal, batteries, vertical farming and carbon capture. Along the way I&apos;ve raised around £200 million across my own and advised companies, done project finance at Citigroup and corporate venture capital at Shell Technology Ventures, taken a company public on AIM, and spent a decade building Fischer Farms into one of the world&apos;s largest vertical farms.
+                    I&apos;m chief executive or board director of 14 companies, almost all in hard technology. I&apos;ve built three greenfield industrial sites, including Fischer Farms&apos; 25,000 m² automated factory. I&apos;ve raised around £200 million, worked in project finance at Citigroup and at Shell Technology Ventures, and taken a company public on AIM.
                   </p>
                   <p className="text-muted-foreground leading-relaxed">
-                    Software founders rent infrastructure from AWS so they can focus on shipping code. Hardware has no equivalent — you&apos;re expected to build the factory yourself. I&apos;m building one.
+                    Hard-technology founders need clear engineering, cost and commercial information before committing capital. Fractional Forge provides that information quickly and in a form their teams can inspect and check.
                   </p>
                   <p className="text-muted-foreground leading-relaxed">
-                    If you&apos;re a deep-tech or hardware founder, describe your idea and we&apos;ll build your Design Dossier — an auditable engineering-and-costing model where every number traces back to a formula you can check, reviewed by a senior engineer before it reaches you. From there we work together on advisory, capital and build. No self-serve dashboards — just experienced people doing the work.
+                    If you&apos;re a deep-tech or hardware founder, submit a brief for a Design Dossier. Anvil produces a buildable design and an auditable engineering, costing and financial model in a live Excel workbook, with every number linked to a traceable formula. Fractional Forge does not review the Dossier, so your own engineers should check it. Advisory and fundraising introductions remain available on a success-fee basis, with no fee if no funds are raised.
                   </p>
                   <a
                     href="https://linkedin.com/in/tristanfischer"
@@ -142,7 +142,7 @@ export default function AboutPage() {
               Start your Design Dossier
             </h2>
             <p className="text-muted-foreground max-w-lg mx-auto">
-              Describe your idea in a short brief — your first Design Dossier is free, and I&apos;ll send it within a few business days.
+              Describe your idea in a short brief. A Design Dossier costs £2,500 and is delivered in a few days.
             </p>
             <Link
               href="/brief"

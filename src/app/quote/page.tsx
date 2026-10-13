@@ -15,14 +15,14 @@ import { FOCUS_SECTORS } from "@/lib/focus-sectors"
 export const metadata: Metadata = {
   title: "Quote faster than anyone — and win more",
   description:
-    "If your team assesses briefs and quotes for customers, Anvil turns a project brief into a costed, engineer-checked proposal in days, not months — first-principles physics, live component pricing, and a human sign-off on every quote.",
+    "If your team assesses briefs and quotes for customers, Anvil turns a project brief into a costed, fully traceable proposal in days, not months — first-principles physics, live component pricing, and a human sign-off on every quote.",
   alternates: { canonical: "https://fractionalforge.app/quote" },
 }
 
 const PILLARS = [
   {
     title: "Days, not months",
-    body: "A brief becomes a costed, engineer-checked proposal in days — faster still for work like something you've done before. You're back to the client before your competitors have finished scoping.",
+    body: "A brief becomes a costed, fully traceable proposal in days — faster still for work like something you've done before. You're back to the client before your competitors have finished scoping.",
   },
   {
     title: "Win the near-misses",
@@ -59,7 +59,7 @@ export default function QuotePage() {
             <p className="text-lg sm:text-xl text-muted-foreground leading-relaxed">
               If your team assesses briefs and quotes for customers &mdash; as an estimator, a
               contractor, or an engineering firm &mdash; Anvil turns a project brief into a costed,
-              engineer-checked proposal in days, not months. The fastest credible quote usually wins
+              fully traceable proposal in days, not months. The fastest credible quote usually wins
               the contract.
             </p>
             <div className="flex flex-wrap gap-3 pt-2">

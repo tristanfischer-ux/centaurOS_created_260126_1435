@@ -30,13 +30,13 @@ import { MarketingNav } from "@/components/marketing/marketing-nav"
 import { MarketingFooter } from "@/components/marketing/marketing-footer"
 
 export const metadata: Metadata = {
-  title: "Sample Engineering Package",
+  title: "Sample Design Dossier",
   description:
-    "See what the Forge produces from a paragraph of plain English. A complete engineering package for a smart agricultural irrigation system — modules, a bill of materials, design-for-manufacturing analysis, and matched UK suppliers.",
+    "See what the Anvil engine produces from a paragraph of plain English: a buildable design, costed bill of materials, financial model, engineering drawings, worked calculations and regulatory register.",
   openGraph: {
-    title: "Sample Engineering Package — Smart Agricultural Irrigation System",
+    title: "Sample Design Dossier — Smart Agricultural Irrigation System",
     description:
-      "Product architecture, bill of materials, design-for-manufacturing analysis, competitive benchmarking, and matched suppliers — all generated from a paragraph of plain English.",
+      "A buildable design, costed bill of materials, financial model, engineering drawings, worked calculations and regulatory register, built by the Anvil engine.",
     type: "website",
     url: "https://fractionalforge.app/sample-package",
     siteName: "Fractional Forge",
@@ -139,7 +139,7 @@ const COMPETITORS: readonly Competitor[] = [
     positioning: "Budget",
   },
   {
-    name: "This Product (Forge output)",
+    name: "This product (Anvil output)",
     price: "$95-100",
     iot: "Full 2G and narrowband cellular",
     positioning: "Smart and affordable",
@@ -177,27 +177,26 @@ export default function SamplePackagePage() {
           <section className="pt-8 sm:pt-12 space-y-6">
             <div className="space-y-4">
               <Badge variant="brand" size="lg">
-                Sample Package
+                Sample Design Dossier
               </Badge>
               <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight text-foreground">
                 Smart agricultural irrigation system
               </h1>
               <p className="max-w-2xl text-lg sm:text-xl text-muted-foreground leading-relaxed">
-                Sensors, edge compute, and remote connectivity in an everyday
-                irrigation controller — the smart-product wave at work. This
-                complete engineering package was generated from a paragraph of
-                plain English. Twenty-minute first pass, hours of detail after
-                &mdash; then engineer review, and delivery within a few business
-                days.
+                This Design Dossier for a sensor-equipped irrigation controller
+                was built by the Anvil engine from a paragraph of plain English,
+                using open engineering libraries and real component prices. It
+                shows the buildable design, costs and engineering evidence
+                delivered within a few days.
               </p>
             </div>
 
             {/* Quick stats */}
             <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
               {[
-                { label: "Time to Generate", value: "3 hours" },
+                { label: "Delivery", value: "A few days" },
                 { label: "Components Specified", value: "47" },
-                { label: "Suppliers Matched", value: "47 UK" },
+                { label: "Workbook", value: "Live Excel" },
                 { label: "Target Unit Cost", value: "<$100" },
               ].map((stat) => (
                 <Card key={stat.label}>
@@ -224,8 +223,7 @@ export default function SamplePackagePage() {
             <Card>
               <CardContent className="pt-6">
                 <p className="mb-4 text-sm text-muted-foreground">
-                  The founder entered this plain-English description into the
-                  Forge:
+                  The founder submitted this plain-English description:
                 </p>
                 <ul className="space-y-2">
                   {[
@@ -333,9 +331,8 @@ export default function SamplePackagePage() {
               </CardContent>
             </Card>
             <p className="text-xs text-muted-foreground">
-              Prices are indicative and based on supplier catalogue data at
-              time of generation. We help you request live quotes from the
-              shortlisted suppliers.
+              Prices are indicative and based on real component catalogue data
+              available at the time of generation.
             </p>
           </section>
 
@@ -467,31 +464,30 @@ export default function SamplePackagePage() {
             <SectionHeader
               icon={Factory}
               label="Section 6"
-              title="Matched Suppliers"
+              title="Traceable engineering record"
             />
             <Card>
               <CardContent className="pt-6 space-y-4">
                 <div className="flex items-baseline gap-2">
                   <span className="text-4xl font-bold text-international-orange">
-                    47
+                    Every
                   </span>
                   <span className="text-lg text-foreground font-medium">
-                    UK manufacturers matched
+                    number is a traceable formula
                   </span>
                 </div>
                 <p className="text-sm text-muted-foreground leading-relaxed">
-                  Shortlisted from a curated network of 18,000+ UK and European
-                  suppliers by injection moulding capability, electronics
-                  assembly, and ingress-protected (weatherproof) enclosure
-                  production. We help you request quotes from the right ones.
+                  The live Excel workbook links the design, component prices,
+                  true cost, financial model, engineering calculations and
+                  regulatory risks so that each figure can be checked.
                 </p>
                 <div className="flex flex-wrap gap-2 pt-2">
                   {[
-                    "Injection Moulding",
-                    "Electronics Assembly",
-                    "Weatherproof Enclosures",
-                    "Printed Circuit Board Fabrication",
-                    "Solar Panel Integration",
+                    "Buildable Design",
+                    "Costed Bill of Materials",
+                    "Engineering Drawings",
+                    "Worked Calculations",
+                    "Risk and Regulatory Register",
                   ].map((cap) => (
                     <Badge key={cap} variant="outline" size="sm">
                       {cap}
@@ -514,8 +510,8 @@ export default function SamplePackagePage() {
                     Traditional Approach
                   </h3>
                   <ul className="space-y-2 text-sm text-muted-foreground">
-                    <li>4-8 weeks timeline</li>
-                    <li>$5,000 - $15,000 in freelance fees</li>
+                    <li>4–8 weeks timeline</li>
+                    <li>£5,000–£15,000 in freelance fees</li>
                     <li>Multiple freelancers to coordinate</li>
                     <li>Static deliverables</li>
                   </ul>
@@ -529,19 +525,19 @@ export default function SamplePackagePage() {
                   <ul className="space-y-2 text-sm text-foreground">
                     <li className="flex items-center gap-2">
                       <CheckCircle2 className="h-4 w-4 text-success" />
-                      Twenty-minute first pass, hours of detail after
+                      Delivered within a few days
                     </li>
                     <li className="flex items-center gap-2">
                       <CheckCircle2 className="h-4 w-4 text-success" />
-                      Your first Design Dossier is free
+                      £2,500 per Design Dossier
                     </li>
                     <li className="flex items-center gap-2">
                       <CheckCircle2 className="h-4 w-4 text-success" />
-                      Single platform
+                      Built by the Anvil engine
                     </li>
                     <li className="flex items-center gap-2">
                       <CheckCircle2 className="h-4 w-4 text-success" />
-                      Living package that updates with each iteration
+                      Live Excel workbook with traceable formulas
                     </li>
                   </ul>
                 </CardContent>
@@ -555,10 +551,12 @@ export default function SamplePackagePage() {
               Get your own Design Dossier
             </h2>
             <p className="mx-auto max-w-lg text-muted-foreground">
-              Describe your idea in a short brief. We build your Design Dossier
-              — an auditable, engineer-checked workbook with the modules, a
-              costed bill of materials, and matched UK and European
-              manufacturers — and I send it within a few business days.
+              Describe your idea in a short brief. The Anvil engine builds a
+              live Excel workbook containing a buildable design, costed bill of
+              materials, true cost and financial model, engineering drawings,
+              worked calculations, and a risk and regulatory register. It is
+              delivered within a few days. Fractional Forge does not review the
+              engineering, so your own engineers should check it.
             </p>
             <Link
               href="/brief"
@@ -568,7 +566,7 @@ export default function SamplePackagePage() {
               <ArrowRight className="h-4 w-4" />
             </Link>
             <p className="text-xs text-muted-foreground">
-              Your first Design Dossier is free.
+              £2,500 per Design Dossier, or £6,000 a month for up to three.
             </p>
           </section>
         </div>

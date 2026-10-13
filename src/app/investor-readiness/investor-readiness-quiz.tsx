@@ -91,19 +91,19 @@ function getTier(score: number): { label: string; color: string; icon: React.Rea
     label: "Getting There",
     color: "text-blue-600",
     icon: <TrendingUp className="size-5" />,
-    description: "Solid foundations, with a few gaps before institutional investors move fast. A senior-engineer-checked Design Dossier answers the manufacturing and cost questions they will ask first.",
+    description: "Solid foundations, with a few gaps before institutional investors move fast. A Design Dossier answers the manufacturing and cost questions they will ask first.",
   }
   if (score >= 35) return {
     label: "Early Stage",
     color: "text-amber-600",
     icon: <Target className="size-5" />,
-    description: "You're building in the right direction. A free Design Dossier de-risks the manufacturing and the numbers — and from there we help you get built and reach the right capital.",
+    description: "You're building in the right direction. A Design Dossier pins down the design and the numbers, and from there we can help you reach the right capital.",
   }
   return {
     label: "Not Yet",
     color: "text-red-500",
     icon: <AlertTriangle className="size-5" />,
-    description: "Early — and that's normal. Start with a free Design Dossier to pin down what it actually takes to build your idea, before you spend on prototypes or pitch investors.",
+    description: "Early — and that's normal. Start with a Design Dossier to pin down what it actually takes to build your idea, before you spend on prototypes or pitch investors.",
   }
 }
 
@@ -299,7 +299,7 @@ export function InvestorReadinessQuiz() {
             {/* CTA */}
             <div className="rounded-2xl bg-gradient-to-br from-orange-50 to-background p-6 text-center">
               <p className="mb-1 font-semibold text-foreground">Fractional Forge helps you close these gaps</p>
-              <p className="mb-4 text-sm text-muted-foreground">A senior operator, an auditable Design Dossier, and a curated network of engineering and manufacturing partners — so you get funded and built. Your first Dossier is free.</p>
+              <p className="mb-4 text-sm text-muted-foreground">A costed, buildable Design Dossier for £2,500, and fundraising introductions on a success-fee basis: no raise, no fee.</p>
               <Button asChild size="lg" className="gap-2 bg-[#ff4500] text-white hover:bg-[#e03d00]">
                 <Link href="/brief">Start a brief <ArrowRight className="size-4" /></Link>
               </Button>

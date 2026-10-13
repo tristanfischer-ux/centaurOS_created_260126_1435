@@ -9,6 +9,8 @@ export const MAIL = "tristan.fischer@fractionalforge.app";
 export const KEYS: LumicityKey[] = ["condition-desk", "habitat-draft", "bid-check"];
 type C = (typeof copy)["condition-desk"];
 
+import { GAINS_CSS, gainsSection } from "@/lib/home/gains";
+
 export const esc = (s: string) =>
   s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
@@ -419,7 +421,7 @@ export function buildHtml(key: LumicityKey): string {
   const pdf = `/lumicity/samples/${key}-sample.pdf`;
   const dlName = `${c.name} sample report.pdf`;
   const dlBtn = (cls: string, label: string) => `<a class="${cls}" href="${pdf}" download="${esc(dlName)}">${DL} ${esc(label)}</a>`;
-  return `<style>${CSS}${CSS2}${CSS3}</style>
+  return `<style>${CSS}${CSS2}${CSS3}${GAINS_CSS}</style>
 <div class="pg" style="${style}">
 <header class="nav"><div class="wrap nav-inner"><a class="logo" href="/${key}"><span class="mk">${MARK[key]}</span><span><b>${esc(c.name)}</b><small>A Fractional Forge service</small></span></a>
 <nav class="navlinks" aria-label="Page sections"><a href="#how">How it works</a><a href="#demo">Example</a><a href="#sample">Sample report</a><a href="#price">Price</a><a href="#faq">Questions</a></nav>${link(c, "Send a request", "btn btn-primary")}</div></header>
@@ -437,6 +439,7 @@ ${dlBtn("dl-link", `Download a sample report (PDF, ${x.sample.pages} pages)`)}
 <div class="float">${mini(key)}</div></div>
 </div></section>
 <section class="stats" aria-label="Key numbers"><div class="wrap"><ul>${x.stats.map((s) => `<li><b>${esc(s[0])}</b><span>${esc(s[1])}</span></li>`).join("")}</ul></div></section>
+${gainsSection(key)}
 <section class="s"><div class="wrap split"><div class="pic"><img src="/lumicity/img/${x.img}-context.jpg" alt="" width="1100" height="817" loading="lazy"></div>
 <div><h2>${esc(x.problemTitle)}</h2><ul class="plist2">${c.problem.map((p) => `<li><i>!</i><span>${esc(p)}</span></li>`).join("")}</ul>
 <p class="lede" style="margin-top:22px">${esc(c.name)} does that groundwork for you, usually within a day, so your team can get on with the parts only they can do.</p></div></div></section>

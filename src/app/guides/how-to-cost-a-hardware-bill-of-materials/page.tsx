@@ -317,7 +317,7 @@ export default function CostBillOfMaterialsGuide() {
             </h2>
             <p className="text-muted-foreground max-w-lg mx-auto">
               Describe your product in a short brief and get a Design Dossier — an
-              auditable, engineer-checked model with a full bill of materials and a
+              auditable, fully traceable model with a full bill of materials and a
               landed unit cost at the volumes you care about. Your first one is free.
             </p>
             <Link

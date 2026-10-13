@@ -4,7 +4,7 @@ import { BriefIntake } from "./brief-intake"
 export const metadata: Metadata = {
   title: "Get your Design Dossier — Fractional Forge",
   description:
-    "Describe your hardware idea in a short brief and get an auditable Design Dossier from Anvil — an Excel workbook with the architecture, a costed bill of materials, a financial model, the engineering drawings, the licences and risks, and a built-in self-audit, reviewed by a senior engineer. Your first one is free.",
+    "Describe your hardware idea in a short brief and get a buildable Design Dossier from Anvil in a few days — a live Excel workbook with a costed bill of materials, true cost and financial model, engineering drawings, worked calculations, and a risk and regulatory register. Every number is a traceable formula. Your own engineers should check it.",
 }
 
 export default function BriefPage() {

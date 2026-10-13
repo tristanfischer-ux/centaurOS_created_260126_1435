@@ -1,4 +1,5 @@
 import { CSS, CSS2, CSS3, MARK, TICK, esc } from "@/lib/lumicity/html";
+import { GAINS, GAINS_CSS } from "@/lib/home/gains";
 
 // Fractional Forge homepage: a short front door to the four services.
 // Copy drafted by an OpenRouter writer/critic loop (13 Oct 2026) against a fixed fact sheet; no invented claims.
@@ -34,18 +35,19 @@ const SERVICES: Svc[] = [
   { key: "design-dossier", name: "Design Dossier", href: "/design-dossier", img: "/ff/img/dd-card.jpg", mark: DD_MARK,
     acc: "#d9461a", accD: "#b23a12", accS: "#fff1ea", accM: "#f5b79c",
     who: "For hardware and deep-tech founders",
-    what: "Send a short brief. Get a buildable, costed engineering design: bill of materials, true cost and financial model, drawings, worked calculations and a risk and regulatory register, in a live Excel workbook reviewed by a senior engineer.",
-    price: "First Dossier free", time: "A few days", example: ["6", "parts: buildable design, costed bill of materials, true cost and financial model, drawings, worked calculations, risk and regulatory register"] },
+    what: "Send a short brief. Get a buildable, costed engineering design: bill of materials, true cost and financial model, drawings, worked calculations and a risk and regulatory register, in a live Excel workbook where every number is a traceable formula.",
+    price: "£2,500 per Dossier", mo: "£6,000 a month for three", time: "A few days", example: ["6", "parts: buildable design, costed bill of materials, true cost and financial model, drawings, worked calculations, risk and regulatory register"] },
 ];
 
 export const FAQS: [string, string][] = [
   ["Do I need to talk to anyone?", "No. There are no sales calls. Each service page has an enquiry form, or you can email the documents."],
-  ["Who checks the work?", "A senior engineer reviews each Design Dossier before you see it. For Habitat Draft, your own ecologist checks and signs everything. Condition Desk sets out each condition from the decision notice and Bid Check quotes the tender for every item, so your team can check each point against the original."],
+  ["Who checks the work?", "Your own team does. Every report shows its sources so it can be checked: Condition Desk sets out each condition from the decision notice, Bid Check quotes the tender for every item, your ecologist checks and signs each Habitat Draft desk study, and every number in a Design Dossier is a traceable formula."],
   ["What do the reports use?", "Public documents and public data: the decision notice, the tender pack, national habitat and protected-site data, and the Environment Agency laser survey. Design Dossiers also use open engineering libraries and real component prices."],
   ["Can I see the work first?", "Yes. Every service page has a full sample report to download, built on a real, current case."],
 ];
 
 export const CSS_HOME = `
+
 .home{--acc:#d9461a;--acc-d:#b23a12;--acc-s:#fff1ea;--acc-m:#f5b79c}
 .home .logo .mk{background:var(--ink)}
 .home .navlinks{gap:28px}
@@ -113,7 +115,7 @@ function card(s: Svc): string {
   const vars = `--sa:${s.acc};--sd:${s.accD};--ss:${s.accS};--sm:${s.accM}`;
   return `<a class="svc" href="${s.href}" style="${vars}">
 <div class="im"><img src="${s.img}" alt="" loading="lazy"><span class="tag"><span>${s.mark}</span>${esc(s.who.replace(/^For /, ""))}</span></div>
-<div class="bd"><h3>${esc(s.name)}</h3><p class="who">${esc(s.who)}</p><p class="what">${esc(s.what)}</p>
+<div class="bd"><h3>${esc(s.name)}</h3><p class="who">${esc(s.who)}</p><p class="lead">${esc(GAINS[s.key as keyof typeof GAINS].lead)}</p><p class="what">${esc(s.what)}</p>
 <div class="ex"><b>${esc(s.example[0])}</b><small>${esc(s.example[1])}</small></div>
 <div class="ft"><p class="pr">${esc(s.price)}<small>${esc(s.time)}</small>${s.mo ? `<small class="mo">${esc(s.mo)}</small>` : ""}</p><span class="go">${s.key === "design-dossier" ? "Sample package and brief form" : "Sample report and form"} ${ARROW}</span></div></div></a>`;
 }
@@ -142,7 +144,7 @@ export function buildHomeHtml(): string {
   const jump = SERVICES.map((s) => `<a href="${s.href}"><i style="background:${s.acc}"></i>${esc(s.name)}</a>`).join("");
   const faqs = FAQS.map(([q, a], i) => `<details class="faq" open><summary>${esc(q)}</summary><p>${esc(a)}</p></details>`).join("");
   const svcLinks = SVC_LINKS();
-  return `<style>${CSS}${CSS2}${CSS3}${CSS_HOME}</style>
+  return `<style>${CSS}${CSS2}${CSS3}${CSS_HOME}${GAINS_CSS}</style>
 <div class="pg home">
 ${siteHeader()}
 
@@ -177,7 +179,7 @@ ${siteHeader()}
 <div class="hsteps">
 <div class="hstep"><h3>Send the documents</h3><p>A decision notice, a site boundary, a tender pack or a short hardware brief, through the service's form or by email.</p></div>
 <div class="hstep"><h3>The report is built</h3><p>Planning, ecology and tender reports are built from the public documents and data for your case. Design Dossiers are built from your brief, open engineering libraries and real component prices.</p></div>
-<div class="hstep"><h3>Back by email</h3><p>Most reports arrive within a day; Design Dossiers take a few days and are reviewed by a senior engineer first.</p></div>
+<div class="hstep"><h3>Back by email</h3><p>Most reports arrive within a day; Design Dossiers take a few days.</p></div>
 </div></div></section>
 
 
@@ -191,3 +193,4 @@ ${siteHeader()}
 ${siteFooter()}
 </div>`;
 }
+
