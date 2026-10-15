@@ -49,6 +49,7 @@ run "render-vision rot-test (skip offline)"     "$PY" scripts/lib/render_vision_
 run "emitter mis-pin guards"                      npx tsx scripts/lib/emitter-mispin-selftest.ts
 run "render service-coherence guard"             "$PY" scripts/blender-universal/service_coherence_selftest.py
 run "provenance.py --selftest"               "$PY" scripts/lib/provenance.py --selftest
+run "femm-document.py --selftest"            "$PY" scripts/lib/femm-document.py --selftest
 # EXCEL-STRICT OOXML validator (2026-07-05) — catches the class of defect LibreOffice
 # (our only prior verifier) silently tolerates: Tristan opened bess-campaign-v3's
 # dossier.xlsx in real Excel for Mac and got a "we found a problem with some content"

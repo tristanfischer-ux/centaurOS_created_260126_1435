@@ -22,6 +22,18 @@ RELATED: [files or patterns]
 
 <!-- Add lessons below this line -->
 
+## 2026-09-14 - RULE: FEMM current-on hang is MinAngle first, not units
+
+**NEVER** tell Tony (or write into a letter) that tightening FEMM min-angle is the wrong knob, or that a micrometre→millimetre restamp is what lets current finish, as a general claim.
+
+**ALWAYS** treat a file that finishes at I=0 and hangs with winding current as a mesh / MinAngle problem first. Tony's Windows FEMM 4.2 hung on the millimetre Ser0020 copy with coil 1 at +0.12 A at MA=30/33 and finished at MA=15. The same millimetre file with all currents zero did not hang. A unit restamp is a sibling table and must not be overlaid on the native-units walk.
+
+**ALWAYS** rewrite only `[MinAngle]` when emitting the MA=15 copy (`scripts/lib/femm-document.py`). Same mesh, same whole-body contour (`mo_groupselectblock`), then three repeats before any new family.
+
+**REASON:** Anvil's 11 September letter said min-angle was the wrong knob. Tony's 13 September 19:53 UTC mail disproved that on his engine.
+
+**RELATED:** `scripts/lib/femm-document.py`, Drive folder `1NT3gyqGVevCPBKFUDCnasJQesb8bplfB`, Gmail `1a09c54aef436388`.
+
 ## 2026-04-17 - RULE: Test users on prod Supabase must be deleted at session end
 
 **NEVER** leave a test user / test foundry sitting on prod Supabase after an agent-browser walkthrough session ends. Sandbox foundries (`is_sandbox=true`) are excluded from analytics, but they still count against RLS scans, authentication logs, and storage quota. Over time they accumulate.
