@@ -1,0 +1,76 @@
+/* Fractional Forge public tokens. Colours, type and motion — see STYLE.md. */
+
+:root {
+  --paper: #FFFDFA;
+  --ink: #0F1729;
+  --ink-2: #3B4458;
+  --muted: #6B7285;
+  --line: #ECE6DE;
+  --rust: #B23A12;
+  --rust-soft: #FBEDE6;
+  --rust-line: #F1CDBD;
+  --moss: #2F5E3F;
+  --moss-soft: #E8F1EA;
+  --slate: #33415C;
+  --r-lg: 22px;
+  --r-md: 14px;
+  --shadow: 0 1px 2px rgba(15, 23, 41, 0.06), 0 12px 32px -12px rgba(15, 23, 41, 0.18);
+  --serif: var(--font-fraunces), "Fraunces", Georgia, serif;
+  --sans: var(--font-inter), "Inter", -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+  --card: #ffffff;
+  --card-2: #FCFAF7;
+  --skel: #E9E4DC;
+  --on-rust: #ffffff;
+  --band: #0F1729;
+  --band-ink: #ffffff;
+  --band-muted: #c7cfdc;
+  --ease-out: cubic-bezier(0.05, 0.7, 0.1, 1);
+  --ease-std: cubic-bezier(0.2, 0, 0, 1);
+  --t-quick: 200ms;
+  --t-std: 300ms;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #0E1320;
+    --ink: #F3EFE8;
+    --ink-2: #C5C9D3;
+    --muted: #9AA1B2;
+    --line: #262D3D;
+    --rust: #E2703F;
+    --rust-soft: #2A1A14;
+    --rust-line: #5A2E1C;
+    --moss: #7FBF93;
+    --moss-soft: #15241A;
+    --slate: #C5C9D3;
+    --card: #151B2B;
+    --card-2: #121826;
+    --skel: #2A3142;
+    --on-rust: #0E1320;
+    --band: #151B2B;
+    --band-ink: #F3EFE8;
+    --band-muted: #C5C9D3;
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 12px 32px -12px rgba(0, 0, 0, 0.55);
+  }
+}
+
+/* Cookie banner: rust on paper/card, AA in light and dark. */
+.ff-cookie-toast {
+  background: var(--card);
+  color: var(--ink);
+  border: 1px solid var(--line);
+}
+.ff-cookie-toast p {
+  color: var(--muted);
+}
+.ff-cookie-link {
+  color: var(--rust);
+}
+.ff-cookie-decline {
+  background: var(--skel);
+  color: var(--ink);
+}
+.ff-cookie-accept {
+  background: var(--rust);
+  color: var(--on-rust);
+}

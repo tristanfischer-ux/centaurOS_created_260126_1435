@@ -1,34 +1,34 @@
 import { SITE_GRAPH } from "@/lib/seo";
 import type { Metadata, Viewport } from "next";
-import { Outfit, Playfair_Display, Inter, JetBrains_Mono } from "next/font/google";
+import { Outfit, Playfair_Display, JetBrains_Mono } from "next/font/google";
+import { fraunces, inter } from "@/fonts";
 import "./globals.css";
+import "@/styles/ff-tokens.css";
 import { Toaster } from "@/components/ui/sonner";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { CookieConsent } from "@/components/cookie-consent";
-import { Analytics } from "@vercel/analytics/next";
+import { MaybeAnalytics } from "@/components/maybe-analytics";
 
+// CentaurOS app faces: available to signed-in routes, not preloaded on public pages.
 const outfit = Outfit({
   subsets: ["latin"],
   variable: "--font-outfit",
   display: "swap",
+  preload: false,
 });
 
 const playfair = Playfair_Display({
   subsets: ["latin"],
   variable: "--font-playfair",
   display: "swap",
-});
-
-const inter = Inter({
-  subsets: ["latin"],
-  variable: "--font-inter",
-  display: "swap",
+  preload: false,
 });
 
 const jetbrains = JetBrains_Mono({
   subsets: ["latin"],
   variable: "--font-jetbrains",
   display: "swap",
+  preload: false,
 });
 
 export const viewport: Viewport = {
@@ -99,7 +99,7 @@ export default function RootLayout({
         />
       </head>
       <body
-        className={`${outfit.variable} ${playfair.variable} ${inter.variable} ${jetbrains.variable} antialiased font-sans`}
+        className={`${fraunces.variable} ${inter.variable} ${outfit.variable} ${playfair.variable} ${jetbrains.variable} antialiased font-sans`}
       >
         <ThemeProvider
           attribute="class"
@@ -108,7 +108,7 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           {children}
-          <Analytics />
+          <MaybeAnalytics />
           <Toaster />
           <CookieConsent />
         </ThemeProvider>
