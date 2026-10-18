@@ -86,26 +86,26 @@ export function CookieConsent() {
             transition={{ type: "spring", stiffness: 320, damping: 30 }}
             role="region"
             aria-label="Cookie preferences"
-            className="pointer-events-auto w-full max-w-[360px] rounded-full bg-card px-3 py-1.5 shadow-lg flex items-center gap-2"
+            className="ff-cookie-toast pointer-events-auto w-full max-w-[360px] rounded-full px-3 py-1.5 shadow-lg flex items-center gap-2"
           >
-            <p className="text-[11px] text-muted-foreground flex-1 truncate">
+            <p className="text-[12px] flex-1 truncate">
               Cookies?{" "}
               <Link
                 href="/privacy"
-                className="text-international-orange underline underline-offset-2 hover:opacity-80 transition-opacity"
+                className="ff-cookie-link underline underline-offset-2 hover:opacity-80 transition-opacity"
               >
                 Privacy
               </Link>
             </p>
             <button
               onClick={handleReject}
-              className="inline-flex items-center justify-center rounded-md bg-muted/60 px-2 py-1 text-[11px] font-medium text-foreground hover:bg-muted transition-colors"
+              className="ff-cookie-decline inline-flex items-center justify-center rounded-md px-2 py-1 text-[12px] font-medium hover:opacity-90 transition-opacity"
             >
               Decline
             </button>
             <button
               onClick={handleAccept}
-              className="inline-flex items-center justify-center rounded-md bg-international-orange px-2 py-1 text-[11px] font-medium text-white hover:opacity-90 transition-opacity"
+              className="ff-cookie-accept inline-flex items-center justify-center rounded-md px-2 py-1 text-[12px] font-medium hover:opacity-90 transition-opacity"
             >
               Accept
             </button>
