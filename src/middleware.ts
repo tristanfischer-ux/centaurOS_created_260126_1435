@@ -96,6 +96,6 @@ export const config = {
          *   the site goes invisible to Google + AI answer-engines)
          * Feel free to modify this pattern to include more paths.
          */
-        '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|txt|xml|ico|webmanifest)$).*)',
+        '/((?!_next/static|_next/image|_vercel|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|avif|js|mjs|woff2|woff|txt|xml|ico|webmanifest)$).*)',
     ],
 }

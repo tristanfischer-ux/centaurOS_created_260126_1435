@@ -54,6 +54,9 @@ const PUBLIC_ROUTES = [
     '/investor-readiness',// investor-readiness landing
     '/preview-landing',   // preview / campaign landing
     '/quote',             // estimator / contractor landing (P1-a)
+    '/privacy',           // privacy policy — must return 200 logged out (footer)
+    '/terms',             // terms of service — must return 200 logged out (footer)
+    '/ff',                // public homepage assets (hero-panel.js, images)
 ]
 
 // RED-TEAM-PIVOT-PLAN Tier 2 step 14: anonymous /investors landing. The
