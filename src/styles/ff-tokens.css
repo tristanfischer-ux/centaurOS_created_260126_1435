@@ -15,8 +15,6 @@
   --r-lg: 22px;
   --r-md: 14px;
   --shadow: 0 1px 2px rgba(15, 23, 41, 0.06), 0 12px 32px -12px rgba(15, 23, 41, 0.18);
-  --serif: var(--font-fraunces), "Fraunces", Georgia, serif;
-  --sans: var(--font-inter), "Inter", -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
   --card: #ffffff;
   --card-2: #FCFAF7;
   --skel: #E9E4DC;
@@ -28,6 +26,19 @@
   --ease-std: cubic-bezier(0.2, 0, 0, 1);
   --t-quick: 200ms;
   --t-std: 300ms;
+}
+
+/*
+ * next/font sets --font-fraunces / --font-inter on <html> (the variable classes).
+ * --serif/--sans must be computed on that same element (or a descendant). A
+ * :root-only stack of var(--font-fraunces), Georgia is invalid if the next/font
+ * variable is missing at :root, and the whole font-family then falls back to
+ * Tailwind's ui-sans-serif.
+ */
+html,
+body {
+  --serif: var(--font-fraunces), "Fraunces", Georgia, serif;
+  --sans: var(--font-inter), "Inter", -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
 }
 
 @media (prefers-color-scheme: dark) {

@@ -91,16 +91,18 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en-GB" suppressHydrationWarning>
+    <html
+      lang="en-GB"
+      suppressHydrationWarning
+      className={`${fraunces.variable} ${inter.variable} ${outfit.variable} ${playfair.variable} ${jetbrains.variable}`}
+    >
       <head>
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(JSON_LD) }}
         />
       </head>
-      <body
-        className={`${fraunces.variable} ${inter.variable} ${outfit.variable} ${playfair.variable} ${jetbrains.variable} antialiased font-sans`}
-      >
+      <body className="antialiased font-sans">
         <ThemeProvider
           attribute="class"
           defaultTheme="light"
