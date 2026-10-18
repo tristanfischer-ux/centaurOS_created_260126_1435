@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Script from "next/script";
 import { buildHomeHtml } from "@/lib/home/html";
 import { homeLd, ldScript } from "@/lib/seo";
 
@@ -19,6 +20,7 @@ export default function HomePage() {
     <>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: ldScript(homeLd()) }} />
       <div dangerouslySetInnerHTML={{ __html: buildHomeHtml() }} />
+      <Script src="/ff/hero-panel.js" strategy="afterInteractive" />
     </>
   );
 }

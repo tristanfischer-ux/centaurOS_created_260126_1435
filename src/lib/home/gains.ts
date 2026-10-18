@@ -7,10 +7,10 @@ export { GAINS };
 const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
 export const GAINS_CSS = `
-.gains{display:grid;gap:16px}.gain{background:#fff;border:1px solid var(--line);border-radius:20px;padding:22px;border-top:4px solid var(--acc)}
+.gains{display:grid;gap:16px}.gain{background:var(--card);border:1px solid var(--line);border-radius:20px;padding:22px;border-top:4px solid var(--acc)}
 .gain small{display:inline-block;font-size:12px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;color:var(--acc-d);background:var(--acc-s);border-radius:999px;padding:4px 10px}
-.gain h3{font-family:"Fraunces",Georgia,serif;font-size:22px;font-weight:600;margin-top:12px}.gain p{color:var(--ink-soft);margin-top:8px;font-size:16px}
-.svc .lead{font-family:"Fraunces",Georgia,serif;font-size:19px;color:var(--ink);margin-top:10px;font-weight:600}
+.gain h3{font-family:var(--serif);font-size:22px;font-weight:600;margin-top:12px}.gain p{color:var(--ink-soft);margin-top:8px;font-size:16px}
+.svc .lead{font-family:var(--serif);font-size:19px;color:var(--ink);margin-top:10px;font-weight:600}
 @media(min-width:760px){.gains{grid-template-columns:repeat(4,1fr)}}
 `;
 

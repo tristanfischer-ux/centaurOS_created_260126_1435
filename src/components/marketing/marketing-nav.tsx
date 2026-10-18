@@ -95,7 +95,7 @@ export function MarketingNav({ isAuthed = false }: MarketingNavProps = {}) {
                             className={cn(
                                 'text-[15px] font-semibold transition-colors duration-200',
                                 isActive(link.href)
-                                    ? 'text-international-orange'
+                                    ? 'text-[var(--rust)]'
                                     : 'text-muted-foreground hover:text-foreground'
                             )}
                         >
@@ -109,7 +109,7 @@ export function MarketingNav({ isAuthed = false }: MarketingNavProps = {}) {
                     <Link href={isAuthed ? '/investors' : '/brief'}>
                         <Button
                             size="sm"
-                            className="bg-international-orange text-white hover:bg-international-orange-hover"
+                            className="bg-[var(--rust)] text-[var(--on-rust)] hover:opacity-90"
                         >
                             {isAuthed ? 'Open app' : 'Send a brief'}
                         </Button>
@@ -140,7 +140,7 @@ export function MarketingNav({ isAuthed = false }: MarketingNavProps = {}) {
                         <div className="flex flex-col gap-1 px-4 py-4 sm:px-6">
                             <Link
                                 href={isAuthed ? '/investors' : '/brief'}
-                                className="mb-3 flex min-h-[48px] items-center justify-center rounded-md bg-international-orange text-center text-sm font-bold text-primary-foreground transition-colors hover:bg-international-orange-hover"
+                                className="mb-3 flex min-h-[48px] items-center justify-center rounded-md bg-[var(--rust)] text-center text-sm font-bold text-[var(--on-rust)] transition-colors hover:opacity-90"
                                 onClick={() => setMobileMenuOpen(false)}
                             >
                                 {isAuthed ? 'Open app' : 'Send a brief'}
@@ -152,7 +152,7 @@ export function MarketingNav({ isAuthed = false }: MarketingNavProps = {}) {
                                     className={cn(
                                         'flex min-h-[48px] items-center border-b border-muted/50 py-3.5 text-sm font-semibold transition-colors last:border-b-0',
                                         isActive(link.href)
-                                            ? 'text-international-orange'
+                                            ? 'text-[var(--rust)]'
                                             : 'text-muted-foreground hover:text-foreground'
                                     )}
                                     onClick={() => setMobileMenuOpen(false)}
