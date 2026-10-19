@@ -21,7 +21,7 @@ export default function TermsPage() {
 
       <main className="flex-1">
       <div className="max-w-3xl mx-auto px-4 sm:px-6 py-12 sm:py-16">
-        <h1 className="text-3xl sm:text-4xl font-display font-bold text-foreground mb-2">
+        <h1 className="text-3xl sm:text-4xl font-bold text-foreground mb-2" style={{ fontFamily: "var(--serif)" }}>
           Terms of Service
         </h1>
         <p className="text-sm text-muted-foreground mb-8">

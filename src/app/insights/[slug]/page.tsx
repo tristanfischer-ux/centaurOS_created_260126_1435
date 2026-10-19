@@ -86,6 +86,8 @@ export default async function ArticlePage({
           <img
             src={`/images/insights/${slug}.webp`}
             alt=""
+            width={1000}
+            height={559}
             className="mt-8 w-full aspect-[16/9] object-cover rounded-2xl border border-border"
             style={{ background: "#faf7f3" }}
           />

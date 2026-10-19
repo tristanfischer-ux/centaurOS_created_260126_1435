@@ -128,25 +128,37 @@ export default function WaterTreatmentCostPage() {
           {/* Real dossier visuals */}
           <section className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <figure className="m-0">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src="/images/site/dossier-render.webp"
-                alt="Photoreal isometric render of the water-treatment plant"
-                className="w-full rounded-xl border border-border shadow-sm"
-                loading="lazy"
-              />
+              <picture>
+                <source type="image/avif" srcSet="/images/site/dossier-render-560w.avif 560w, /images/site/dossier-render-1120w.avif 1120w" sizes="(min-width: 640px) 50vw, 100vw" />
+                <source type="image/webp" srcSet="/images/site/dossier-render-560w.webp 560w, /images/site/dossier-render-1120w.webp 1120w" sizes="(min-width: 640px) 50vw, 100vw" />
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src="/images/site/dossier-render-560w.jpg"
+                  alt="Photoreal isometric render of the water-treatment plant"
+                  className="w-full rounded-xl border border-border shadow-sm"
+                  width={560}
+                  height={373}
+                  loading="lazy"
+                />
+              </picture>
               <figcaption className="mt-2 text-xs text-muted-foreground text-center">
                 The plant, built from the same model as the costs
               </figcaption>
             </figure>
             <figure className="m-0">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src="/images/site/dossier-exec.webp"
-                alt="The Design Dossier's Executive Summary tab — 45 cubic metres per hour, £1,360,613 installed, ship verdict"
-                className="w-full rounded-xl border border-border shadow-sm bg-white"
-                loading="lazy"
-              />
+              <picture>
+                <source type="image/avif" srcSet="/images/site/dossier-exec-560w.avif 560w, /images/site/dossier-exec-1120w.avif 1120w" sizes="(min-width: 640px) 50vw, 100vw" />
+                <source type="image/webp" srcSet="/images/site/dossier-exec-560w.webp 560w, /images/site/dossier-exec-1120w.webp 1120w" sizes="(min-width: 640px) 50vw, 100vw" />
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src="/images/site/dossier-exec-560w.jpg"
+                  alt="The Design Dossier's Executive Summary tab — 45 cubic metres per hour, £1,360,613 installed, ship verdict"
+                  className="w-full rounded-xl border border-border shadow-sm bg-white"
+                  width={560}
+                  height={462}
+                  loading="lazy"
+                />
+              </picture>
               <figcaption className="mt-2 text-xs text-muted-foreground text-center">
                 The dossier's own Executive Summary tab
               </figcaption>

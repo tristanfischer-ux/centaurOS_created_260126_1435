@@ -65,14 +65,18 @@ export default function AboutPage() {
             <Card>
               <CardContent className="flex flex-col sm:flex-row items-start gap-6 pt-6">
                 {/* Avatar placeholder — initials circle matching UserAvatar pattern */}
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src="/images/site/tristan.webp"
-                  alt="Tristan Fischer, Founder of Fractional Forge"
-                  className="flex-shrink-0 h-20 w-20 rounded-full object-cover"
-                  width={80}
-                  height={80}
-                />
+                <picture>
+                  <source type="image/avif" srcSet="/images/site/tristan-160w.avif" />
+                  <source type="image/webp" srcSet="/images/site/tristan-160w.webp" />
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src="/images/site/tristan-160w.jpg"
+                    alt="Tristan Fischer, Founder of Fractional Forge"
+                    className="flex-shrink-0 h-20 w-20 rounded-full object-cover"
+                    width={80}
+                    height={80}
+                  />
+                </picture>
                 <div className="space-y-3">
                   <div>
                     <h3 className="text-xl font-semibold text-foreground">
