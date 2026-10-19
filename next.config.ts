@@ -7,6 +7,74 @@ const analyzeBundles = withBundleAnalyzer({
   enabled: process.env.ANALYZE === "true",
 });
 
+/**
+ * Content-Security-Policy value.
+ *
+ * SECURITY (H-5 audit, 2026-04-02): 'unsafe-inline' is REQUIRED and cannot
+ * be removed without breaking the app. Reasons:
+ *
+ * script-src 'unsafe-inline':
+ *   1. Next.js injects inline <script> tags for hydration data (__NEXT_DATA__),
+ *      route prefetching, and chunk loading — these are not controllable by app code
+ *   2. Next.js does not yet support nonce-based CSP in the App Router production
+ *      build (https://github.com/vercel/next.js/issues/43743)
+ *   3. Sentry SDK initialization requires inline script execution
+ *
+ * style-src 'unsafe-inline':
+ *   1. Radix UI (shadcn/ui) injects inline styles for portal positioning
+ *      (dropdowns, tooltips, dialogs, popovers) — cannot be externalized
+ *   2. Recharts uses inline SVG styles for chart rendering
+ *   3. next/font injects inline style tags for font-face declarations
+ *
+ * MITIGATION: unsafe-eval is NOT allowed. XSS risk is reduced by:
+ *   - All user content rendered via React (auto-escaped)
+ *   - No dangerouslySetInnerHTML usage in app code
+ *   - Strict form-action, base-uri, and object-src restrictions below
+ *
+ * TODO: Migrate to nonce-based CSP when Next.js App Router supports it
+ *
+ * 'wasm-unsafe-eval': CSP3 directive that permits WebAssembly
+ * module compilation (strictly narrower than the full
+ * script-executing directive — it only lets the browser compile
+ * and instantiate .wasm modules). Required by
+ * @react-pdf/renderer, which uses WASM for its PDF font and
+ * layout pipeline. Without this, the Design Report PDF export
+ * silently fails with a "WebAssembly.instantiate violates CSP"
+ * message and the background op completes with zero output.
+ *
+ * Preview-only: Vercel injects the toolbar script
+ * https://vercel.live/_next-live/feedback/feedback.js on preview
+ * deployments. Sources are the documented toolbar hosts
+ * (https://vercel.com/docs/vercel-toolbar/managing-toolbar).
+ * img-src already allows https:, frame-src already allows https:.
+ * Production and unset VERCEL_ENV keep the previous CSP bytes.
+ */
+export function contentSecurityPolicy(): string {
+  const previewToolbar = process.env.VERCEL_ENV === "preview";
+  return [
+    "default-src 'self'",
+    "script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://*.supabase.co https://*.stripe.com https://*.sentry.io https://*.posthog.com https://eu-assets.i.posthog.com" +
+      (previewToolbar ? " https://vercel.live" : ""),
+    "style-src 'self' 'unsafe-inline'" +
+      (previewToolbar ? " https://vercel.live" : ""),
+    "img-src 'self' data: https: blob:",
+    "font-src 'self' data:" +
+      (previewToolbar ? " https://vercel.live https://assets.vercel.com" : ""),
+    "media-src 'self'",
+    "worker-src 'self' blob:",
+    "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.stripe.com https://api.openai.com https://*.sentry.io https://*.ingest.sentry.io https://*.posthog.com" +
+      (previewToolbar ? " https://vercel.live wss://ws-us3.pusher.com" : ""),
+    // SECURITY: Allow iframes from any origin for the in-app browser (/browse).
+    // The iframe uses sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
+    // to restrict embedded page capabilities (no top-navigation, no pointer-lock).
+    "frame-src 'self' https://*.stripe.com https:",
+    "frame-ancestors 'self'",
+    "form-action 'self'",
+    "base-uri 'self'",
+    "object-src 'none'",
+  ].join("; ");
+}
+
 const nextConfig: NextConfig = {
   turbopack: {},
 
@@ -229,55 +297,7 @@ const nextConfig: NextConfig = {
           },
           {
             key: "Content-Security-Policy",
-            value: [
-              "default-src 'self'",
-              // SECURITY (H-5 audit, 2026-04-02): 'unsafe-inline' is REQUIRED and cannot
-              // be removed without breaking the app. Reasons:
-              //
-              // script-src 'unsafe-inline':
-              //   1. Next.js injects inline <script> tags for hydration data (__NEXT_DATA__),
-              //      route prefetching, and chunk loading — these are not controllable by app code
-              //   2. Next.js does not yet support nonce-based CSP in the App Router production
-              //      build (https://github.com/vercel/next.js/issues/43743)
-              //   3. Sentry SDK initialization requires inline script execution
-              //
-              // style-src 'unsafe-inline':
-              //   1. Radix UI (shadcn/ui) injects inline styles for portal positioning
-              //      (dropdowns, tooltips, dialogs, popovers) — cannot be externalized
-              //   2. Recharts uses inline SVG styles for chart rendering
-              //   3. next/font injects inline style tags for font-face declarations
-              //
-              // MITIGATION: unsafe-eval is NOT allowed. XSS risk is reduced by:
-              //   - All user content rendered via React (auto-escaped)
-              //   - No dangerouslySetInnerHTML usage in app code
-              //   - Strict form-action, base-uri, and object-src restrictions below
-              //
-              // TODO: Migrate to nonce-based CSP when Next.js App Router supports it
-              //
-              // 'wasm-unsafe-eval': CSP3 directive that permits WebAssembly
-              // module compilation (strictly narrower than the full
-              // script-executing directive — it only lets the browser compile
-              // and instantiate .wasm modules). Required by
-              // @react-pdf/renderer, which uses WASM for its PDF font and
-              // layout pipeline. Without this, the Design Report PDF export
-              // silently fails with a "WebAssembly.instantiate violates CSP"
-              // message and the background op completes with zero output.
-              "script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://*.supabase.co https://*.stripe.com https://*.sentry.io https://*.posthog.com https://eu-assets.i.posthog.com",
-              "style-src 'self' 'unsafe-inline'",
-              "img-src 'self' data: https: blob:",
-              "font-src 'self' data:",
-              "media-src 'self'",
-              "worker-src 'self' blob:",
-              "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.stripe.com https://api.openai.com https://*.sentry.io https://*.ingest.sentry.io https://*.posthog.com",
-              // SECURITY: Allow iframes from any origin for the in-app browser (/browse).
-              // The iframe uses sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
-              // to restrict embedded page capabilities (no top-navigation, no pointer-lock).
-              "frame-src 'self' https://*.stripe.com https:",
-              "frame-ancestors 'self'",
-              "form-action 'self'",
-              "base-uri 'self'",
-              "object-src 'none'",
-            ].join("; "),
+            value: contentSecurityPolicy(),
           },
         ],
       },
