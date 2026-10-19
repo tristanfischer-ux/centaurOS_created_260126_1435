@@ -22,7 +22,7 @@ export function explainerFilm(key: FilmKey): string {
   return `<section class="s" id="explainer"><div class="wrap"><div class="film">
 <p class="eyebrow">Explainer</p>
 <h2>Watch how it works<span class="film-dur">${d.duration}</span></h2>
-<div class="film-frame"><video controls preload="metadata" playsinline poster="/ff/films/${key}.webp" width="1920" height="1080">
+<div class="film-frame"><video controls preload="none" playsinline poster="/ff/films/${key}.webp" width="1920" height="1080">
 <source src="/ff/films/${key}.mp4" type="video/mp4">
 <track kind="captions" src="/ff/films/${key}.vtt" srclang="en" label="English" default>
 </video></div>
