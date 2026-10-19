@@ -21,7 +21,7 @@
         "text": "Commission the right specialists. You or your planner send each submission to the council with the covering letter we draft."
       }
     ],
-    "demo_intro": "Sample: a new school scheme. 26 numbered conditions plus the biodiversity gain condition. Filter by stage, then click one to see what it means and which documents you need.",
+    "demo_intro": "Sample: a new school scheme. 26 numbered conditions plus the biodiversity gain condition.",
     "you_get": [
       "A register of every condition in plain English, usually within a day.",
       "When each condition is due: before work starts, during the build, before people move in, or with a reserved matters application.",
@@ -106,7 +106,7 @@
         "text": "Usually within a day you receive a two-page desk study with a prioritised list of parcels to check on the walkover."
       }
     ],
-    "demo_intro": "Know which parcels matter before the walkover. Click any parcel to see its likely habitat, how sure we are (low, medium or high), and what to check on the walkover. The checks are for your visit; the desk study does not score habitat condition.",
+    "demo_intro": "Know which parcels matter before the walkover.",
     "you_get": [
       "Protected sites and priority habitats (those most important for nature conservation) within 600 metres of your site",
       "A first habitat map of the site from national data, with a confidence rating for each parcel (low, medium or high)",
@@ -189,7 +189,7 @@
         "text": "Usually within a day: your checklist, your evidence checked against each requirement, a list of gaps to close and first-draft answers for your team to sign off."
       }
     ],
-    "demo_intro": "Sample: a parish council fencing tender. 30 bidder-facing requirements: 16 specification points, 4 items to submit, 4 contract deliverables, 6 scored criteria. Tick off the items and watch the ready to bid bar fill.",
+    "demo_intro": "Sample: a parish council fencing tender. 30 bidder-facing requirements: 16 specification points, 4 items to submit, 4 contract deliverables, 6 scored criteria.",
     "you_get": [
       "Every pass-or-fail condition, quoted from the tender so you can check each one",
       "Every document you must submit, how bids are scored and the key dates",

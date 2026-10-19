@@ -18,17 +18,17 @@ type Svc = {
 };
 
 const SERVICES: Svc[] = [
-  { key: "condition-desk", name: "Condition Desk", href: "/condition-desk", imgBase: "/ff/img/cards/condition-desk", mark: MARK["condition-desk"],
+  { key: "condition-desk", name: "Condition Desk", href: "/condition-desk", imgBase: "/ff/films/condition-desk", mark: MARK["condition-desk"],
     acc: "var(--rust)", accD: "var(--rust)", accS: "var(--rust-soft)", accM: "var(--rust-line)",
     who: "For housebuilders and land promoters",
     what: "Send the decision notice. Get every planning condition in plain English, with the ones that block a start on site picked out and covering letters drafted.",
     price: "£400 per permission", mo: "£1,000 a month for five live sites", time: "Usually within a day", example: ["26", "numbered conditions plus the biodiversity gain condition. 7 before work starts"] },
-  { key: "habitat-draft", name: "Habitat Draft", href: "/habitat-draft", imgBase: "/ff/img/cards/habitat-draft", mark: MARK["habitat-draft"],
+  { key: "habitat-draft", name: "Habitat Draft", href: "/habitat-draft", imgBase: "/ff/films/habitat-draft", mark: MARK["habitat-draft"],
     acc: "var(--moss)", accD: "var(--moss)", accS: "var(--moss-soft)", accM: "var(--moss)",
     who: "For ecology consultancies",
     what: "A two-page desk study before the walkover: protected sites within 600 m, a first habitat map, tree and hedge heights, and the parcels to check. Your ecologist signs everything.",
     price: "£150 per desk study", mo: "£1,000 a month for eight", time: "Usually within a day", example: ["", "Know which parcels matter before the walkover"] },
-  { key: "bid-check", name: "Bid Check", href: "/bid-check", imgBase: "/ff/img/cards/bid-check", mark: MARK["bid-check"],
+  { key: "bid-check", name: "Bid Check", href: "/bid-check", imgBase: "/ff/films/bid-check", mark: MARK["bid-check"],
     acc: "var(--rust)", accD: "var(--rust)", accS: "var(--rust-soft)", accM: "var(--rust-line)",
     who: "For firms that bid for public contracts",
     what: "Send the tender pack. Get a bid at a glance: every pass-or-fail condition, every document to submit, how bids are scored and the key dates, each quoted from the tender.",
@@ -44,7 +44,7 @@ export const FAQS: [string, string][] = [
   ["Do I need to talk to anyone?", "No. There are no sales calls. Each service page has an enquiry form, or you can email the documents."],
   ["Who checks the work?", "Your own team does. Every report shows its sources so it can be checked: Condition Desk sets out each condition from the decision notice, Bid Check quotes the tender for every item, your ecologist checks and signs each Habitat Draft desk study, and every number in a Design Dossier is a traceable formula."],
   ["What do the reports use?", "Public documents and public data: the decision notice, the tender pack, national habitat and protected-site data, and the Environment Agency laser survey. Design Dossiers also use open engineering libraries and real component prices."],
-  ["Can I see the work first?", "Yes. Every service page has a worked example and a short film that shows what you get, built from public documents."],
+  ["Can I see the work first?", "Yes. Every service page has a short film showing how it works."],
 ];
 
 export const CSS_HOME = `
@@ -195,15 +195,20 @@ export const CSS_HOME = `
 
 function card(s: Svc): string {
   const vars = `--sa:${s.acc};--sd:${s.accD};--ss:${s.accS};--sm:${s.accM}`;
-  const img = responsiveImg({
-    base: s.imgBase,
-    alt: "",
-    width: 560,
-    height: 315,
-    widths: CARD_WIDTHS,
-    sizes: CARD_SIZES,
-    lazy: true,
-  });
+  const alt = s.key === "design-dossier"
+    ? `${s.name} sample`
+    : `${s.name} explainer film`;
+  const img = s.key === "design-dossier"
+    ? responsiveImg({
+        base: s.imgBase,
+        alt,
+        width: 560,
+        height: 315,
+        widths: CARD_WIDTHS,
+        sizes: CARD_SIZES,
+        lazy: true,
+      })
+    : `<img src="${s.imgBase}.webp" width="1280" height="720" alt="${esc(alt)}" loading="lazy" decoding="async">`;
   return `<a class="svc" href="${s.href}" style="${vars}">
 <div class="im">${img}<span class="tag"><span>${s.mark}</span>${esc(s.who.replace(/^For /, ""))}</span></div>
 <div class="bd"><h3>${esc(s.name)}</h3><p class="who">${esc(s.who)}</p><p class="lead">${esc(GAINS[s.key as keyof typeof GAINS].lead)}</p><p class="what">${esc(s.what)}</p>
@@ -285,13 +290,13 @@ ${siteHeader()}
 <h1>Clear specialist reports, <em>at a fixed price.</em></h1>
 <p class="sub">Four services for housebuilders, ecologists, bid teams and hardware founders. Send your documents by email or web form. Most reports are back within a day; Design Dossiers take a few days.</p>
 <div class="cta-row"><a class="btn btn-primary" href="#services">Choose a service</a><a class="btn btn-ghost" href="#how">How it works</a></div>
-<div class="meta"><span>${TICK} Fixed prices</span><span>${TICK} No sales calls</span><span>${TICK} A worked example on every service page</span></div>
+<div class="meta"><span>${TICK} Fixed prices</span><span>${TICK} No sales calls</span><span>${TICK} A short film on every service page</span></div>
 </div>
 <div>${heroPanel()}</div>
 </div></section>
 
 <section class="s" id="services"><div class="wrap"><div class="s-head"><p class="eyebrow">Four services</p><h2>Pick the job you need done</h2>
-<p class="lede">Each service has its own page with a real worked example, a short film and an enquiry form.</p></div>
+<p class="lede">Each service has its own page with a short film showing how it works and an enquiry form.</p></div>
 <div class="svcs">${SERVICES.map(card).join("")}</div></div></section>
 
 <section class="s"><div class="wrap"><div class="who-band">
@@ -316,7 +321,7 @@ ${tristan}
 <section class="s alt" id="faq"><div class="wrap"><div class="s-head"><h2>Questions</h2></div>${faqs}</div></section>
 
 <section class="cta-photo">${ctaBg}<div class="wrap"><h2>Start with the service that fits</h2>
-<p>Every service page has a worked example, a short film and an enquiry form. Not sure which one? Email <a class="mail" href="mailto:${MAIL}">${MAIL}</a>.</p>
+<p>Every service page has a short film showing how it works. Not sure which one? Email <a class="mail" href="mailto:${MAIL}">${MAIL}</a>.</p>
 <div class="svc-row">${svcLinks}</div></div></section>
 
 ${siteFooter()}
