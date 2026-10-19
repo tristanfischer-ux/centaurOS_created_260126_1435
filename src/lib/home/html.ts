@@ -163,7 +163,7 @@ export const CSS_HOME = `
   .hp-count span{font-size:13px;max-width:none}
   .hp-doc{display:none}
   .hp-tab{padding:8px 6px 12px;font-size:11px;line-height:1.25;overflow:visible}
-  .hp-tab small{white-space:normal;overflow:visible;text-overflow:unset;font-size:10px;line-height:1.3}
+  .hp-tab small{white-space:normal;overflow:visible;text-overflow:unset;font-size:11px;line-height:1.3}
   .hp-out h5{gap:4px}
   .hp-status{text-align:left;max-width:none}
   .hp-foot{flex-direction:column;align-items:flex-start;gap:6px}
