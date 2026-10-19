@@ -104,6 +104,14 @@
     const panel = $("hp-panel");
     if (!panel || panel.dataset.ready) return;
     panel.dataset.ready = "1";
+    panel.style.minHeight = "600px";
+    if (!document.getElementById("hp-blank-css")) {
+      const st = document.createElement("style");
+      st.id = "hp-blank-css";
+      st.textContent =
+        ".hp-count.no-num b{display:inline-block;visibility:hidden;min-width:2ch}";
+      document.head.appendChild(st);
+    }
     const tabs = [...panel.querySelectorAll(".hp-tab")];
     const doclines = $("hp-doclines");
     if (doclines) {
@@ -130,6 +138,8 @@
       if (sample) sample.setAttribute("href", s.href);
       const count = $("hp-count");
       if (count) count.classList.toggle("no-num", !s.showNum);
+      const numEl = $("hp-num");
+      if (numEl) numEl.style.visibility = s.showNum ? "" : "hidden";
       tabs.forEach((t, k) => t.setAttribute("aria-selected", k === i ? "true" : "false"));
       const hotSet = s.hot ? beforeStartSet(s.n, s.hot) : new Set();
       $("hp-rows").innerHTML = Array.from({ length: VIS }, (_, k) =>
@@ -144,7 +154,11 @@
           }).join("")
         : "";
       const segwrap = $("hp-seg");
-      if (segwrap) segwrap.style.display = s.showSeg ? "" : "none";
+      if (segwrap) {
+        segwrap.style.display = "";
+        segwrap.style.visibility = s.showSeg ? "" : "hidden";
+        segwrap.style.minHeight = "12px";
+      }
     }
     function seek(t) {
       if (!$("hp-num") || !$("hp-status") || !$("hp-seg") || !$("hp-rows")) return;
@@ -163,9 +177,12 @@
               ? clamp((D - BLANK - lt) / (0.25 - BLANK), 0, 1)
               : 1;
       const wrap = $("hp-fade");
-      if (wrap) wrap.style.opacity = String(fade);
+      if (wrap) {
+        wrap.style.opacity = String(fade);
+        wrap.style.visibility = fade === 0 ? "hidden" : "visible";
+      }
       const stage = $("hp-stage");
-      if (stage) stage.style.opacity = "1";
+      if (stage) stage.style.opacity = String(fade);
       const prog = ease(clamp((lt - 0.6) / 2.6, 0, 1));
       const shown = Math.round(prog * s.n);
       $("hp-num").textContent = s.showNum ? String(shown) : "";

@@ -104,7 +104,7 @@ export const CSS_HOME = `
 .cta-photo .svc-row a:before{content:"";width:9px;height:9px;border-radius:50%;margin-right:8px;flex:none}.cta-photo .svc-row a:nth-child(1):before{background:#a8481a}.cta-photo .svc-row a:nth-child(2):before{background:#2f6b43}.cta-photo .svc-row a:nth-child(3):before{background:#b4400c}.cta-photo .svc-row a:nth-child(4):before{background:#d9461a}
 
 /* Hero "report being built" panel — ported from hero-after.html */
-.hp-panel{position:relative;background:var(--card);border:1px solid var(--line);border-radius:var(--r-lg);box-shadow:var(--shadow);overflow:hidden}
+.hp-panel{position:relative;background:var(--card);border:1px solid var(--line);border-radius:var(--r-lg);box-shadow:var(--shadow);overflow:hidden;min-height:600px}
 .hp-fade{opacity:1}
 .hp-tabs{display:flex;align-items:stretch;border-bottom:1px solid var(--line);background:var(--card-2);overflow:visible}
 .hp-tab{flex:1;min-width:0;padding:14px 12px 16px;font-size:13px;font-weight:600;color:var(--muted);border:0;background:none;text-align:left;cursor:pointer;position:relative;font-family:inherit;line-height:1.25}
@@ -121,7 +121,7 @@ export const CSS_HOME = `
 .hp-out h5 > span:first-child{white-space:nowrap}
 .hp-count{display:flex;align-items:flex-end;flex-wrap:wrap;gap:8px 12px;margin-bottom:12px}
 .hp-count b{font-family:var(--serif);font-size:56px;font-weight:600;line-height:1;color:var(--c,var(--rust));font-variant-numeric:tabular-nums;min-width:2ch}
-.hp-count.no-num b{display:none;min-width:0}
+.hp-count.no-num b{display:inline-block;visibility:hidden;min-width:2ch}
 .hp-count span{font-size:14px;color:var(--ink-2);line-height:1.35;flex:1;min-width:12ch;max-width:34ch}
 .hp-seg{display:flex;gap:2px;height:12px;margin:0 0 6px}.hp-seg i{flex:1;border-radius:2px;background:var(--skel);opacity:.55}.hp-seg i.on{opacity:1}.hp-seg i.on.hot{background:var(--c,var(--rust))}
 .hp-seg i.on.b0{background:var(--c,var(--rust))}
