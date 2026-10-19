@@ -2,6 +2,7 @@ import { CSS, CSS2, CSS3, TICK, esc } from "@/lib/lumicity/html";
 import { CSS_HOME, MAIL, siteFooter, siteHeader } from "@/lib/home/html";
 import { GAINS_CSS, gainsSection } from "@/lib/home/gains";
 import { AVATAR_SIZES, AVATAR_WIDTHS, CARD_SIZES, CARD_WIDTHS, CTA_SIZES, CTA_WIDTHS, HERO_SIZES, HERO_WIDTHS, responsiveImg } from "@/lib/home/images";
+import { FILM_CSS, explainerFilm } from "@/lib/home/film";
 import copy from "@/lib/home/dd-copy.json";
 
 // Design Dossier page in the same design as the other service pages.
@@ -51,7 +52,23 @@ function example(e: Ex): string {
     })}</div>
 <div class="bd"><h3>${esc(e.title)}</h3><p>${esc(e.text)}</p><small>${esc(e.caption)}</small></div></div>`;
   }
-  return `<div class="ex"><div class="ims"><img src="/images/site/dossier-render.webp" alt="Render of a water-treatment plant designed with Anvil" loading="lazy"><img src="/images/site/dossier-ga.webp" alt="General-arrangement drawing of the water-treatment plant" loading="lazy"></div>
+  return `<div class="ex"><div class="ims">${responsiveImg({
+    base: "/images/site/dossier-render",
+    alt: "Render of a water-treatment plant designed with Anvil",
+    width: 560,
+    height: 373,
+    widths: CARD_WIDTHS,
+    sizes: CARD_SIZES,
+    lazy: true,
+  })}${responsiveImg({
+    base: "/images/site/dossier-ga",
+    alt: "General-arrangement drawing of the water-treatment plant",
+    width: 560,
+    height: 566,
+    widths: CARD_WIDTHS,
+    sizes: CARD_SIZES,
+    lazy: true,
+  })}</div>
 <div class="bd"><h3>${esc(e.title)}</h3><p>${esc(e.text)}</p><small>${esc(e.caption)}</small>
 <a class="lnk" href="/cost/water-treatment-plant">Worked cost breakdown ${ARROW}</a><a class="lnk" href="/sample-package">Example package ${ARROW}</a></div></div>`;
 }
@@ -60,7 +77,7 @@ export function buildDdHtml(): string {
   const c = copy;
   const card = c.hero.card.rows.map(([v, l]) => `<a href="#get"><b style="font-size:20px;min-width:96px">${esc(v)}</b><span>${esc(l)}</span></a>`).join("");
   const faqs = c.faqs.map((f) => `<details class="faq" open><summary>${esc(f.q)}</summary><p>${esc(f.a)}</p></details>`).join("");
-  return `<style>${CSS}${CSS2}${CSS3}${CSS_HOME}${CSS_DD}${GAINS_CSS}</style>
+  return `<style>${CSS}${CSS2}${CSS3}${CSS_HOME}${CSS_DD}${FILM_CSS}${GAINS_CSS}</style>
 <div class="pg home dd">
 ${siteHeader()}
 
@@ -99,9 +116,9 @@ ${gainsSection("design-dossier")}
 <div><h2>${esc(c.problem.title)}</h2><ul>${c.problem.points.map((p) => `<li>${TICK}<span>${esc(p)}</span></li>`).join("")}</ul><p class="close">${esc(c.problem.close)}</p></div></div></section>
 
 <section class="s alt" id="how"><div class="wrap"><div class="s-head"><p class="eyebrow">How it works</p><h2>From one paragraph to a design you can inspect</h2></div>
-<div class="hsteps">${c.steps.map((s) => `<div class="hstep"><h3>${esc(s.title.replace(/^\d+\.\s*/, ""))}</h3><p>${esc(s.text)}</p></div>`).join("")}</div>
+<div class="hsteps"><div class="hsteps-rail" aria-hidden="true"><i class="hsteps-fill"></i></div>${c.steps.map((s) => `<div class="hstep"><h3>${esc(s.title.replace(/^\d+\.\s*/, ""))}</h3><p>${esc(s.text)}</p></div>`).join("")}</div>
 <div class="steer"><b>${esc(c.steer.title)}</b><p>${esc(c.steer.text)}</p></div></div></section>
-
+${explainerFilm("design-dossier")}
 <section class="s" id="get"><div class="wrap"><div class="s-head"><p class="eyebrow">What you get</p><h2>Six parts, one live workbook</h2></div>
 <div class="getg">${c.get.map((g, i) => `<div><b><i>${i + 1}</i>${esc(g.title)}</b><p>${esc(g.text)}</p></div>`).join("")}</div></div></section>
 

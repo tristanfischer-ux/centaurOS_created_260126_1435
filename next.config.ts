@@ -176,6 +176,27 @@ const nextConfig: NextConfig = {
   async headers() {
     return [
       {
+        source: "/ff/films/:path*.mp4",
+        headers: [
+          { key: "Content-Type", value: "video/mp4" },
+          { key: "Accept-Ranges", value: "bytes" },
+          { key: "Cache-Control", value: "public, max-age=31536000, immutable" },
+        ],
+      },
+      {
+        source: "/ff/films/:path*.vtt",
+        headers: [
+          { key: "Content-Type", value: "text/vtt; charset=utf-8" },
+          { key: "Cache-Control", value: "public, max-age=31536000, immutable" },
+        ],
+      },
+      {
+        source: "/ff/clips/:path*",
+        headers: [
+          { key: "Cache-Control", value: "public, max-age=31536000, immutable" },
+        ],
+      },
+      {
         source: "/:path*",
         headers: [
           {
@@ -245,6 +266,7 @@ const nextConfig: NextConfig = {
               "style-src 'self' 'unsafe-inline'",
               "img-src 'self' data: https: blob:",
               "font-src 'self' data:",
+              "media-src 'self'",
               "worker-src 'self' blob:",
               "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.stripe.com https://api.openai.com https://*.sentry.io https://*.ingest.sentry.io https://*.posthog.com",
               // SECURITY: Allow iframes from any origin for the in-app browser (/browse).

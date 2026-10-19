@@ -21,6 +21,7 @@ import {
   HERO_WIDTHS,
   responsiveImg,
 } from "@/lib/home/images";
+import { FILM_CSS, explainerFilm } from "@/lib/home/film";
 
 export const esc = (s: string) =>
   s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -433,7 +434,7 @@ export function buildHtml(key: LumicityKey): string {
   const pdf = `/lumicity/samples/${key}-sample.pdf`;
   const dlName = `${c.name} sample report.pdf`;
   const dlBtn = (cls: string, label: string) => `<a class="${cls}" href="${pdf}" download="${esc(dlName)}">${DL} ${esc(label)}</a>`;
-  return `<style>${CSS}${CSS2}${CSS3}${GAINS_CSS}</style>
+  return `<style>${CSS}${CSS2}${CSS3}${FILM_CSS}${GAINS_CSS}</style>
 <div class="pg" style="${style}">
 <header class="nav"><div class="wrap nav-inner"><a class="logo" href="/${key}"><span class="mk">${MARK[key]}</span><span><b>${esc(c.name)}</b><small>A Fractional Forge service</small></span></a>
 <nav class="navlinks" aria-label="Page sections"><a href="#how">How it works</a><a href="#demo">Example</a><a href="#sample">Sample report</a><a href="#price">Price</a><a href="#faq">Questions</a></nav>${link(c, "Send a request", "btn btn-primary")}</div></header>
@@ -478,6 +479,7 @@ ${gainsSection(key)}
 ${demoShell(key)}<div style="margin-top:28px">${chart(key, d)}</div></div></section>
 <section class="s alt"><div class="wrap"><div class="s-head"><h2>By hand, or with ${esc(c.name)}</h2></div>
 <div class="ba">${d.before_after.map((r) => `<div class="row"><div class="b"><small><svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M3 3l10 10M13 3L3 13" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg> By hand</small>${esc(r[0])}</div><div class="a"><small>${TICK} With ${esc(c.name)}</small>${esc(r[1])}</div></div>`).join("")}</div></div></section>
+${explainerFilm(key)}
 <section class="s" id="sample"><div class="wrap"><div class="sample"><a class="paper" href="${pdf}" download="${esc(dlName)}" aria-label="Download the sample report">${responsiveImg({
     base: `/lumicity/samples/${key}-cover`,
     alt: `First page of the ${c.name} sample report`,
