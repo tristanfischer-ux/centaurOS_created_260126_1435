@@ -1,12 +1,11 @@
 "use client";
 import { useEffect } from "react";
-import { initDemo, initEnquiry } from "@/lib/lumicity/demo";
-import type { LumicityKey } from "@/lib/lumicity/html";
+import { initEnquiry } from "@/lib/lumicity/demo";
 
-export function DemoMount({ page }: { page: LumicityKey }) {
+/** Mounts the service enquiry form handler. Interactive sample demos are retired. */
+export function DemoMount() {
   useEffect(() => {
-    initDemo(page);
     initEnquiry();
-  }, [page]);
+  }, []);
   return null;
 }

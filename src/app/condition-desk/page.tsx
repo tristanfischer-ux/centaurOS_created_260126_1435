@@ -21,7 +21,7 @@ export default function Page() {
     <>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: ldScript(serviceLd("condition-desk")) }} />
       <div dangerouslySetInnerHTML={{ __html: buildHtml("condition-desk") }} />
-      <DemoMount page="condition-desk" />
+      <DemoMount />
     </>
   );
 }

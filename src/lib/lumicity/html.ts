@@ -1,8 +1,5 @@
 import copy from "./copy.json";
 import design from "./design.json";
-import cdData from "../../../public/lumicity/condition-desk.json";
-import hdData from "../../../public/lumicity/habitat-draft.json";
-import bcData from "../../../public/lumicity/bid-check.json";
 
 export type LumicityKey = "condition-desk" | "habitat-draft" | "bid-check";
 export const MAIL = "tristan.fischer@fractionalforge.app";
@@ -13,8 +10,6 @@ import { GAINS_CSS, gainsSection } from "@/lib/home/gains";
 import {
   CONTEXT_SIZES,
   CONTEXT_WIDTHS,
-  COVER_SIZES,
-  COVER_WIDTHS,
   CTA_SIZES,
   CTA_WIDTHS,
   HERO_SIZES,
@@ -199,10 +194,6 @@ const mailto = (c: C) =>
   `<a href="mailto:${MAIL}?subject=${encodeURIComponent(c.mail)}">${MAIL}</a>`;
 type D = (typeof design)["condition-desk"];
 
-const STAGE_LABEL: Record<string, string> = {
-  before_start: "Before work starts", with_reserved_matters: "With the detailed plans", during_build: "During the build",
-  before_occupation: "Before people move in", start_deadline: "Time limit to start", if_event: "Only if something happens", compliance: "Rules to follow throughout",
-};
 const short = (s: string, n: number) => (s.length > n ? s.slice(0, n - 1).replace(/\s+\S*$/, "") + "…" : s);
 
 const ICON = [
@@ -210,58 +201,6 @@ const ICON = [
   `<svg viewBox="0 0 32 32" width="30" height="30" aria-hidden="true"><rect x="6" y="3" width="20" height="26" rx="3" fill="none" stroke="currentColor" stroke-width="2"/><path d="M11 11h10M11 16h10M11 21h6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>`,
   `<svg viewBox="0 0 32 32" width="30" height="30" aria-hidden="true"><circle cx="16" cy="16" r="12" fill="none" stroke="currentColor" stroke-width="2"/><path d="M10 16.5l4 4 8-9" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
 ];
-function mockup(key: LumicityKey): string {
-  if (key === "condition-desk") {
-    const all = cdData.conditions;
-    const blockers = all.filter((c) => c.stage === "before_start");
-    const rows = blockers.slice(0, 4).map((c) => `<div class="mrow"><span class="num">${c.n}</span><div><div class="tt">${esc(c.title)}</div><div class="ss"><span class="spill">${esc(STAGE_LABEL[c.stage])}</span> prepared by ${esc(c.who.toLowerCase())}</div></div></div>`).join("");
-    return `<div class="mock" aria-label="Example of a Condition Desk register"><div class="mock-bar"><i></i><i></i><i></i><span>Condition register: Sample: a new school scheme</span></div><div class="mock-body">
-<h4>Sample: a new school scheme</h4><p class="mm">26 numbered conditions plus the biodiversity gain condition</p>
-<div class="big"><div><b>26</b><small>numbered conditions plus the biodiversity gain condition</small></div><div class="hot"><b>7</b><small>before work starts</small></div></div>
-${rows}<div class="letter">A covering letter to the council is drafted for each submission.</div></div></div>`;
-  }
-  if (key === "habitat-draft") {
-    const ps = hdData.parcels.slice(0, 6);
-    const rows = ps.map((p) => `<div class="crow"><b>${esc(p.id)}</b><span>${esc(short(p.habitat, 26))}</span><span class="pill ${p.confidence}">${esc(p.confidence)}</span></div>`).join("");
-    return `<div class="mock" aria-label="Example of a Habitat Draft desk study"><div class="mock-bar"><i></i><i></i><i></i><span>Desk study: Ecology desk study, first draft</span></div>
-<div class="mock-map"><img src="/lumicity/romsey-map.png" alt="First habitat map drawn from national data" width="600" height="800"><div class="mock-body"><h4>Ecology desk study, first draft</h4><p class="mm">Know which parcels matter before the walkover. First draft, unchecked. How sure we are, per parcel:</p>${rows}<p class="mm" style="margin-top:8px">The ecologist checks and signs everything.</p></div></div></div>`;
-  }
-  const items = bcData.items;
-  const gates = items.filter((i) => i.kind === "gate").slice(0, 3);
-  const rows = gates.map((g, i) => `<div class="mrow"><span class="num">${i + 1}</span><div><div class="q">“${esc(short(g.text, 88))}”</div><div class="ss"><span class="spill">Pass or fail</span> Tender pack</div></div></div>`).join("");
-  return `<div class="mock" aria-label="Example of a Bid Check bid at a glance"><div class="mock-bar"><i></i><i></i><i></i><span>Bid at a glance: Sample: a parish council fencing tender</span></div><div class="mock-body">
-<h4>Sample: a parish council fencing tender</h4><p class="mm">30 bidder-facing requirements</p>
-<div class="big"><div><b>30</b><small>bidder-facing requirements</small></div><div class="hot"><b>16</b><small>specification points</small></div><div><b>4</b><small>items to submit</small></div></div>${rows}</div></div>`;
-}
-
-function chart(key: LumicityKey, d: D): string {
-  const cap = `<p class="cap">${esc(d.chart_caption)}</p>`;
-  if (key === "condition-desk") {
-    return `<div class="chart"><h3>${esc(d.chart_title)}</h3>
-<div class="hbar hot"><span>Before work starts</span><span class="track"><i style="width:27%"></i></span><b>7</b></div>
-<div class="hbar"><span>26 numbered conditions plus the biodiversity gain condition</span><span class="track"><i style="width:100%"></i></span><b>26</b></div>
-${cap}</div>`;
-  }
-  if (key === "habitat-draft") {
-    const col: Record<string, string> = { low: "#d97706", medium: "#2563eb", high: "#0f7a4d" };
-    return `<div class="chart"><h3>${esc(d.chart_title)}</h3>
-<div class="legend">${["low", "medium", "high"].map((k) => `<span style="--c:${col[k]}">${k} confidence</span>`).join("")}</div>${cap}</div>`;
-  }
-  const kinds: [string, number, string][] = [
-    ["specification points", 16, "#b4400c"],
-    ["items to submit", 4, "#64748b"],
-    ["contract deliverables", 4, "#0f7a4d"],
-    ["scored criteria", 6, "#2563eb"],
-  ];
-  return `<div class="chart"><h3>${esc(d.chart_title)}</h3><div class="stack" role="img" aria-label="30 bidder-facing requirements">${kinds.map((k) => `<i style="width:${(k[1] / 30) * 100}%;background:${k[2]}"></i>`).join("")}</div>
-<div class="legend">${kinds.map((k) => `<span style="--c:${k[2]}">${k[1]} ${k[0]}</span>`).join("")}</div>
-${cap}</div>`;
-}
-
-function demoShell(key: LumicityKey): string {
-  return `<div id="demo-root" data-demo="${key}" class="panel"><p>Loading the example</p></div>`;
-}
-
 export const CSS3 = `
 .pg{--font:var(--sans);font-family:var(--font);background:var(--paper);color:var(--ink)}
 .pg h1,.pg h2,.pg h3.serif{font-family:var(--serif);font-weight:600;letter-spacing:-.02em}
@@ -359,7 +298,6 @@ export const MARK: Record<LumicityKey, string> = {
   "bid-check": `<svg viewBox="0 0 24 24" width="19" height="19" aria-hidden="true"><path d="M4 6l2 2 3-3M4 13l2 2 3-3M4 20l2 2 3-3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M13 7h7M13 14h7M13 21h7" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>`,
 };
 export const TICK = `<svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path d="M2.5 8.5l3.5 3.5 7.5-8" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
-const DL = `<svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><path d="M10 3v10m0 0l-4-4m4 4l4-4M4 16h12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 
 type Extra = { img: string; problemTitle: string; stats: [string, string][]; sample: { pages: number; label: string; points: string[] }; ctaLine: string };
 function extra(key: LumicityKey): Extra {
@@ -431,20 +369,16 @@ export function buildHtml(key: LumicityKey): string {
     .map((f) => `<details class="faq"><summary>${esc(f.q)}</summary><p>${esc(f.a)}</p></details>`)
     .join("");
   const style = `--acc:${d.accent};--acc-d:${d.accent_dark};--acc-s:${d.accent_soft};--acc-m:${d.accent_mid}`;
-  const pdf = `/lumicity/samples/${key}-sample.pdf`;
-  const dlName = `${c.name} sample report.pdf`;
-  const dlBtn = (cls: string, label: string) => `<a class="${cls}" href="${pdf}" download="${esc(dlName)}">${DL} ${esc(label)}</a>`;
   return `<style>${CSS}${CSS2}${CSS3}${FILM_CSS}${GAINS_CSS}</style>
 <div class="pg" style="${style}">
 <header class="nav"><div class="wrap nav-inner"><a class="logo" href="/${key}"><span class="mk">${MARK[key]}</span><span><b>${esc(c.name)}</b><small>A Fractional Forge service</small></span></a>
-<nav class="navlinks" aria-label="Page sections"><a href="#how">How it works</a><a href="#demo">Example</a><a href="#sample">Sample report</a><a href="#price">Price</a><a href="#faq">Questions</a></nav>${link(c, "Send a request", "btn btn-primary")}</div></header>
+<nav class="navlinks" aria-label="Page sections"><a href="#how">How it works</a><a href="#explainer">Watch</a><a href="#price">Price</a><a href="#faq">Questions</a></nav>${link(c, "Send a request", "btn btn-primary")}</div></header>
 <main>
 <section class="hero2"><div class="wrap grid"><div>
 <p class="eyebrow">${esc(d.kicker)}</p>
 <h1>${esc(c.hero_head || c.headline)}</h1>
 <p class="sub">${esc(c.hero_sub || c.subhead)}</p>
-<div class="cta-row">${link(c, c.cta)}<a class="btn btn-ghost" href="#demo">Try a real example</a></div>
-${dlBtn("dl-link", `Download a sample report (PDF, ${x.sample.pages} pages)`)}
+<div class="cta-row">${link(c, c.cta)}<a class="btn btn-ghost" href="#explainer">Watch how it works</a></div>
 <div class="meta"><span>${TICK} Usually within a day</span><span>${TICK} ${esc(c.one[0])} ${esc(c.one[1])}</span><span>${TICK} Built from public documents</span></div>
 </div>
 <div class="photo"><div class="ph">${responsiveImg({
@@ -474,24 +408,9 @@ ${gainsSection(key)}
 <p class="lede" style="margin-top:22px">${esc(c.name)} does that groundwork for you, usually within a day, so your team can get on with the parts only they can do.</p></div></div></section>
 <section class="s alt" id="how"><div class="wrap"><div class="s-head"><h2>How it works</h2></div>
 <div class="steps">${d.step_titles.map((t, i) => `<div class="step"><div class="ic">${ICON[i]}</div><div class="n">${i + 1}</div><h3>${esc(t)}</h3><p>${esc(d.step_texts[i])}</p></div>`).join("")}</div></div></section>
-<section class="s" id="demo"><div class="wrap"><div class="s-head"><h2>${esc(c.demo_title)}</h2><p>${esc(c.demo_intro)}</p></div>
-<p class="demo-label"><b>A real example, built from public documents.</b>${(() => { const rest = c.demo_label.replace(/^A real example, built from public documents[:.]?\s*/, ""); return rest ? " " + esc(rest) : ""; })()}</p>
-${demoShell(key)}<div style="margin-top:28px">${chart(key, d)}</div></div></section>
 <section class="s alt"><div class="wrap"><div class="s-head"><h2>By hand, or with ${esc(c.name)}</h2></div>
 <div class="ba">${d.before_after.map((r) => `<div class="row"><div class="b"><small><svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M3 3l10 10M13 3L3 13" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg> By hand</small>${esc(r[0])}</div><div class="a"><small>${TICK} With ${esc(c.name)}</small>${esc(r[1])}</div></div>`).join("")}</div></div></section>
 ${explainerFilm(key)}
-<section class="s" id="sample"><div class="wrap"><div class="sample"><a class="paper" href="${pdf}" download="${esc(dlName)}" aria-label="Download the sample report">${responsiveImg({
-    base: `/lumicity/samples/${key}-cover`,
-    alt: `First page of the ${c.name} sample report`,
-    width: 340,
-    height: 481,
-    widths: COVER_WIDTHS,
-    sizes: COVER_SIZES,
-    lazy: true,
-  })}<span class="pdf">PDF · ${x.sample.pages} ${x.sample.pages === 1 ? "page" : "pages"}</span></a>
-<div><p class="eyebrow">Sample report</p><h2 style="margin-top:14px">See a full report before you pay</h2><p class="lede">${esc(x.sample.label)}</p>
-<ul>${x.sample.points.map((p) => `<li>${esc(p)}</li>`).join("")}</ul>
-<div class="cta-row">${dlBtn("btn btn-dl", "Download the sample")}${link(c, c.cta, "btn btn-ghost")}</div></div></div></div></section>
 <section class="s alt" id="price"><div class="wrap"><div class="s-head"><h2>Simple pricing</h2></div>
 <div class="price"><div class="pc feat"><span class="badge">Start here</span><p class="eyebrow">One-off</p><p class="amt">${esc(c.one[0])}</p><p class="unit">${esc(c.one[1])}</p><div class="cta-row">${link(c, c.cta)}</div></div>
 <div class="pc"><p class="eyebrow">Monthly</p><p class="amt">${esc(c.mon[0])}</p><p class="unit">${esc(c.mon[1])}</p><div class="cta-row">${link(c, "Ask about monthly", "btn btn-ghost")}</div></div></div>
@@ -513,7 +432,7 @@ ${form(key, c)}
     lazy: true,
     className: "bg",
   })}<div class="wrap"><h2>${esc(c.cta)}</h2><p>${esc(x.ctaLine)} Everything is done by email: no calls or meetings needed.</p>
-<div class="cta-row">${link(c, c.cta)}${dlBtn("btn btn-ghost", "Download the sample")}</div></div></section>
+<div class="cta-row">${link(c, c.cta)}<a class="btn btn-ghost" href="#explainer">Watch how it works</a></div></div></section>
 </main>
 <footer><div class="wrap"><p>${esc(c.name)}, a <a href="/">Fractional Forge</a> service. Also from Fractional Forge: ${others} · <a href="/design-dossier">Design Dossier</a></p>
 <p>Fractional Forge Limited · Tristan Fischer · ${mailto(c)}</p></div></footer>

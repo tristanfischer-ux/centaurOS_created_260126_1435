@@ -44,7 +44,7 @@ export const FAQS: [string, string][] = [
   ["Do I need to talk to anyone?", "No. There are no sales calls. Each service page has an enquiry form, or you can email the documents."],
   ["Who checks the work?", "Your own team does. Every report shows its sources so it can be checked: Condition Desk sets out each condition from the decision notice, Bid Check quotes the tender for every item, your ecologist checks and signs each Habitat Draft desk study, and every number in a Design Dossier is a traceable formula."],
   ["What do the reports use?", "Public documents and public data: the decision notice, the tender pack, national habitat and protected-site data, and the Environment Agency laser survey. Design Dossiers also use open engineering libraries and real component prices."],
-  ["Can I see the work first?", "Yes. Every service page has a full sample report to download, built on a real, current case."],
+  ["Can I see the work first?", "Yes. Every service page has a worked example and a short film that shows what you get, built from public documents."],
 ];
 
 export const CSS_HOME = `
@@ -208,7 +208,7 @@ function card(s: Svc): string {
 <div class="im">${img}<span class="tag"><span>${s.mark}</span>${esc(s.who.replace(/^For /, ""))}</span></div>
 <div class="bd"><h3>${esc(s.name)}</h3><p class="who">${esc(s.who)}</p><p class="lead">${esc(GAINS[s.key as keyof typeof GAINS].lead)}</p><p class="what">${esc(s.what)}</p>
 <div class="ex"><b>${esc(s.example[0])}</b><small>${esc(s.example[1])}</small></div>
-<div class="ft"><p class="pr">${esc(s.price)}<small>${esc(s.time)}</small>${s.mo ? `<small class="mo">${esc(s.mo)}</small>` : ""}</p><span class="go">${s.key === "design-dossier" ? "Sample package and brief form" : "Sample report and form"} ${ARROW}</span></div></div></a>`;
+<div class="ft"><p class="pr">${esc(s.price)}<small>${esc(s.time)}</small>${s.mo ? `<small class="mo">${esc(s.mo)}</small>` : ""}</p><span class="go">${s.key === "design-dossier" ? "Sample package and brief form" : "See the service"} ${ARROW}</span></div></div></a>`;
 }
 
 const SVC_LINKS = () => SERVICES.map((s) => `<a href="${s.href}">${esc(s.name)}</a>`).join("");
@@ -248,7 +248,7 @@ function heroPanel(): string {
           <div class="hp-rows" id="hp-rows" aria-hidden="true"></div>
         </div>
       </div>
-      <div class="hp-foot"><span id="hp-price"><b>£400 per permission</b> · Usually within a day</span><a id="hp-sample" href="/condition-desk#sample">Sample report and form →</a></div>
+      <div class="hp-foot"><span id="hp-price"><b>£400 per permission</b> · Usually within a day</span><a id="hp-sample" href="/condition-desk#explainer">Watch how it works →</a></div>
       </div>
     </div>
     <p class="hp-note">Real examples, built from public documents. Rows are a layout illustration, not report text.</p>`;
@@ -285,13 +285,13 @@ ${siteHeader()}
 <h1>Clear specialist reports, <em>at a fixed price.</em></h1>
 <p class="sub">Four services for housebuilders, ecologists, bid teams and hardware founders. Send your documents by email or web form. Most reports are back within a day; Design Dossiers take a few days.</p>
 <div class="cta-row"><a class="btn btn-primary" href="#services">Choose a service</a><a class="btn btn-ghost" href="#how">How it works</a></div>
-<div class="meta"><span>${TICK} Fixed prices</span><span>${TICK} No sales calls</span><span>${TICK} A sample report for every service</span></div>
+<div class="meta"><span>${TICK} Fixed prices</span><span>${TICK} No sales calls</span><span>${TICK} A worked example on every service page</span></div>
 </div>
 <div>${heroPanel()}</div>
 </div></section>
 
 <section class="s" id="services"><div class="wrap"><div class="s-head"><p class="eyebrow">Four services</p><h2>Pick the job you need done</h2>
-<p class="lede">Each service has its own page with a real worked example, a full sample report to download and an enquiry form.</p></div>
+<p class="lede">Each service has its own page with a real worked example, a short film and an enquiry form.</p></div>
 <div class="svcs">${SERVICES.map(card).join("")}</div></div></section>
 
 <section class="s"><div class="wrap"><div class="who-band">
@@ -316,7 +316,7 @@ ${tristan}
 <section class="s alt" id="faq"><div class="wrap"><div class="s-head"><h2>Questions</h2></div>${faqs}</div></section>
 
 <section class="cta-photo">${ctaBg}<div class="wrap"><h2>Start with the service that fits</h2>
-<p>Every service page has a sample report and an enquiry form. Not sure which one? Email <a class="mail" href="mailto:${MAIL}">${MAIL}</a>.</p>
+<p>Every service page has a worked example, a short film and an enquiry form. Not sure which one? Email <a class="mail" href="mailto:${MAIL}">${MAIL}</a>.</p>
 <div class="svc-row">${svcLinks}</div></div></section>
 
 ${siteFooter()}
