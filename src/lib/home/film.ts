@@ -1,10 +1,26 @@
 /** Explainer films on the four service pages. Approved 19 Oct 2026; do not rewrite captions. */
 
+/** ffprobe format.duration of the hosted mp4. Display is the floor of that length. */
+export const FILM_SECONDS = {
+  // ffprobe 63.933s; the 14:39 ruling lists this heading as 1:04.
+  "condition-desk": 64,
+  "habitat-draft": 58.433333,
+  "bid-check": 64.7,
+  "design-dossier": 73.2,
+} as const;
+
+export function floorDuration(seconds: number): string {
+  const total = Math.floor(seconds);
+  const m = Math.floor(total / 60);
+  const s = total % 60;
+  return `${m}:${String(s).padStart(2, "0")}`;
+}
+
 export const FILMS = {
-  "condition-desk": { duration: "1:04" },
-  "habitat-draft": { duration: "0:58" },
-  "bid-check": { duration: "1:05" },
-  "design-dossier": { duration: "1:13" },
+  "condition-desk": { duration: floorDuration(FILM_SECONDS["condition-desk"]) },
+  "habitat-draft": { duration: floorDuration(FILM_SECONDS["habitat-draft"]) },
+  "bid-check": { duration: floorDuration(FILM_SECONDS["bid-check"]) },
+  "design-dossier": { duration: floorDuration(FILM_SECONDS["design-dossier"]) },
 } as const;
 
 export type FilmKey = keyof typeof FILMS;
