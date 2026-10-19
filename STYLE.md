@@ -41,6 +41,6 @@ Hover lifts on cards and buttons are 1 to 3 pixels, over 200 ms, and do not move
 
 "Three steps, no calls" uses native CSS scroll-driven animation (`animation-timeline: view()`): a progress line fills and each step settles as it enters. Unsupported browsers and reduced motion see the finished static state. Total settle time is 200 ms.
 
-Each service page has an explainer film with controls, a poster, default-on captions and `preload="metadata"`. Films do not autoplay. Short looping clips of the hero panel are share assets only; they are not embedded on the pages.
+Each service page has an explainer film with controls, a poster, default-on captions and `preload="none"`, so no video bytes load before play. Films do not autoplay. Short looping clips of the hero panel are share assets only; they are not embedded on the pages.
 
 There is no looping decoration on the rest of the page.
