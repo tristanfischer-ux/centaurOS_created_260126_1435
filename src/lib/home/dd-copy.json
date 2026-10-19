@@ -31,10 +31,6 @@
  },
  "stats": [
   [
-   "~10 MW",
-   "floating AI data centre designed with Anvil"
-  ],
-  [
    "6",
    "parts in one live Excel workbook"
   ],
@@ -96,14 +92,8 @@
    "text": "The risks, assumptions and regulatory matters to check as the project develops."
   }
  ],
- "examples_intro": "Two worked examples show the range. The same engine has also been applied to grid-scale battery storage, vertical farms, CO₂ capture and power-to-liquid aviation fuel.",
+ "examples_intro": "One worked example is published. The same engine has also been applied to grid-scale battery storage, vertical farms, CO₂ capture and power-to-liquid aviation fuel.",
  "examples": [
-  {
-   "key": "barge",
-   "title": "A floating AI data centre",
-   "text": "A floating AI data centre of about 10 MW, gas-powered and designed with Anvil on a barge. Photoreal renders were produced from the 3D model.",
-   "caption": "Renders from the 3D model show the barge at sea and the deck."
-  },
   {
    "key": "water",
    "title": "A water-treatment plant",

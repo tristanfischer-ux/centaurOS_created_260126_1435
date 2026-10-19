@@ -1,14 +1,12 @@
 import { CSS, CSS2, CSS3, TICK, esc } from "@/lib/lumicity/html";
 import { CSS_HOME, MAIL, siteFooter, siteHeader } from "@/lib/home/html";
 import { GAINS_CSS, gainsSection } from "@/lib/home/gains";
-import { AVATAR_SIZES, AVATAR_WIDTHS, CARD_SIZES, CARD_WIDTHS, CTA_SIZES, CTA_WIDTHS, HERO_SIZES, HERO_WIDTHS, responsiveImg } from "@/lib/home/images";
+import { AVATAR_SIZES, AVATAR_WIDTHS, CARD_SIZES, CARD_WIDTHS, CTA_SIZES, HERO_SIZES, responsiveImg } from "@/lib/home/images";
 import { FILM_CSS, explainerFilm } from "@/lib/home/film";
 import copy from "@/lib/home/dd-copy.json";
 
 // Design Dossier page in the same design as the other service pages.
 // Copy drafted by an OpenRouter writer/critic loop (13 Oct 2026) against a fixed fact sheet.
-// The AI barge example is shown anonymously (Tristan, 13 Oct 2026): no client name, suppliers, sites or costs.
-
 const ARROW = `<svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><path d="M4 10h11m0 0l-4-4m4 4l-4 4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 
 const CSS_DD = `
@@ -32,26 +30,6 @@ const CSS_DD = `
 type Ex = { key: string; title: string; text: string; caption: string };
 
 function example(e: Ex): string {
-  if (e.key === "barge") {
-    return `<div class="ex"><div class="ims">${responsiveImg({
-      base: "/ff/img/barge-sea",
-      alt: "Render of a floating AI data centre on a barge at sea, from the 3D model",
-      width: 800,
-      height: 450,
-      widths: HERO_WIDTHS,
-      sizes: HERO_SIZES,
-      lazy: true,
-    })}${responsiveImg({
-      base: "/ff/img/barge-deck",
-      alt: "Render of the barge deck with cooling and power equipment",
-      width: 560,
-      height: 315,
-      widths: CARD_WIDTHS,
-      sizes: CARD_SIZES,
-      lazy: true,
-    })}</div>
-<div class="bd"><h3>${esc(e.title)}</h3><p>${esc(e.text)}</p><small>${esc(e.caption)}</small></div></div>`;
-  }
   return `<div class="ex"><div class="ims">${responsiveImg({
     base: "/images/site/dossier-render",
     alt: "Render of a water-treatment plant designed with Anvil",
@@ -89,11 +67,11 @@ ${siteHeader()}
 <div class="meta"><span>${TICK} £2,500 fixed price</span><span>${TICK} No sales calls</span><span>${TICK} Every number traceable</span></div>
 </div>
 <div class="pic">${responsiveImg({
-    base: "/ff/img/barge-sea",
-    alt: "Render of a floating AI data centre designed with Anvil, at sea",
-    width: 800,
-    height: 450,
-    widths: HERO_WIDTHS,
+    base: "/ff/img/dd-card",
+    alt: "An engineering workshop with a skid-mounted water treatment unit",
+    width: 560,
+    height: 416,
+    widths: CARD_WIDTHS,
     sizes: HERO_SIZES,
     priority: true,
   })}
@@ -151,11 +129,11 @@ ${responsiveImg({
 <section class="s alt" id="faq"><div class="wrap"><div class="s-head"><h2>Questions</h2></div>${faqs}</div></section>
 
 <section class="cta-photo">${responsiveImg({
-    base: "/ff/img/barge-deck",
+    base: "/ff/img/dd-card",
     alt: "",
     width: 800,
-    height: 342,
-    widths: CTA_WIDTHS,
+    height: 595,
+    widths: [800, 1120],
     sizes: CTA_SIZES,
     lazy: true,
     className: "bg",

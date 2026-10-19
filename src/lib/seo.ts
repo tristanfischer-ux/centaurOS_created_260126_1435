@@ -22,7 +22,7 @@ export const SERVICES: Svc[] = [
     offers: [{ price: 600, unit: "per tender", desc: "One tender" }, { price: 1500, unit: "per month", desc: "Up to three tenders a month" }], image: "/lumicity/img/bc-hero.jpg" },
   { key: "design-dossier", name: "Design Dossier", type: "Engineering design and costing study", audience: "Hardware and deep-tech founders",
     desc: "Send a short brief and get, in a few days, a buildable design, a costed bill of materials, the true cost and a financial model, engineering drawings, worked calculations and a risk and regulatory register, in a live Excel workbook where every number is a traceable formula.",
-    offers: [{ price: 2500, unit: "per Design Dossier", desc: "One Design Dossier" }, { price: 6000, unit: "per month", desc: "Up to three Design Dossiers a month" }], image: "/ff/img/barge-sea.jpg" },
+    offers: [{ price: 2500, unit: "per Design Dossier", desc: "One Design Dossier" }, { price: 6000, unit: "per month", desc: "Up to three Design Dossiers a month" }], image: "/ff/img/dd-card.jpg" },
 ];
 
 export const SITE_GRAPH = {

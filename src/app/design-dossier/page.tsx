@@ -5,13 +5,13 @@ import { ldScript, serviceLd } from "@/lib/seo";
 const TITLE = "Costed Engineering Design for Hardware | £2,500";
 const DESC = "Send a short brief and get a buildable engineering design, costed bill of materials, drawings and financial model in a few days. £2,500 fixed price.";
 const URL = "https://fractionalforge.app/design-dossier";
-const IMG = "https://fractionalforge.app/ff/img/barge-sea.jpg";
+const IMG = "https://fractionalforge.app/ff/img/dd-card.jpg";
 
 export const metadata: Metadata = {
   title: TITLE,
   description: DESC,
   alternates: { canonical: URL },
-  openGraph: { title: TITLE, description: DESC, url: URL, type: "website", locale: "en_GB", siteName: "Fractional Forge", images: [{ url: IMG, width: 1600, height: 900 }] },
+  openGraph: { title: TITLE, description: DESC, url: URL, type: "website", locale: "en_GB", siteName: "Fractional Forge", images: [{ url: IMG, width: 1184, height: 880 }] },
   twitter: { card: "summary_large_image", title: TITLE, description: DESC, images: [IMG] },
 };
 
