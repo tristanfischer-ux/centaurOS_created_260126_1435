@@ -117,7 +117,8 @@ export const CSS_HOME = `
 .hp-doc h6{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-bottom:10px;font-weight:700}
 .hp-doc .hp-l{height:5px;border-radius:3px;background:var(--skel);margin:7px 0}
 .hp-scan{position:absolute;left:0;right:0;height:38px;background:linear-gradient(180deg,transparent,rgba(178,58,18,.10),transparent);border-bottom:1.5px solid var(--c,var(--rust))}
-.hp-out h5{font-size:12px;font-weight:600;color:var(--muted);display:flex;justify-content:space-between;margin-bottom:10px;gap:8px}
+.hp-out h5{font-size:12px;font-weight:600;color:var(--muted);display:flex;flex-direction:column;align-items:flex-start;justify-content:flex-start;margin-bottom:10px;gap:4px}
+.hp-out h5 > span:first-child{white-space:nowrap}
 .hp-count{display:flex;align-items:flex-end;flex-wrap:wrap;gap:8px 12px;margin-bottom:12px}
 .hp-count b{font-family:var(--serif);font-size:56px;font-weight:600;line-height:1;color:var(--c,var(--rust));font-variant-numeric:tabular-nums;min-width:2ch}
 .hp-count.no-num b{display:none;min-width:0}
@@ -138,9 +139,10 @@ export const CSS_HOME = `
 .hp-tag.b1{background:color-mix(in srgb,var(--soft,var(--rust-soft)) 70%, var(--card));color:var(--ink);border:1px solid var(--line)}
 .hp-tag.b2{background:color-mix(in srgb,var(--soft,var(--rust-soft)) 45%, var(--card));color:var(--ink);border:1px solid var(--line)}
 .hp-tag.b3{background:var(--card-2);color:var(--muted);border:1px solid var(--line)}
-.hp-out h5{align-items:flex-start;line-height:1.35}
-.hp-status{max-width:38ch;text-align:right;white-space:normal}
-.hp-foot{display:flex;justify-content:space-between;align-items:center;border-top:1px solid var(--line);padding:14px 22px;font-size:13px;color:var(--ink-2);background:var(--card-2)}
+.hp-out h5{line-height:1.35}
+.hp-status{max-width:none;text-align:left;white-space:normal}
+.hp-foot{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px 16px;border-top:1px solid var(--line);padding:14px 22px;font-size:13px;color:var(--ink-2);background:var(--card-2)}
+.hp-foot > *{flex:none;white-space:nowrap}
 .hp-foot b{color:var(--ink)}
 .hp-foot a{color:var(--c,var(--rust));font-weight:600;text-decoration:none}
 .hp-note{font-size:11px;color:var(--muted);margin-top:10px;text-align:right}
@@ -162,9 +164,10 @@ export const CSS_HOME = `
   .hp-doc{display:none}
   .hp-tab{padding:8px 6px 12px;font-size:11px;line-height:1.25;overflow:visible}
   .hp-tab small{white-space:normal;overflow:visible;text-overflow:unset;font-size:10px;line-height:1.3}
-  .hp-out h5{flex-direction:column;gap:4px}
+  .hp-out h5{gap:4px}
   .hp-status{text-align:left;max-width:none}
   .hp-foot{flex-direction:column;align-items:flex-start;gap:6px}
+  .hp-foot > *{white-space:normal}
   .hh .eyebrow{font-size:12px;white-space:normal;flex-wrap:wrap}
   .who-band{padding:48px 20px}.who-band picture,.who-band img{max-width:160px;aspect-ratio:1;border-radius:18px;margin-bottom:4px}.hh .pic img{aspect-ratio:16/10;height:auto;border-radius:20px}
   .cta-photo .svc-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}.cta-photo .svc-row a{width:100%;justify-content:center}
