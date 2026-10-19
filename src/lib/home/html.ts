@@ -22,17 +22,17 @@ const SERVICES: Svc[] = [
     acc: "var(--rust)", accD: "var(--rust)", accS: "var(--rust-soft)", accM: "var(--rust-line)",
     who: "For housebuilders and land promoters",
     what: "Send the decision notice. Get every planning condition in plain English, with the ones that block a start on site picked out and covering letters drafted.",
-    price: "£400 per permission", mo: "£1,000 a month for five live sites", time: "Usually within a day", example: ["38", "conditions on a 150-home permission in Albrighton, 11 before work starts"] },
+    price: "£400 per permission", mo: "£1,000 a month for five live sites", time: "Usually within a day", example: ["26", "numbered conditions plus the biodiversity gain condition. 7 before work starts"] },
   { key: "habitat-draft", name: "Habitat Draft", href: "/habitat-draft", imgBase: "/ff/img/cards/habitat-draft", mark: MARK["habitat-draft"],
     acc: "var(--moss)", accD: "var(--moss)", accS: "var(--moss-soft)", accM: "var(--moss)",
     who: "For ecology consultancies",
     what: "A two-page desk study before the walkover: protected sites within 600 m, a first habitat map, tree and hedge heights, and the parcels to check. Your ecologist signs everything.",
-    price: "£150 per desk study", mo: "£1,000 a month for eight", time: "Usually within a day", example: ["15", "parcels mapped in Romsey, 5 to check"] },
+    price: "£150 per desk study", mo: "£1,000 a month for eight", time: "Usually within a day", example: ["", "Know which parcels matter before the walkover"] },
   { key: "bid-check", name: "Bid Check", href: "/bid-check", imgBase: "/ff/img/cards/bid-check", mark: MARK["bid-check"],
     acc: "var(--rust)", accD: "var(--rust)", accS: "var(--rust-soft)", accM: "var(--rust-line)",
     who: "For firms that bid for public contracts",
     what: "Send the tender pack. Get a bid at a glance: every pass-or-fail condition, every document to submit, how bids are scored and the key dates, each quoted from the tender.",
-    price: "£600 per tender", mo: "£1,500 a month for three", time: "Usually within a day", example: ["52", "requirements for Drummond Community Centre, 18 pass or fail"] },
+    price: "£600 per tender", mo: "£1,500 a month for three", time: "Usually within a day", example: ["30", "bidder-facing requirements: 16 specification points, 4 items to submit, 4 contract deliverables, 6 scored criteria"] },
   { key: "design-dossier", name: "Design Dossier", href: "/design-dossier", imgBase: "/ff/img/dd-card", mark: DD_MARK,
     acc: "var(--rust)", accD: "var(--rust)", accS: "var(--rust-soft)", accM: "var(--rust-line)",
     who: "For hardware and deep-tech founders",
@@ -74,7 +74,7 @@ export const CSS_HOME = `
 .svc .who{color:var(--sd);font-weight:700;font-size:14.5px;margin-top:4px}
 .svc .what{color:var(--ink-2);margin-top:12px;font-size:16px}
 .svc .ex{display:flex;gap:12px;align-items:baseline;margin-top:16px;padding:12px 14px;border-radius:14px;background:var(--ss);border:1px solid var(--sm)}
-.svc .ex b{font-family:var(--serif);font-size:26px;color:var(--sd);line-height:1;white-space:nowrap;font-variant-numeric:tabular-nums;flex:none;min-width:2ch}.svc .ex small{font-size:13.5px;color:var(--ink-2)}
+.svc .ex b{font-family:var(--serif);font-size:26px;color:var(--sd);line-height:1;white-space:nowrap;font-variant-numeric:tabular-nums;flex:none;min-width:2ch}.svc .ex b:empty{display:none;min-width:0}.svc .ex small{font-size:13.5px;color:var(--ink-2)}
 .svc .ft{display:flex;flex-direction:column;align-items:stretch;gap:14px;margin-top:auto;padding-top:18px}
 .svc .pr{font-weight:800;font-size:18px;color:var(--ink)}.svc .pr small{display:block;font-weight:600;color:var(--muted);font-size:13px}.svc .pr small.mo{font-size:14px;line-height:1.4;color:var(--ink-2);margin-top:4px}
 .svc .go{display:flex;justify-content:center;align-items:center;gap:8px;font-weight:700;color:var(--on-rust);background:var(--sd);border-radius:999px;padding:12px 18px;font-size:15.5px;min-height:46px}.svc:hover .go{background:var(--ink);color:var(--paper)}
@@ -105,9 +105,10 @@ export const CSS_HOME = `
 
 /* Hero "report being built" panel — ported from hero-after.html */
 .hp-panel{position:relative;background:var(--card);border:1px solid var(--line);border-radius:var(--r-lg);box-shadow:var(--shadow);overflow:hidden}
-.hp-tabs{display:flex;border-bottom:1px solid var(--line);background:var(--card-2)}
-.hp-tab{flex:1;min-width:0;padding:14px 12px 12px;font-size:13px;font-weight:600;color:var(--muted);border:0;background:none;text-align:left;cursor:pointer;position:relative;font-family:inherit}
-.hp-tab small{display:block;font-weight:500;font-size:11px;margin-top:2px}
+.hp-fade{opacity:1}
+.hp-tabs{display:flex;align-items:stretch;border-bottom:1px solid var(--line);background:var(--card-2);overflow:visible}
+.hp-tab{flex:1;min-width:0;padding:14px 12px 16px;font-size:13px;font-weight:600;color:var(--muted);border:0;background:none;text-align:left;cursor:pointer;position:relative;font-family:inherit;line-height:1.25}
+.hp-tab small{display:block;font-weight:500;font-size:11px;margin-top:3px;line-height:1.3;white-space:normal}
 .hp-tab .hp-bar{position:absolute;left:0;bottom:-1px;height:2px;background:var(--c,var(--rust));width:0}
 .hp-tab[aria-selected=true]{color:var(--ink)}
 .hp-tab:focus-visible{outline:2px solid var(--rust);outline-offset:3px}
@@ -117,17 +118,28 @@ export const CSS_HOME = `
 .hp-doc .hp-l{height:5px;border-radius:3px;background:var(--skel);margin:7px 0}
 .hp-scan{position:absolute;left:0;right:0;height:38px;background:linear-gradient(180deg,transparent,rgba(178,58,18,.10),transparent);border-bottom:1.5px solid var(--c,var(--rust))}
 .hp-out h5{font-size:12px;font-weight:600;color:var(--muted);display:flex;justify-content:space-between;margin-bottom:10px;gap:8px}
-.hp-count{display:flex;align-items:baseline;gap:10px;margin-bottom:12px}
+.hp-count{display:flex;align-items:flex-end;flex-wrap:wrap;gap:8px 12px;margin-bottom:12px}
 .hp-count b{font-family:var(--serif);font-size:56px;font-weight:600;line-height:1;color:var(--c,var(--rust));font-variant-numeric:tabular-nums;min-width:2ch}
-.hp-count span{font-size:14px;color:var(--ink-2);line-height:1.35}
+.hp-count.no-num b{display:none;min-width:0}
+.hp-count span{font-size:14px;color:var(--ink-2);line-height:1.35;flex:1;min-width:12ch;max-width:34ch}
 .hp-seg{display:flex;gap:2px;height:12px;margin:0 0 6px}.hp-seg i{flex:1;border-radius:2px;background:var(--skel);opacity:.55}.hp-seg i.on{opacity:1}.hp-seg i.on.hot{background:var(--c,var(--rust))}
-.hp-seglab{font-size:12px;color:var(--ink-2);margin-bottom:14px;min-height:16px}.hp-seglab b{color:var(--c,var(--rust))}
+.hp-seg i.on.b0{background:var(--c,var(--rust))}
+.hp-seg i.on.b1{background:color-mix(in srgb,var(--c,var(--rust)) 70%, var(--ink))}
+.hp-seg i.on.b2{background:color-mix(in srgb,var(--c,var(--rust)) 45%, var(--ink))}
+.hp-seg i.on.b3{background:color-mix(in srgb,var(--c,var(--rust)) 30%, var(--muted))}
+.hp-seglab{font-size:12px;color:var(--ink-2);margin-bottom:14px;min-height:16px;line-height:1.4}.hp-seglab b{color:var(--c,var(--rust))}
 .hp-rows{display:flex;flex-direction:column;gap:7px}
 .hp-row{display:grid;grid-template-columns:28px 1fr auto;gap:10px;align-items:center;padding:7px 10px;border:1px solid var(--line);border-radius:9px;background:var(--card)}
 .hp-row .n{font:600 11px/1 var(--sans);color:var(--muted);font-variant-numeric:tabular-nums}
 .hp-row .t{height:6px;border-radius:3px;background:var(--skel)}
 .hp-tag{font-size:11px;font-weight:700;letter-spacing:.02em;padding:3px 7px;border-radius:999px;background:var(--card-2);border:1px solid var(--line);color:var(--muted);white-space:nowrap}
-.hp-tag.hot{background:var(--soft,var(--rust-soft));color:var(--c,var(--rust));border:1px solid var(--cl,var(--rust-line))}
+.hp-tag:empty{display:none}
+.hp-tag.hot,.hp-tag.b0{background:var(--soft,var(--rust-soft));color:var(--c,var(--rust));border:1px solid var(--cl,var(--rust-line))}
+.hp-tag.b1{background:color-mix(in srgb,var(--soft,var(--rust-soft)) 70%, var(--card));color:var(--ink);border:1px solid var(--line)}
+.hp-tag.b2{background:color-mix(in srgb,var(--soft,var(--rust-soft)) 45%, var(--card));color:var(--ink);border:1px solid var(--line)}
+.hp-tag.b3{background:var(--card-2);color:var(--muted);border:1px solid var(--line)}
+.hp-out h5{align-items:flex-start;line-height:1.35}
+.hp-status{max-width:38ch;text-align:right;white-space:normal}
 .hp-foot{display:flex;justify-content:space-between;align-items:center;border-top:1px solid var(--line);padding:14px 22px;font-size:13px;color:var(--ink-2);background:var(--card-2)}
 .hp-foot b{color:var(--ink)}
 .hp-foot a{color:var(--c,var(--rust));font-weight:600;text-decoration:none}
@@ -146,9 +158,12 @@ export const CSS_HOME = `
   .hh .meta{margin-top:12px}
   .hp-stage{grid-template-columns:1fr;min-height:0;padding:14px}
   .hp-count b{font-size:40px}
+  .hp-count span{font-size:13px;max-width:none}
   .hp-doc{display:none}
-  .hp-tab{padding:8px 6px;font-size:12px;line-height:1.2;overflow:hidden}
-  .hp-tab small{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:11px}
+  .hp-tab{padding:8px 6px 12px;font-size:11px;line-height:1.25;overflow:visible}
+  .hp-tab small{white-space:normal;overflow:visible;text-overflow:unset;font-size:10px;line-height:1.3}
+  .hp-out h5{flex-direction:column;gap:4px}
+  .hp-status{text-align:left;max-width:none}
   .hp-foot{flex-direction:column;align-items:flex-start;gap:6px}
   .hh .eyebrow{font-size:12px;white-space:normal;flex-wrap:wrap}
   .who-band{padding:48px 20px}.who-band picture,.who-band img{max-width:160px;aspect-ratio:1;border-radius:18px;margin-bottom:4px}.hh .pic img{aspect-ratio:16/10;height:auto;border-radius:20px}
@@ -215,21 +230,23 @@ export function siteFooter(): string {
 
 function heroPanel(): string {
   return `<div class="hp-panel" id="hp-panel" role="group" aria-label="Real examples, built from public documents">
+      <div class="hp-fade" id="hp-fade">
       <div class="hp-tabs" role="tablist">
-        <button class="hp-tab" role="tab" data-i="0" type="button">Condition Desk<small>Albrighton, 150 homes</small><span class="hp-bar"></span></button>
-        <button class="hp-tab" role="tab" data-i="1" type="button">Habitat Draft<small>Romsey, 98 homes</small><span class="hp-bar"></span></button>
-        <button class="hp-tab" role="tab" data-i="2" type="button">Bid Check<small>Drummond, Hedge End</small><span class="hp-bar"></span></button>
+        <button class="hp-tab" role="tab" data-i="0" type="button">Condition Desk<small>Sample: a new school scheme</small><span class="hp-bar"></span></button>
+        <button class="hp-tab" role="tab" data-i="1" type="button">Habitat Draft<small>Ecology desk study, first draft</small><span class="hp-bar"></span></button>
+        <button class="hp-tab" role="tab" data-i="2" type="button">Bid Check<small>Sample: a parish council fencing tender</small><span class="hp-bar"></span></button>
       </div>
       <div class="hp-stage" id="hp-stage">
         <div class="hp-doc" aria-hidden="true"><h6 id="hp-docname">Decision notice</h6><div id="hp-doclines"></div><div class="hp-scan" id="hp-scan"></div></div>
         <div class="hp-out">
-          <h5><span id="hp-outname">Plain-English conditions</span><span id="hp-status">Building…</span></h5>
-          <div class="hp-count"><b id="hp-num">0</b><span id="hp-numlabel">planning conditions</span></div>
+          <h5><span id="hp-outname">Plain-English conditions</span><span id="hp-status" class="hp-status">Building…</span></h5>
+          <div class="hp-count" id="hp-count"><b id="hp-num">0</b><span id="hp-numlabel">26 numbered conditions plus the biodiversity gain condition</span></div>
           <div class="hp-seg" id="hp-seg" aria-hidden="true"></div><div class="hp-seglab" id="hp-seglab"></div>
           <div class="hp-rows" id="hp-rows" aria-hidden="true"></div>
         </div>
       </div>
       <div class="hp-foot"><span id="hp-price"><b>£400 per permission</b> · Usually within a day</span><a id="hp-sample" href="/condition-desk#sample">Sample report and form →</a></div>
+      </div>
     </div>
     <p class="hp-note">Real examples, built from public documents. Rows are a layout illustration, not report text.</p>`;
 }
