@@ -21,7 +21,7 @@
     "text": "Commission the right specialists. You or your planner send each submission to the council with the covering letter we draft."
    }
   ],
-  "demo_intro": "Below is the real register we produced for a 150-home outline permission in Albrighton, Shropshire. Filter the 38 conditions by stage, then click one to see what it means and which documents you need.",
+  "demo_intro": "Sample: a new school scheme. 26 numbered conditions plus the biodiversity gain condition. Filter by stage, then click one to see what it means and which documents you need.",
   "you_get": [
    "A register of every condition in plain English, usually within a day.",
    "When each condition is due: before work starts, during the build, before people move in, or with a reserved matters application.",
@@ -44,11 +44,11 @@
    },
    {
     "q": "Can I see an example first?",
-    "a": "Yes. This page shows the real register we produced for a 150-home outline permission in Albrighton, Shropshire, with all 38 conditions, and you can download the full report."
+    "a": "Yes. This page shows a sample register for a new school scheme: 26 numbered conditions plus the biodiversity gain condition, and 7 before work starts. You can download the full report."
    },
    {
     "q": "Can you handle large permissions?",
-    "a": "Yes. We have worked on real permissions, including 38 conditions on a 150-home outline permission in Albrighton, Shropshire and 46 on a 586-home scheme in New Malden."
+    "a": "Yes. We have worked on real permissions, including a 586-home scheme in New Malden."
    },
    {
     "q": "Does this replace my planning consultant?",
@@ -75,11 +75,11 @@
    "£1,000",
    "a month, for up to five live sites"
   ],
-  "demo_title": "The Albrighton planning permission",
-  "demo_label": "A real example, built from public documents: Land north of Kingswood Road, Albrighton, Shropshire (Shropshire Council, 24/02662/OUT, up to 150 homes).",
+  "demo_title": "Sample: a new school scheme",
+  "demo_label": "A real example, built from public documents.",
   "report": "/lumicity/condition-desk-report.png",
-  "report_alt": "First page of a Condition Desk report for the Albrighton permission, showing counts of conditions by stage and the conditions that block a start on site.",
-  "report_cap": "Page 1 of a real Condition Desk report (Albrighton).",
+  "report_alt": "First page of a Condition Desk report for a new school scheme, showing counts of conditions by stage and the conditions that block a start on site.",
+  "report_cap": "Page 1 of a Condition Desk report.",
   "who_extra": "",
   "hero_head": "Start on site sooner",
   "hero_sub": "Condition Desk turns your decision notice into a plain English register of every planning condition, usually within a day, and picks out the conditions that block a start on site."
@@ -106,7 +106,7 @@
     "text": "Usually within a day you receive a two-page desk study with a prioritised list of parcels to check on the walkover."
    }
   ],
-  "demo_intro": "This is a real worked example: the 98-home site at Romsey, mapped into 15 parcels. Click any parcel to see its likely habitat, how sure we are (low, medium or high), and what to check on the walkover. The checks are for your visit; the desk study does not score habitat condition. Habitat Draft is built on real current applications, including this one.",
+  "demo_intro": "Know which parcels matter before the walkover. Click any parcel to see its likely habitat, how sure we are (low, medium or high), and what to check on the walkover. The checks are for your visit; the desk study does not score habitat condition.",
   "you_get": [
    "Protected sites and priority habitats (those most important for nature conservation) within 600 metres of your site",
    "A first habitat map of the site from national data, with a confidence rating for each parcel (low, medium or high)",
@@ -159,11 +159,11 @@
    "£1,000",
    "a month, for up to eight desk studies"
   ],
-  "demo_title": "The Romsey site",
-  "demo_label": "A real example, built from public documents: Land east of Southampton Road, Romsey (Test Valley Borough Council, 26/01906/FULLS, 98 homes).",
+  "demo_title": "Ecology desk study, first draft",
+  "demo_label": "A real example, built from public documents.",
   "report": "/lumicity/habitat-draft-report.png",
-  "report_alt": "First page of a Habitat Draft desk study for land east of Southampton Road, Romsey, with a first habitat map and a plain English summary.",
-  "report_cap": "Page 1 of a real Habitat Draft desk study (Romsey).",
+  "report_alt": "First page of a Habitat Draft desk study, with a first habitat map and a plain English summary.",
+  "report_cap": "Page 1 of a Habitat Draft desk study.",
   "hero_head": "Know which parcels matter before the walkover",
   "hero_sub": "Send us a site boundary or a planning reference. Usually within a day you get a two-page desk study: a first habitat map, the records search and the parcels to check on your first visit."
  },
@@ -189,7 +189,7 @@
     "text": "Usually within a day: your checklist, your evidence checked against each requirement, a list of gaps to close and first-draft answers for your team to sign off."
    }
   ],
-  "demo_intro": "Try it on a real tender. This is Hedge End Town Council's Drummond Community Centre refurbishment: 52 requirements, 18 of them pass-or-fail, 18 documents and 12 scored criteria. Tick off the pass-or-fail conditions and documents and watch the ready to bid bar fill.",
+  "demo_intro": "Sample: a parish council fencing tender. 30 bidder-facing requirements: 16 specification points, 4 items to submit, 4 contract deliverables, 6 scored criteria. Tick off the items and watch the ready to bid bar fill.",
   "you_get": [
    "Every pass-or-fail condition, quoted from the tender so you can check each one",
    "Every document you must submit, how bids are scored and the key dates",
@@ -217,7 +217,7 @@
    },
    {
     "q": "Has it been used on real tenders?",
-    "a": "Yes, on real live tenders, including Hedge End Town Council's Drummond Community Centre refurbishment: 52 requirements, 18 pass-or-fail, 18 documents and 12 scored criteria. You can try that tender as a checklist on this page and download the full sample report."
+    "a": "Yes, on real live tenders. This page shows a sample: a parish council fencing tender, with 30 bidder-facing requirements: 16 specification points, 4 items to submit, 4 contract deliverables, 6 scored criteria. You can try that tender as a checklist on this page and download the full sample report."
    },
    {
     "q": "What does it cost?",
@@ -240,11 +240,11 @@
    "£1,500",
    "a month, for up to three tenders"
   ],
-  "demo_title": "The Drummond tender",
-  "demo_label": "A real example, built from public documents: Drummond Community Centre refurbishment, Hedge End Town Council (closing 19 October 2026).",
+  "demo_title": "Sample: a parish council fencing tender",
+  "demo_label": "A real example, built from public documents.",
   "report": "/lumicity/bid-check-report.png",
-  "report_alt": "First page of a Bid Check \"bid at a glance\" for the Drummond Community Centre tender, with the tender details, key dates and pass or fail conditions.",
-  "report_cap": "Page 1 of a real Bid at a glance (Drummond).",
+  "report_alt": "First page of a Bid Check \"bid at a glance\" for a parish council fencing tender, with the tender details and pass or fail conditions.",
+  "report_cap": "Page 1 of a Bid at a glance.",
   "hero_head": "Every pass-or-fail item, quoted from the tender",
   "hero_sub": "Send us the tender pack. Usually within a day you get a bid at a glance: every pass-or-fail condition, every document to submit, how bids are scored and the key dates, each quoted from the source so you can check it."
  }

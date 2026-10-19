@@ -215,46 +215,47 @@ function mockup(key: LumicityKey): string {
     const all = cdData.conditions;
     const blockers = all.filter((c) => c.stage === "before_start");
     const rows = blockers.slice(0, 4).map((c) => `<div class="mrow"><span class="num">${c.n}</span><div><div class="tt">${esc(c.title)}</div><div class="ss"><span class="spill">${esc(STAGE_LABEL[c.stage])}</span> prepared by ${esc(c.who.toLowerCase())}</div></div></div>`).join("");
-    return `<div class="mock" aria-label="Example of a Condition Desk register"><div class="mock-bar"><i></i><i></i><i></i><span>Condition register: ${esc(cdData.site)}, ${esc(cdData.ref)}</span></div><div class="mock-body">
-<h4>${esc(cdData.site)}</h4><p class="mm">${esc(cdData.council)}, ${esc(cdData.homes)} homes (a real permission)</p>
-<div class="big"><div><b>${all.length}</b><small>conditions found</small></div><div class="hot"><b>${blockers.length}</b><small>must be cleared before work starts</small></div></div>
+    return `<div class="mock" aria-label="Example of a Condition Desk register"><div class="mock-bar"><i></i><i></i><i></i><span>Condition register: Sample: a new school scheme</span></div><div class="mock-body">
+<h4>Sample: a new school scheme</h4><p class="mm">26 numbered conditions plus the biodiversity gain condition</p>
+<div class="big"><div><b>26</b><small>numbered conditions plus the biodiversity gain condition</small></div><div class="hot"><b>7</b><small>before work starts</small></div></div>
 ${rows}<div class="letter">A covering letter to the council is drafted for each submission.</div></div></div>`;
   }
   if (key === "habitat-draft") {
     const ps = hdData.parcels.slice(0, 6);
     const rows = ps.map((p) => `<div class="crow"><b>${esc(p.id)}</b><span>${esc(short(p.habitat, 26))}</span><span class="pill ${p.confidence}">${esc(p.confidence)}</span></div>`).join("");
-    return `<div class="mock" aria-label="Example of a Habitat Draft desk study"><div class="mock-bar"><i></i><i></i><i></i><span>Desk study: ${esc(hdData.site)}, ${esc(hdData.ref)}</span></div>
-<div class="mock-map"><img src="/lumicity/romsey-map.png" alt="First habitat map of the Romsey site drawn from national data" width="600" height="800"><div class="mock-body"><h4>${esc(hdData.proposal)}, ${hdData.area_ha} hectares</h4><p class="mm">${hdData.parcels.length} parcels. First draft, unchecked. How sure we are, per parcel:</p>${rows}<p class="mm" style="margin-top:8px">The ecologist checks and signs everything.</p></div></div></div>`;
+    return `<div class="mock" aria-label="Example of a Habitat Draft desk study"><div class="mock-bar"><i></i><i></i><i></i><span>Desk study: Ecology desk study, first draft</span></div>
+<div class="mock-map"><img src="/lumicity/romsey-map.png" alt="First habitat map drawn from national data" width="600" height="800"><div class="mock-body"><h4>Ecology desk study, first draft</h4><p class="mm">Know which parcels matter before the walkover. First draft, unchecked. How sure we are, per parcel:</p>${rows}<p class="mm" style="margin-top:8px">The ecologist checks and signs everything.</p></div></div></div>`;
   }
   const items = bcData.items;
-  const n = (k: string) => items.filter((i) => i.kind === k).length;
   const gates = items.filter((i) => i.kind === "gate").slice(0, 3);
-  const rows = gates.map((g, i) => `<div class="mrow"><span class="num">${i + 1}</span><div><div class="q">“${esc(short(g.text, 88))}”</div><div class="ss"><span class="spill">Pass or fail</span> ${esc(g.source)}</div></div></div>`).join("");
-  return `<div class="mock" aria-label="Example of a Bid Check bid at a glance"><div class="mock-bar"><i></i><i></i><i></i><span>Bid at a glance: ${esc(bcData.title)}</span></div><div class="mock-body">
-<h4>${esc(bcData.title)}</h4><p class="mm">${esc(bcData.buyer)}, closes ${esc(bcData.closing)}, ${esc(bcData.value)} (a real tender)</p>
-<div class="big"><div><b>${items.length}</b><small>requirements found</small></div><div class="hot"><b>${n("gate")}</b><small>pass-or-fail conditions</small></div><div><b>${n("return_item")}</b><small>documents to return</small></div></div>${rows}</div></div>`;
+  const rows = gates.map((g, i) => `<div class="mrow"><span class="num">${i + 1}</span><div><div class="q">“${esc(short(g.text, 88))}”</div><div class="ss"><span class="spill">Pass or fail</span> Tender pack</div></div></div>`).join("");
+  return `<div class="mock" aria-label="Example of a Bid Check bid at a glance"><div class="mock-bar"><i></i><i></i><i></i><span>Bid at a glance: Sample: a parish council fencing tender</span></div><div class="mock-body">
+<h4>Sample: a parish council fencing tender</h4><p class="mm">30 bidder-facing requirements</p>
+<div class="big"><div><b>30</b><small>bidder-facing requirements</small></div><div class="hot"><b>16</b><small>specification points</small></div><div><b>4</b><small>items to submit</small></div></div>${rows}</div></div>`;
 }
 
 function chart(key: LumicityKey, d: D): string {
   const cap = `<p class="cap">${esc(d.chart_caption)}</p>`;
   if (key === "condition-desk") {
-    const all = cdData.conditions; const order = Object.keys(STAGE_LABEL);
-    const rows = order.map((k) => [k, all.filter((c) => c.stage === k).length] as [string, number]).filter((r) => r[1] > 0).sort((a, b) => b[1] - a[1]);
-    const mx = Math.max(...rows.map((r) => r[1]));
-    return `<div class="chart"><h3>${esc(d.chart_title)}</h3>${rows.map((r) => `<div class="hbar${r[0] === "before_start" ? " hot" : ""}"><span>${esc(STAGE_LABEL[r[0]])}</span><span class="track"><i style="width:${(r[1] / mx) * 100}%"></i></span><b>${r[1]}</b></div>`).join("")}${cap}</div>`;
+    return `<div class="chart"><h3>${esc(d.chart_title)}</h3>
+<div class="hbar hot"><span>Before work starts</span><span class="track"><i style="width:27%"></i></span><b>7</b></div>
+<div class="hbar"><span>26 numbered conditions plus the biodiversity gain condition</span><span class="track"><i style="width:100%"></i></span><b>26</b></div>
+${cap}</div>`;
   }
   if (key === "habitat-draft") {
     const col: Record<string, string> = { low: "#d97706", medium: "#2563eb", high: "#0f7a4d" };
-    const cnt = (k: string) => hdData.parcels.filter((p) => p.confidence === k).length;
-    const tot = hdData.parcels.length;
-    return `<div class="chart"><h3>${esc(d.chart_title)}</h3><div class="stack" role="img" aria-label="Parcels by confidence: ${cnt("low")} low, ${cnt("medium")} medium, ${cnt("high")} high">${["low", "medium", "high"].map((k) => `<i style="width:${(cnt(k) / tot) * 100}%;background:${col[k]}"></i>`).join("")}</div>
-<div class="legend">${["low", "medium", "high"].map((k) => `<span style="--c:${col[k]}">${cnt(k)} parcels, ${k} confidence</span>`).join("")}</div>${cap}</div>`;
+    return `<div class="chart"><h3>${esc(d.chart_title)}</h3>
+<div class="legend">${["low", "medium", "high"].map((k) => `<span style="--c:${col[k]}">${k} confidence</span>`).join("")}</div>${cap}</div>`;
   }
-  const items = bcData.items; const kinds: [string, string, string][] = [["gate", "Pass or fail", "#b4400c"], ["return_item", "Documents to return", "#64748b"], ["scored", "Scored criteria", "#2563eb"], ["deadline", "Deadlines", "#0f7a4d"], ["other", "Other", "#a8b3c4"]];
-  const cnt = (k: string) => items.filter((i) => i.kind === k).length;
-  return `<div class="chart"><h3>${esc(d.chart_title)}</h3><div class="stack" role="img" aria-label="Requirements by type">${kinds.map((k) => `<i style="width:${(cnt(k[0]) / items.length) * 100}%;background:${k[2]}"></i>`).join("")}</div>
-<div class="legend">${kinds.map((k) => `<span style="--c:${k[2]}">${cnt(k[0])} ${k[1].toLowerCase()}</span>`).join("")}</div>
-<p style="margin-top:14px;color:var(--ink-soft)"><b>How the bid is scored:</b> Price 50%, Quality 40%.</p>${cap}</div>`;
+  const kinds: [string, number, string][] = [
+    ["specification points", 16, "#b4400c"],
+    ["items to submit", 4, "#64748b"],
+    ["contract deliverables", 4, "#0f7a4d"],
+    ["scored criteria", 6, "#2563eb"],
+  ];
+  return `<div class="chart"><h3>${esc(d.chart_title)}</h3><div class="stack" role="img" aria-label="30 bidder-facing requirements">${kinds.map((k) => `<i style="width:${(k[1] / 30) * 100}%;background:${k[2]}"></i>`).join("")}</div>
+<div class="legend">${kinds.map((k) => `<span style="--c:${k[2]}">${k[1]} ${k[0]}</span>`).join("")}</div>
+${cap}</div>`;
 }
 
 function demoShell(key: LumicityKey): string {
@@ -292,7 +293,7 @@ export const CSS3 = `
 .mini .mt{display:flex;gap:10px;align-items:center}.mini .mk{width:34px;height:34px;border-radius:10px;background:var(--acc);color:var(--on-rust);display:flex;align-items:center;justify-content:center;flex:none}
 .mini .mt b{display:block;font-size:15px}.mini .mt small{display:block;font-size:12.5px;color:var(--muted)}
 .mini .mn{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}.mini .mn div{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px 12px}
-.mini .mn b{display:block;font-family:var(--serif);font-size:30px;line-height:1;font-weight:600}.mini .mn small{font-size:12.5px;color:var(--ink-soft)}
+.mini .mn b{display:block;font-family:var(--serif);font-size:30px;line-height:1;font-weight:600}.mini .mn b:empty{display:none}.mini .mn small{font-size:12.5px;color:var(--ink-soft)}
 .mini .mn .hot{background:var(--acc-s);border-color:var(--acc-m)}.mini .mn .hot b{color:var(--acc-d)}
 .mini .mf{margin-top:10px;font-size:13px;font-weight:600;color:var(--ink-soft);display:flex;gap:6px;align-items:center}.mini .mf svg{color:var(--acc)}
 .photo .tagc{position:absolute;z-index:3;top:18px;left:18px;background:var(--card);color:var(--ink);backdrop-filter:blur(6px);border-radius:14px;padding:10px 14px;box-shadow:0 10px 30px rgba(15,23,41,.18);font-size:13.5px;font-weight:700;display:flex;align-items:center;gap:10px}
@@ -301,6 +302,7 @@ export const CSS3 = `
 .stats{background:var(--band);color:var(--band-ink);padding:34px 0}
 .stats ul{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:1fr 1fr;gap:22px}
 .stats b{display:block;font-family:var(--serif);font-size:clamp(34px,4vw,48px);font-weight:600;line-height:1;color:var(--band-ink)}
+.stats b:empty{display:none}
 .stats span{display:block;margin-top:8px;font-size:14px;color:var(--band-muted);max-width:24ch}
 .split{display:grid;gap:34px;align-items:center}
 .split .pic{border-radius:24px;overflow:hidden;box-shadow:0 24px 60px rgba(15,23,41,.16);aspect-ratio:4/3}
@@ -362,34 +364,32 @@ const DL = `<svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><
 type Extra = { img: string; problemTitle: string; stats: [string, string][]; sample: { pages: number; label: string; points: string[] }; ctaLine: string };
 function extra(key: LumicityKey): Extra {
   if (key === "condition-desk") {
-    const all = cdData.conditions; const pre = all.filter((c) => c.stage === "before_start").length;
     return { img: "cd", problemTitle: "Planning conditions hold up the start on site",
-      stats: [[String(all.length), `conditions on a real permission for ${cdData.homes} homes in Albrighton`], [String(pre), "of them must be cleared before work can start"], ["1 day", "usual turnaround for the full register"], ["£400", "per permission, or £1,000 a month for five live sites"]],
-      sample: { pages: 17, label: "The full Condition Desk report for Land north of Kingswood Road, Albrighton: all 38 conditions, built from Shropshire Council's decision notice.", points: ["Every condition in plain English, with when it is due", "Which specialist usually prepares each one, and the documents to gather", "The conditions that block a start on site, picked out", "A drafted covering letter for the first council submission"] },
+      stats: [["26", "numbered conditions plus the biodiversity gain condition"], ["7", "before work starts"], ["1 day", "usual turnaround for the full register"], ["£400", "per permission, or £1,000 a month for five live sites"]],
+      sample: { pages: 17, label: "The full Condition Desk report for a new school scheme: 26 numbered conditions plus the biodiversity gain condition, with 7 before work starts.", points: ["Every condition in plain English, with when it is due", "Which specialist usually prepares each one, and the documents to gather", "The conditions that block a start on site, picked out", "A drafted covering letter for the first council submission"] },
       ctaLine: "Send us a decision notice and get the register back, usually within a day." };
   }
   if (key === "habitat-draft") {
     return { img: "hd", problemTitle: "Desk studies eat into time on site",
-      stats: [[String(hdData.parcels.length), "habitat parcels mapped on a real site in Romsey"], [String(hdData.area_ha), "hectares covered from national data"], ["600 m", "search radius for protected sites and priority habitats"], ["£150", "per desk study, or £1,000 a month for eight"]],
-      sample: { pages: 2, label: "A Habitat Draft desk study for land east of Southampton Road, Romsey, built from open data and the council's public application.", points: ["Protected sites and priority habitats within 600 metres", "A first habitat map from national data, with how sure we are per parcel", "Tree and hedge heights from the Environment Agency's laser survey", "A list of the parcels to check on the walkover"] },
+      stats: [["£150", "per desk study, or £1,000 a month for eight"], ["", "Usually within a day"], ["", "Know which parcels matter before the walkover"], ["", "Your ecologist signs everything"]],
+      sample: { pages: 2, label: "A Habitat Draft desk study: a first habitat map, the records search and the parcels to check on the walkover.", points: ["Protected sites and priority habitats within 600 metres", "A first habitat map from national data, with how sure we are per parcel", "Tree and hedge heights from the Environment Agency's laser survey", "A list of the parcels to check on the walkover"] },
       ctaLine: "Send us a site boundary and get the desk study back, usually within a day." };
   }
-  const items = bcData.items; const n = (k: string) => items.filter((i) => i.kind === k).length;
   return { img: "bc", problemTitle: "Tender packs are long, and one miss loses the bid",
-    stats: [[String(items.length), "requirements found in a real council tender"], [String(n("gate")), "of them are pass-or-fail"], [String(n("return_item")), "documents the bidder must submit"], ["£600", "per tender, or £1,500 a month for three"]],
-    sample: { pages: 3, label: "The bid at a glance for Hedge End Town Council's Drummond Community Centre refurbishment, built only from the public tender documents.", points: ["Every pass-or-fail condition, quoted from the tender", "Every document to submit, and how bids are scored", "The key dates and deadlines", "Each item linked to the page it came from"] },
+    stats: [["30", "bidder-facing requirements"], ["16", "specification points"], ["4", "items to submit"], ["£600", "per tender, or £1,500 a month for three"]],
+    sample: { pages: 3, label: "The bid at a glance for a parish council fencing tender: 30 bidder-facing requirements, 16 specification points, 4 items to submit, 4 contract deliverables, 6 scored criteria.", points: ["Every pass-or-fail condition, quoted from the tender", "Every document to submit, and how bids are scored", "The key dates and deadlines", "Each item linked to the page it came from"] },
     ctaLine: "Send us a tender pack and get your bid at a glance, usually within a day." };
 }
 
 function mini(key: LumicityKey): string {
   let t = "", m = "", a: [string, string], b: [string, string], foot = "";
   if (key === "condition-desk") {
-    const all = cdData.conditions; t = "Condition register"; m = `${cdData.site}`;
-    a = [String(all.length), "conditions"]; b = [String(all.filter((c) => c.stage === "before_start").length), "before work starts"]; foot = "Covering letters drafted";
+    t = "Condition register"; m = "Sample: a new school scheme";
+    a = ["26", "numbered conditions"]; b = ["7", "before work starts"]; foot = "Covering letters drafted";
   } else if (key === "habitat-draft") {
-    t = "Desk study"; m = `${hdData.site}`; a = [String(hdData.parcels.length), "parcels mapped"]; b = [String(hdData.parcels.filter((p) => p.confidence === "low").length), "to check on site"]; foot = "Ecologist signs everything";
+    t = "Desk study"; m = "Ecology desk study, first draft"; a = ["£150", "per desk study"]; b = ["", "Usually within a day"]; foot = "Ecologist signs everything";
   } else {
-    const it = bcData.items; t = "Bid at a glance"; m = `${bcData.title}`; a = [String(it.length), "requirements"]; b = [String(it.filter((i) => i.kind === "gate").length), "pass or fail"]; foot = "Each quoted from the tender";
+    t = "Bid at a glance"; m = "Sample: a parish council fencing tender"; a = ["30", "bidder-facing requirements"]; b = ["16", "specification points"]; foot = "Each quoted from the tender";
   }
   return `<div class="mini"><div class="mt"><span class="mk">${MARK[key]}</span><div><b>${esc(t)}</b><small>${esc(short(m, 42))}</small></div></div><div class="mn"><div><b>${a[0]}</b><small>${esc(a[1])}</small></div><div class="hot"><b>${b[0]}</b><small>${esc(b[1])}</small></div></div><p class="mf">${TICK} ${esc(foot)}</p></div>`;
 }
@@ -397,8 +397,8 @@ function mini(key: LumicityKey): string {
 const BIO = "Tristan Fischer has been chief executive or a board director of fourteen companies, almost all of them hard technology: wind, solar, wave and tidal, batteries, carbon capture and controlled-environment agriculture. He has built three greenfield industrial sites, including a 25,000 m² automated factory, and has raised around £200m for his companies. He started in project finance at Citigroup and later ran corporate venture investments at Shell Technology Ventures.";
 
 const ASK: Record<LumicityKey, [string, string]> = {
-  "condition-desk": ["Planning reference or link to the decision notice", "For example 24/02662/OUT, Shropshire Council"],
-  "habitat-draft": ["Site address, grid reference or planning reference", "For example land east of Southampton Road, Romsey"],
+  "condition-desk": ["Planning reference or link to the decision notice", "Planning reference or a link to the decision notice"],
+  "habitat-draft": ["Site address, grid reference or planning reference", "Site address, grid reference or planning reference"],
   "bid-check": ["Link to the tender, or the buyer and tender title", "For example a Find a Tender or Contracts Finder link"],
 };
 
@@ -459,7 +459,7 @@ ${dlBtn("dl-link", `Download a sample report (PDF, ${x.sample.pages} pages)`)}
 <div class="tagc"><i>${TICK}</i><span>Usually within a day<small>Built from public documents</small></span></div>
 <div class="float">${mini(key)}</div></div>
 </div></section>
-<section class="stats" aria-label="Key numbers"><div class="wrap"><ul>${x.stats.map((s) => `<li><b>${esc(s[0])}</b><span>${esc(s[1])}</span></li>`).join("")}</ul></div></section>
+<section class="stats" aria-label="Key numbers"><div class="wrap"><ul>${x.stats.map((s) => `<li>${s[0] ? `<b>${esc(s[0])}</b>` : ""}<span>${esc(s[1])}</span></li>`).join("")}</ul></div></section>
 ${gainsSection(key)}
 <section class="s"><div class="wrap split"><div class="pic">${responsiveImg({
     base: `/lumicity/img/${x.img}-context`,
@@ -475,7 +475,7 @@ ${gainsSection(key)}
 <section class="s alt" id="how"><div class="wrap"><div class="s-head"><h2>How it works</h2></div>
 <div class="steps">${d.step_titles.map((t, i) => `<div class="step"><div class="ic">${ICON[i]}</div><div class="n">${i + 1}</div><h3>${esc(t)}</h3><p>${esc(d.step_texts[i])}</p></div>`).join("")}</div></div></section>
 <section class="s" id="demo"><div class="wrap"><div class="s-head"><h2>${esc(c.demo_title)}</h2><p>${esc(c.demo_intro)}</p></div>
-<p class="demo-label"><b>A real example, built from public documents.</b> ${esc(c.demo_label.replace(/^A real example, built from public documents: /, ""))}</p>
+<p class="demo-label"><b>A real example, built from public documents.</b>${(() => { const rest = c.demo_label.replace(/^A real example, built from public documents[:.]?\s*/, ""); return rest ? " " + esc(rest) : ""; })()}</p>
 ${demoShell(key)}<div style="margin-top:28px">${chart(key, d)}</div></div></section>
 <section class="s alt"><div class="wrap"><div class="s-head"><h2>By hand, or with ${esc(c.name)}</h2></div>
 <div class="ba">${d.before_after.map((r) => `<div class="row"><div class="b"><small><svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M3 3l10 10M13 3L3 13" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg> By hand</small>${esc(r[0])}</div><div class="a"><small>${TICK} With ${esc(c.name)}</small>${esc(r[1])}</div></div>`).join("")}</div></div></section>
