@@ -18,17 +18,17 @@ type Svc = {
 };
 
 const SERVICES: Svc[] = [
-  { key: "condition-desk", name: "Condition Desk", href: "/condition-desk", imgBase: "/lumicity/img/cd-hero", mark: MARK["condition-desk"],
+  { key: "condition-desk", name: "Condition Desk", href: "/condition-desk", imgBase: "/ff/img/cards/condition-desk", mark: MARK["condition-desk"],
     acc: "var(--rust)", accD: "var(--rust)", accS: "var(--rust-soft)", accM: "var(--rust-line)",
     who: "For housebuilders and land promoters",
     what: "Send the decision notice. Get every planning condition in plain English, with the ones that block a start on site picked out and covering letters drafted.",
     price: "£400 per permission", mo: "£1,000 a month for five live sites", time: "Usually within a day", example: ["38", "conditions on a 150-home permission in Albrighton, 11 before work starts"] },
-  { key: "habitat-draft", name: "Habitat Draft", href: "/habitat-draft", imgBase: "/lumicity/img/hd-hero", mark: MARK["habitat-draft"],
+  { key: "habitat-draft", name: "Habitat Draft", href: "/habitat-draft", imgBase: "/ff/img/cards/habitat-draft", mark: MARK["habitat-draft"],
     acc: "var(--moss)", accD: "var(--moss)", accS: "var(--moss-soft)", accM: "var(--moss)",
     who: "For ecology consultancies",
     what: "A two-page desk study before the walkover: protected sites within 600 m, a first habitat map, tree and hedge heights, and the parcels to check. Your ecologist signs everything.",
     price: "£150 per desk study", mo: "£1,000 a month for eight", time: "Usually within a day", example: ["15", "parcels mapped in Romsey, 5 to check"] },
-  { key: "bid-check", name: "Bid Check", href: "/bid-check", imgBase: "/lumicity/img/bc-hero", mark: MARK["bid-check"],
+  { key: "bid-check", name: "Bid Check", href: "/bid-check", imgBase: "/ff/img/cards/bid-check", mark: MARK["bid-check"],
     acc: "var(--rust)", accD: "var(--rust)", accS: "var(--rust-soft)", accM: "var(--rust-line)",
     who: "For firms that bid for public contracts",
     what: "Send the tender pack. Get a bid at a glance: every pass-or-fail condition, every document to submit, how bids are scored and the key dates, each quoted from the tender.",
@@ -66,7 +66,7 @@ export const CSS_HOME = `
 .svcs{display:grid;gap:22px}
 .svc{display:flex;flex-direction:column;background:var(--card);border:1px solid var(--line);border-radius:24px;overflow:hidden;text-decoration:none;color:var(--ink);box-shadow:var(--shadow);transition:transform var(--t-quick) var(--ease-std),box-shadow var(--t-quick) var(--ease-std)}
 .svc:hover{transform:translateY(-3px);box-shadow:0 26px 50px -24px rgba(15,23,41,.4)}.svc:focus-visible{outline:3px solid var(--sa);outline-offset:3px}
-.svc .im{position:relative}.svc .im picture{display:block;width:100%}.svc .im img{width:100%;aspect-ratio:16/9;object-fit:cover;display:block}
+.svc .im{position:relative}.svc .im picture{display:block;width:100%}.svc .im img{width:100%;aspect-ratio:16/9;object-fit:cover;object-position:top center;display:block}
 .svc .tag{position:absolute;left:14px;top:14px;background:var(--card);border-radius:999px;padding:6px 12px 6px 6px;display:inline-flex;align-items:center;gap:8px;font-size:13px;font-weight:700;color:var(--ink);box-shadow:0 6px 16px rgba(15,23,41,.2)}
 .svc .tag span{width:26px;height:26px;border-radius:50%;background:var(--sa);color:var(--on-rust);display:flex;align-items:center;justify-content:center}.svc .tag svg{width:16px;height:16px}
 .svc .bd{padding:22px 22px 24px;display:flex;flex-direction:column;flex:1}
@@ -78,10 +78,15 @@ export const CSS_HOME = `
 .svc .ft{display:flex;flex-direction:column;align-items:stretch;gap:14px;margin-top:auto;padding-top:18px}
 .svc .pr{font-weight:800;font-size:18px;color:var(--ink)}.svc .pr small{display:block;font-weight:600;color:var(--muted);font-size:13px}.svc .pr small.mo{font-size:14px;line-height:1.4;color:var(--ink-2);margin-top:4px}
 .svc .go{display:flex;justify-content:center;align-items:center;gap:8px;font-weight:700;color:var(--on-rust);background:var(--sd);border-radius:999px;padding:12px 18px;font-size:15.5px;min-height:46px}.svc:hover .go{background:var(--ink);color:var(--paper)}
-.hsteps{display:grid;gap:18px;counter-reset:st}
+.hsteps{display:grid;gap:18px;counter-reset:st;position:relative}
+.hsteps-rail{display:none;background:var(--line);border-radius:2px;overflow:hidden}
+.hsteps-fill{display:block;width:100%;height:100%;background:var(--rust);transform-origin:left center;transform:scaleX(1)}
 .hstep{background:var(--card);border:1px solid var(--line);border-radius:20px;padding:22px}
 .hstep:before{counter-increment:st;content:counter(st);display:flex;width:34px;height:34px;border-radius:50%;background:var(--ink);color:var(--paper);font-weight:700;align-items:center;justify-content:center;font-family:var(--serif)}
 .hstep h3{margin-top:12px;font-size:20px}.hstep p{color:var(--ink-2);margin-top:6px;font-size:16px}
+@keyframes hsettle{from{opacity:.45;transform:translateY(8px)}to{opacity:1;transform:none}}
+@keyframes hfill-x{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+@keyframes hfill-y{from{transform:scaleY(0)}to{transform:scaleY(1)}}
 .who-band{display:grid;gap:26px;align-items:center;background:var(--band);color:var(--band-ink);border-radius:28px;padding:28px;overflow:hidden}
 .who-band picture{display:block;width:100%;max-width:260px}.who-band img{width:100%;max-width:260px;aspect-ratio:1;object-fit:cover;border-radius:22px;display:block}
 .who-band h2{color:var(--band-ink)}.who-band p{color:var(--band-muted);margin-top:12px;font-size:16px;line-height:1.6;max-width:60ch}
@@ -130,6 +135,7 @@ export const CSS_HOME = `
 
 @media(min-width:760px){.mnav{display:none}.home .nav .btn-primary{display:inline-flex}.hh{padding:60px 0 64px}.hh .grid{grid-template-columns:minmax(0,1.02fr) minmax(0,1fr);gap:56px}.hh h1{font-size:clamp(40px,4.4vw,64px);max-width:13ch}.hh .pic{align-self:stretch}.hh .pic img{aspect-ratio:auto;height:500px}.proof{position:absolute;left:-44px;bottom:-36px;width:250px;margin:0}
 .svcs{grid-template-columns:1fr 1fr}.hsteps{grid-template-columns:repeat(3,1fr)}
+.hsteps-rail{display:block;grid-column:1/-1;height:3px;order:-1}
 .who-band{grid-template-columns:260px 1fr;padding:40px;gap:44px}.who-band ul{grid-template-columns:repeat(4,1fr)}.hfoot .cols{grid-template-columns:2fr 1fr 1fr 1fr}}
 #faq .wrap{max-width:768px;margin:0 auto}
 @media(max-width:759px){
@@ -147,6 +153,22 @@ export const CSS_HOME = `
   .hh .eyebrow{font-size:12px;white-space:normal;flex-wrap:wrap}
   .who-band{padding:48px 20px}.who-band picture,.who-band img{max-width:160px;aspect-ratio:1;border-radius:18px;margin-bottom:4px}.hh .pic img{aspect-ratio:16/10;height:auto;border-radius:20px}
   .cta-photo .svc-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}.cta-photo .svc-row a{width:100%;justify-content:center}
+}
+@media(max-width:759px){
+  .hsteps{padding-left:22px}
+  .hsteps-rail{display:block;position:absolute;left:8px;top:16px;bottom:16px;width:3px;height:auto}
+  .hsteps-fill{transform-origin:center top;transform:scaleY(1)}
+}
+@supports (animation-timeline: view()) {
+  @media (prefers-reduced-motion: no-preference) {
+    .hsteps-fill{transform:scaleX(0);animation:hfill-x linear both;animation-timeline:view();animation-range:entry 0% cover 70%}
+    .hstep{animation:hsettle var(--t-quick) var(--ease-out) both;animation-timeline:view();animation-range:entry 0% entry 35%}
+    .hstep:nth-child(3){animation-range:entry 8% entry 43%}
+    .hstep:nth-child(4){animation-range:entry 16% entry 51%}
+  }
+  @media (prefers-reduced-motion: no-preference) and (max-width:759px) {
+    .hsteps-fill{transform:scaleY(0);animation-name:hfill-y;transform-origin:center top}
+  }
 }
 @media(prefers-reduced-motion:reduce){
   .svc,.svc:hover{transition:none;transform:none}
@@ -263,6 +285,7 @@ ${tristan}
 
 <section class="s alt" id="how"><div class="wrap"><div class="s-head"><p class="eyebrow">How it works</p><h2>Three steps, no calls</h2></div>
 <div class="hsteps">
+<div class="hsteps-rail" aria-hidden="true"><i class="hsteps-fill"></i></div>
 <div class="hstep"><h3>Send the documents</h3><p>A decision notice, a site boundary, a tender pack or a short hardware brief, through the service's form or by email.</p></div>
 <div class="hstep"><h3>The report is built</h3><p>Planning, ecology and tender reports are built from the public documents and data for your case. Design Dossiers are built from your brief, open engineering libraries and real component prices.</p></div>
 <div class="hstep"><h3>Back by email</h3><p>Most reports arrive within a day; Design Dossiers take a few days.</p></div>

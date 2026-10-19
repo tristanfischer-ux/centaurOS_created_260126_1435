@@ -37,4 +37,10 @@ Motion is a corporate 200 and 300 millisecond scale. Entrances ease out (cubic-b
 
 The homepage hero panel is one `seek(t)` function: a 0.6 second setup, a 2.6 second build, then a hold, in three scenes of six seconds. It pauses when the browser tab is hidden. When the visitor has asked for reduced motion, the panel shows a finished still of the current scene; the tabs still change the scene, with no running animation.
 
-Hover lifts on cards and buttons are 1 to 3 pixels. There is no looping decoration on the rest of the page.
+Hover lifts on cards and buttons are 1 to 3 pixels, over 200 ms, and do not move when the visitor has asked for reduced motion.
+
+"Three steps, no calls" uses native CSS scroll-driven animation (`animation-timeline: view()`): a progress line fills and each step settles as it enters. Unsupported browsers and reduced motion see the finished static state. Total settle time is 200 ms.
+
+Each service page has an explainer film with controls, a poster, default-on captions and `preload="metadata"`. Films do not autoplay. Short looping clips of the hero panel are share assets only; they are not embedded on the pages.
+
+There is no looping decoration on the rest of the page.
